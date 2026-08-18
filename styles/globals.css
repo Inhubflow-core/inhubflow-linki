@@ -1,0 +1,206 @@
+@import "./tailadmin.css";
+@import "tailwindcss";
+
+@plugin "daisyui" {
+  themes: light --default, dark;
+}
+
+@plugin "daisyui/theme" {
+  name: "light";
+  default: true;
+  color-scheme: light;
+  --color-base-100: #f9fafb;
+  --color-base-200: #ffffff;
+  --color-base-300: #e4e7ec;
+  --color-base-content: #101828;
+  --color-primary: #465fff;
+  --color-primary-content: #ffffff;
+  --color-neutral: #f2f4f7;
+  --color-neutral-content: #101828;
+  --color-info: #0ba5ec;
+  --color-success: #12b76a;
+  --color-warning: #f79009;
+  --color-error: #f04438;
+}
+
+@plugin "daisyui/theme" {
+  name: "dark";
+  color-scheme: dark;
+  --color-base-100: #0c111d;
+  --color-base-200: #101828;
+  --color-base-300: #1d2939;
+  --color-base-content: #fcfcfd;
+  --color-primary: #465fff;
+  --color-primary-content: #ffffff;
+  --color-neutral: #1a2231;
+  --color-neutral-content: #fcfcfd;
+  --color-info: #0ba5ec;
+  --color-success: #12b76a;
+  --color-warning: #f79009;
+  --color-error: #f04438;
+}
+
+:root,
+html[data-theme="light"],
+html:not(.dark) {
+  --color-base-100: #f9fafb;
+  --color-base-200: #ffffff;
+  --color-base-300: #e4e7ec;
+  --color-base-content: #101828;
+  --color-neutral: #f2f4f7;
+  --color-neutral-content: #101828;
+  --bg-app: #f9fafb;
+  --bg-card: #ffffff;
+  --border-color: #e4e7ec;
+  color-scheme: light;
+}
+
+html[data-theme="dark"],
+html.dark {
+  --color-base-100: #0c111d;
+  --color-base-200: #101828;
+  --color-base-300: #1d2939;
+  --color-base-content: #fcfcfd;
+  --color-neutral: #1a2231;
+  --color-neutral-content: #fcfcfd;
+  --bg-app: #0c111d;
+  --bg-card: #101828;
+  --border-color: #1d2939;
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-outfit), "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+html.dark body {
+  background: #0c111d;
+  color: #fcfcfd;
+  color-scheme: dark;
+}
+
+html:not(.dark) body {
+  background: #f9fafb;
+  color: #101828;
+  color-scheme: light;
+}
+
+/* ── Smooth Theme Transition Animations ── */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 350ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+::view-transition-old(root) {
+  animation-name: fade-out;
+}
+
+::view-transition-new(root) {
+  animation-name: fade-in;
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+html,
+body,
+header,
+aside,
+main,
+nav,
+div,
+section,
+button,
+select,
+input {
+  transition: background-color 300ms cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 300ms cubic-bezier(0.4, 0, 0.2, 1),
+              color 300ms cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1),
+              fill 300ms cubic-bezier(0.4, 0, 0.2, 1),
+              stroke 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(150, 150, 150, 0.2) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(150, 150, 150, 0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(150, 150, 150, 0.35);
+}
+
+::selection {
+  background: rgba(70, 95, 255, 0.25);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Product tour (driver.js) — styled to match TailAdmin */
+.linki-tour-popover.driver-popover {
+  background: #101828;
+  border: 1px solid #1d2939;
+  border-radius: 16px;
+  color: #fcfcfd;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  font-family: var(--font-outfit), sans-serif;
+}
+.linki-tour-popover .driver-popover-title {
+  color: #fcfcfd;
+  font-size: 15px;
+  font-weight: 600;
+}
+.linki-tour-popover .driver-popover-description {
+  color: #98a2b3;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.linki-tour-popover .driver-popover-progress-text {
+  color: #667085;
+  font-size: 11px;
+}
+.linki-tour-popover .driver-popover-footer button {
+  background: #1d2939;
+  color: #fcfcfd;
+  text-shadow: none;
+  border: 1px solid #344054;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 12px;
+}
+.linki-tour-popover .driver-popover-footer .driver-popover-next-btn {
+  background: #465fff;
+  border-color: #465fff;
+  color: #ffffff;
+}
