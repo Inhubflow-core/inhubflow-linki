@@ -116,30 +116,32 @@ export default function Sidebar({
       }`}
     >
       {/* Brand Header */}
-      <div className="flex h-16 shrink-0 items-center justify-between px-4 border-b border-gray-100 dark:border-gray-800">
-        <Link href="/" className="flex items-center gap-3 w-full">
+      <div className={`flex shrink-0 items-center border-b border-gray-100 dark:border-gray-800 transition-all duration-300 ${
+        isCollapsed ? "h-16 justify-center px-2" : "h-20 justify-start px-5"
+      }`}>
+        <Link href="/" className="flex items-center w-full">
           {isCollapsed ? (
-            <div className="relative flex h-9 w-9 mx-auto items-center justify-center rounded-xl bg-transparent">
+            <div className="relative flex h-10 w-10 mx-auto items-center justify-center rounded-xl bg-transparent">
               <Image
                 src="/logo-icon.png"
                 alt="InHubFlow"
-                width={36}
-                height={36}
-                className="h-9 w-9 object-contain"
+                width={38}
+                height={38}
+                className="h-10 w-10 object-contain"
                 priority
               />
             </div>
           ) : (
-            <div className="flex flex-col items-start justify-center py-1">
+            <div className="flex flex-col items-start justify-center w-full py-1">
               <Image
                 src={theme === "dark" ? "/logo-master-dark.png" : "/logo-master-light.png"}
                 alt="InHubFlow"
-                width={140}
-                height={34}
-                className="h-7 w-auto object-contain transition-all duration-200"
+                width={220}
+                height={55}
+                className="w-full max-w-[200px] h-auto object-contain transition-all duration-200"
                 priority
               />
-              <span className="text-[9px] font-bold text-brand-500 uppercase tracking-widest pl-0.5 mt-0.5">
+              <span className="text-[10px] font-extrabold text-brand-500 uppercase tracking-widest pl-1 mt-1">
                 OUTREACH B2B
               </span>
             </div>
