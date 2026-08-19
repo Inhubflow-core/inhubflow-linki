@@ -129,11 +129,21 @@ export default function LoginPage() {
           {/* Brand Header */}
           <div className="flex flex-col items-center gap-3 mb-6 text-center">
             <Image
-              src={theme === "dark" ? "/logo-master-dark.png" : "/logo-master-light.png"}
+              src="/logo-master-light.png?v=2"
               alt="InHubFlow Logo"
               width={220}
               height={60}
-              className="h-14 w-auto object-contain transition-all duration-300"
+              className="block dark:hidden h-14 w-auto object-contain transition-all duration-300"
+              unoptimized
+              priority
+            />
+            <Image
+              src="/logo-master-dark.png?v=2"
+              alt="InHubFlow Logo"
+              width={220}
+              height={60}
+              className="hidden dark:block h-14 w-auto object-contain transition-all duration-300"
+              unoptimized
               priority
             />
             <div>

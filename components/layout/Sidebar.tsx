@@ -123,22 +123,33 @@ export default function Sidebar({
           {isCollapsed ? (
             <div className="relative flex h-10 w-10 mx-auto items-center justify-center rounded-xl bg-transparent">
               <Image
-                src="/logo-icon.png"
+                src="/logo-icon.png?v=2"
                 alt="InHubFlow"
                 width={38}
                 height={38}
                 className="h-10 w-10 object-contain"
+                unoptimized
                 priority
               />
             </div>
           ) : (
             <div className="flex flex-col items-start justify-center w-full py-1">
               <Image
-                src={theme === "dark" ? "/logo-master-dark.png" : "/logo-master-light.png"}
+                src="/logo-master-light.png?v=2"
                 alt="InHubFlow"
                 width={220}
                 height={55}
-                className="w-full max-w-[200px] h-auto object-contain transition-all duration-200"
+                className="block dark:hidden w-full max-w-[200px] h-auto object-contain transition-all duration-200"
+                unoptimized
+                priority
+              />
+              <Image
+                src="/logo-master-dark.png?v=2"
+                alt="InHubFlow"
+                width={220}
+                height={55}
+                className="hidden dark:block w-full max-w-[200px] h-auto object-contain transition-all duration-200"
+                unoptimized
                 priority
               />
               <span className="text-[10px] font-extrabold text-brand-500 uppercase tracking-widest pl-1 mt-1">
