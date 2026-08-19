@@ -142,7 +142,7 @@ export default function Sidebar({
                 priority
               />
               <span className="text-[10px] font-extrabold text-brand-500 uppercase tracking-widest pl-1 mt-1">
-                OUTREACH B2B
+                B2B OUTREACH ENGINE
               </span>
             </div>
           )}
