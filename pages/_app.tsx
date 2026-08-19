@@ -7,6 +7,14 @@ import Layout from "@/components/layout/Layout";
 import { Toaster } from "sonner";
 import { LanguageProvider } from "@/lib/i18n/LanguageContext";
 import { ThemeProvider, useTheme } from "@/lib/context/ThemeContext";
+import { Inter } from "next/font/google";
+
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800"],
+  variable: "--font-inter",
+  display: "swap",
+});
 
 const PUBLIC_PATHS = ["/login"];
 
@@ -46,17 +54,18 @@ function AppWithToaster({ Component, pageProps }: { Component: any; pageProps: a
 
 export default function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
   return (
-    <SessionProvider session={session}>
-      <ThemeProvider>
-        <LanguageProvider>
-          <AuthGuard>
-            <Layout>
-              <AppWithToaster Component={Component} pageProps={pageProps} />
-            </Layout>
-          </AuthGuard>
-        </LanguageProvider>
-      </ThemeProvider>
-    </SessionProvider>
+    <div className={`${inter.className} ${inter.variable} min-h-screen font-sans`}>
+      <SessionProvider session={session}>
+        <ThemeProvider>
+          <LanguageProvider>
+            <AuthGuard>
+              <Layout>
+                <AppWithToaster Component={Component} pageProps={pageProps} />
+              </Layout>
+            </AuthGuard>
+          </LanguageProvider>
+        </ThemeProvider>
+      </SessionProvider>
+    </div>
   );
 }
-
