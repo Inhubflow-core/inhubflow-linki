@@ -22,6 +22,7 @@ import {
 } from "react-icons/ri";
 import { pathToTourPage, replayPageTour } from "@/lib/tour";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
+import { useTheme } from "@/lib/context/ThemeContext";
 
 const LEARNING_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLBf6xNJOmsIQ";
 
@@ -52,6 +53,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const router = useRouter();
   const { t, locale, setLocale, supportedLocales } = useTranslation();
+  const { theme } = useTheme();
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -115,24 +117,30 @@ export default function Sidebar({
     >
       {/* Brand Header */}
       <div className="flex h-16 shrink-0 items-center justify-between px-4 border-b border-gray-100 dark:border-gray-800">
-        <Link href="/" className="flex items-center gap-3">
-          <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-transparent">
-            <Image
-              src="/logo-icon.png"
-              alt="InHubFlow Logo"
-              width={36}
-              height={36}
-              className="h-9 w-9 rounded-xl object-contain"
-              priority
-            />
-          </div>
-          {!isCollapsed && (
-            <div className="flex flex-col">
-              <span className="font-bold text-sm text-gray-900 dark:text-white tracking-tight">
-                InHubFlow
-              </span>
-              <span className="text-[10px] font-semibold text-brand-500 uppercase tracking-wider">
-                Outreach B2B
+        <Link href="/" className="flex items-center gap-3 w-full">
+          {isCollapsed ? (
+            <div className="relative flex h-9 w-9 mx-auto items-center justify-center rounded-xl bg-transparent">
+              <Image
+                src="/logo-icon.png"
+                alt="InHubFlow"
+                width={36}
+                height={36}
+                className="h-9 w-9 object-contain"
+                priority
+              />
+            </div>
+          ) : (
+            <div className="flex flex-col items-start justify-center py-1">
+              <Image
+                src={theme === "dark" ? "/logo-master-dark.png" : "/logo-master-light.png"}
+                alt="InHubFlow"
+                width={140}
+                height={34}
+                className="h-7 w-auto object-contain transition-all duration-200"
+                priority
+              />
+              <span className="text-[9px] font-bold text-brand-500 uppercase tracking-widest pl-0.5 mt-0.5">
+                OUTREACH B2B
               </span>
             </div>
           )}
