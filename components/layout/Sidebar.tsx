@@ -135,20 +135,20 @@ export default function Sidebar({
           ) : (
             <div className="flex flex-col items-start justify-center w-full py-1">
               <Image
-                src="/logo-master-light.png?v=2"
+                src="/logo-master-light.png?v=3"
                 alt="InHubFlow"
-                width={220}
-                height={55}
-                className="block dark:hidden w-full max-w-[200px] h-auto object-contain transition-all duration-200"
+                width={200}
+                height={44}
+                className="block dark:hidden w-[200px] h-[44px] object-contain transition-all duration-200"
                 unoptimized
                 priority
               />
               <Image
-                src="/logo-master-dark.png?v=2"
+                src="/logo-master-dark.png?v=3"
                 alt="InHubFlow"
-                width={220}
-                height={55}
-                className="hidden dark:block w-full max-w-[200px] h-auto object-contain transition-all duration-200"
+                width={200}
+                height={44}
+                className="hidden dark:block w-[200px] h-[44px] object-contain transition-all duration-200"
                 unoptimized
                 priority
               />
