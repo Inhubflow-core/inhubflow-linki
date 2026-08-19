@@ -177,20 +177,20 @@ export default function Sidebar({
               href={item.href}
               data-tour={item.tour}
               title={isCollapsed ? label : undefined}
-              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-medium transition-all ${
+              className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all ${
                 active
-                  ? "bg-brand-500/10 text-brand-600 dark:text-brand-400 font-semibold shadow-sm"
+                  ? "bg-brand-500/10 text-brand-600 dark:text-brand-400 font-semibold shadow-xs"
                   : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
               } ${isCollapsed ? "justify-center px-0" : ""}`}
             >
               <div
                 className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
                   active
-                    ? "bg-brand-500 text-white shadow-sm"
+                    ? "bg-brand-500 text-white shadow-xs"
                     : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
                 }`}
               >
-                <item.icon size={15} />
+                <item.icon size={17} />
               </div>
               {!isCollapsed && <span className="truncate">{label}</span>}
               {!isCollapsed && active && (
@@ -220,14 +220,14 @@ export default function Sidebar({
         <Link
           href="/settings"
           title={isCollapsed ? t("nav.settings") : undefined}
-          className={`flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-medium transition-colors ${
+          className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
             isActive("/settings")
               ? "bg-brand-500/10 text-brand-600 dark:text-brand-400 font-semibold"
               : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
           } ${isCollapsed ? "justify-center px-0" : ""}`}
         >
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-            <RiUserSettingsLine size={15} />
+            <RiUserSettingsLine size={17} />
           </div>
           {!isCollapsed && <span>{t("nav.settings")}</span>}
         </Link>
@@ -237,12 +237,12 @@ export default function Sidebar({
           <button
             onClick={() => setHelpOpen((v) => !v)}
             title={isCollapsed ? t("nav.help") : undefined}
-            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white transition-colors ${
+            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white transition-colors ${
               isCollapsed ? "justify-center px-0" : ""
             }`}
           >
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-              <RiQuestionLine size={15} />
+              <RiQuestionLine size={17} />
             </div>
             {!isCollapsed && <span>{t("nav.help")}</span>}
           </button>
