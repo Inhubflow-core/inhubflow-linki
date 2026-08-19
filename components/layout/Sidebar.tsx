@@ -161,9 +161,9 @@ export default function Sidebar({
       </div>
 
       {/* Main Navigation */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5">
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
         {!isCollapsed && (
-          <p className="px-3 text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
+          <p className="px-3 text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1.5">
             Navegación
           </p>
         )}
@@ -177,20 +177,20 @@ export default function Sidebar({
               href={item.href}
               data-tour={item.tour}
               title={isCollapsed ? label : undefined}
-              className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-normal transition-all ${
+              className={`flex items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-normal transition-all ${
                 active
                   ? "bg-brand-500/10 text-brand-600 dark:text-brand-400 font-medium"
                   : "text-gray-600 hover:bg-gray-100/70 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
               } ${isCollapsed ? "justify-center px-0" : ""}`}
             >
               <div
-                className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
+                className={`flex h-6.5 w-6.5 items-center justify-center rounded-lg transition-colors ${
                   active
                     ? "bg-brand-500 text-white shadow-xs"
                     : "text-gray-500 dark:text-gray-400"
                 }`}
               >
-                <item.icon size={18} />
+                <item.icon size={17} />
               </div>
               {!isCollapsed && <span className="truncate">{label}</span>}
               {!isCollapsed && active && (
@@ -203,7 +203,7 @@ export default function Sidebar({
 
       {/* Update Banner */}
       {updateAvailable && !isCollapsed && (
-        <div className="mx-3 mb-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs flex items-center justify-between">
+        <div className="mx-3 mb-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs flex items-center justify-between">
           <div className="flex items-center gap-2">
             <RiArrowUpCircleLine size={16} />
             <span>v{latestVersion} disponible</span>
@@ -215,19 +215,19 @@ export default function Sidebar({
       )}
 
       {/* Footer Navigation */}
-      <div className="border-t border-gray-100 dark:border-gray-800 p-3 space-y-1">
+      <div className="border-t border-gray-100 dark:border-gray-800 p-3 space-y-0.5">
         {/* Settings link */}
         <Link
           href="/settings"
           title={isCollapsed ? t("nav.settings") : undefined}
-          className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-normal transition-colors ${
+          className={`flex items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-normal transition-colors ${
             isActive("/settings")
               ? "bg-brand-500/10 text-brand-600 dark:text-brand-400 font-medium"
               : "text-gray-600 hover:bg-gray-100/70 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
           } ${isCollapsed ? "justify-center px-0" : ""}`}
         >
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400">
-            <RiUserSettingsLine size={18} />
+          <div className="flex h-6.5 w-6.5 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400">
+            <RiUserSettingsLine size={17} />
           </div>
           {!isCollapsed && <span>{t("nav.settings")}</span>}
         </Link>
@@ -237,12 +237,12 @@ export default function Sidebar({
           <button
             onClick={() => setHelpOpen((v) => !v)}
             title={isCollapsed ? t("nav.help") : undefined}
-            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-normal text-gray-600 hover:bg-gray-100/70 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white transition-colors ${
+            className={`flex w-full items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-normal text-gray-600 hover:bg-gray-100/70 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white transition-colors ${
               isCollapsed ? "justify-center px-0" : ""
             }`}
           >
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400">
-              <RiQuestionLine size={18} />
+            <div className="flex h-6.5 w-6.5 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400">
+              <RiQuestionLine size={17} />
             </div>
             {!isCollapsed && <span>{t("nav.help")}</span>}
           </button>
