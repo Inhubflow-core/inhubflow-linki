@@ -163,7 +163,7 @@ export default function Sidebar({
       {/* Main Navigation */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5">
         {!isCollapsed && (
-          <p className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
+          <p className="px-3 text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
             Navegación
           </p>
         )}
@@ -177,17 +177,17 @@ export default function Sidebar({
               href={item.href}
               data-tour={item.tour}
               title={isCollapsed ? label : undefined}
-              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium transition-all ${
+              className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-normal transition-all ${
                 active
-                  ? "bg-brand-500/10 text-brand-600 dark:text-brand-400 font-semibold shadow-xs"
-                  : "text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
+                  ? "bg-brand-500/10 text-brand-600 dark:text-brand-400 font-medium"
+                  : "text-gray-600 hover:bg-gray-100/70 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
               } ${isCollapsed ? "justify-center px-0" : ""}`}
             >
               <div
-                className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
+                className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
                   active
                     ? "bg-brand-500 text-white shadow-xs"
-                    : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+                    : "text-gray-500 dark:text-gray-400"
                 }`}
               >
                 <item.icon size={18} />
@@ -220,13 +220,13 @@ export default function Sidebar({
         <Link
           href="/settings"
           title={isCollapsed ? t("nav.settings") : undefined}
-          className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium transition-colors ${
+          className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-normal transition-colors ${
             isActive("/settings")
-              ? "bg-brand-500/10 text-brand-600 dark:text-brand-400 font-semibold"
-              : "text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
+              ? "bg-brand-500/10 text-brand-600 dark:text-brand-400 font-medium"
+              : "text-gray-600 hover:bg-gray-100/70 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
           } ${isCollapsed ? "justify-center px-0" : ""}`}
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400">
             <RiUserSettingsLine size={18} />
           </div>
           {!isCollapsed && <span>{t("nav.settings")}</span>}
@@ -237,11 +237,11 @@ export default function Sidebar({
           <button
             onClick={() => setHelpOpen((v) => !v)}
             title={isCollapsed ? t("nav.help") : undefined}
-            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white transition-colors ${
+            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-normal text-gray-600 hover:bg-gray-100/70 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white transition-colors ${
               isCollapsed ? "justify-center px-0" : ""
             }`}
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400">
               <RiQuestionLine size={18} />
             </div>
             {!isCollapsed && <span>{t("nav.help")}</span>}

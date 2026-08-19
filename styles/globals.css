@@ -143,9 +143,10 @@ body {
   height: 100%;
   margin: 0;
   padding: 0;
-  font-size: 15px;
-  line-height: 1.5;
-  letter-spacing: 0.005em;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: 0em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -158,7 +159,7 @@ html.dark body {
 
 html:not(.dark) body {
   background: #f9fafb;
-  color: #344054;
+  color: #475467;
   color-scheme: light;
 }
 
