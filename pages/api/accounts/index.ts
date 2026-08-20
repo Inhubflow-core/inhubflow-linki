@@ -24,6 +24,20 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === "POST") {
     const { name, email, daily_connection_limit = 20, daily_message_limit = 50, daily_inmail_limit = 15 } = req.body;
     if (!name || !email) return res.status(400).json({ error: "name and email required" });
+
+    // Check slots limit
+    const { getInstanceSettings } = require("@/lib/auto-seed");
+    const { slotsLimit } = getInstanceSettings(db);
+    const countRow = db.prepare("SELECT COUNT(*) as count FROM accounts").get() as { count: number };
+
+    if (countRow && countRow.count >= slotsLimit) {
+      return res.status(403).json({
+        error: `Has alcanzado el límite de ${slotsLimit} slots/cuentas de tu suscripción actual.`,
+        slotsLimit,
+        currentCount: countRow.count,
+      });
+    }
+
     try {
       const id = randomUUID();
       db
