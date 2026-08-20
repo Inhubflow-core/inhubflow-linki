@@ -2875,7 +2875,7 @@ export default function WorkflowDetailPage({
   return (
     <>
     <Head>
-      <title>{workflowName} — Campaigns — Linki</title>
+      <title>{workflowName} — Campaigns — Dashboard B2B</title>
       <meta name="robots" content="noindex, nofollow" />
     </Head>
     <div>

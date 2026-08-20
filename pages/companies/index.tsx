@@ -104,7 +104,7 @@ export default function CompaniesPage({ initialCompanies }: { initialCompanies: 
   return (
     <>
       <Head>
-        <title>Companies — Linki</title>
+        <title>Companies — Dashboard B2B</title>
         <meta name="robots" content="noindex, nofollow" />
       </Head>
       <div>

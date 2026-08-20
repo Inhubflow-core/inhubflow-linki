@@ -209,7 +209,7 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
   return (
     <>
       <Head>
-        <title>Contacts — Linki</title>
+        <title>Contacts — Dashboard B2B</title>
         <meta name="robots" content="noindex, nofollow" />
       </Head>
       <div>

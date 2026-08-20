@@ -75,7 +75,7 @@ export default function CompanyDetailPage({ company }: { company: Company }) {
   return (
     <>
       <Head>
-        <title>{company.name} — Companies — Linki</title>
+        <title>{company.name} — Companies — Dashboard B2B</title>
         <meta name="robots" content="noindex, nofollow" />
       </Head>
       <div className="max-w-2xl">

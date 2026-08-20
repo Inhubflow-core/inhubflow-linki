@@ -177,7 +177,7 @@ export default function SettingsPage({
   return (
     <>
       <Head>
-        <title>Settings — Linki</title>
+        <title>Settings — Dashboard B2B</title>
         <meta name="robots" content="noindex, nofollow" />
       </Head>
 

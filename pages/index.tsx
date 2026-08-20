@@ -577,7 +577,7 @@ export default function Dashboard() {
   return (
     <>
     <Head>
-      <title>Dashboard — Linki</title>
+      <title>Dashboard B2B</title>
       <meta name="robots" content="noindex, nofollow" />
     </Head>
 

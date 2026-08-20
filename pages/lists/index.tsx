@@ -129,7 +129,7 @@ export default function ListsPage({ initialLists }: { initialLists: List[] }) {
   return (
     <>
     <Head>
-      <title>Lists — Linki</title>
+      <title>Lists — Dashboard B2B</title>
       <meta name="description" content="Lead lists imported from LinkedIn Sales Navigator." />
       <meta name="robots" content="noindex, nofollow" />
     </Head>
