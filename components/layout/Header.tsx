@@ -15,6 +15,7 @@ import {
   RiMessage3Line,
   RiSendPlaneLine,
 } from "react-icons/ri";
+import { SlotsIndicator } from "./SlotsIndicator";
 
 interface HeaderProps {
   onToggleSidebar?: () => void;
@@ -59,7 +60,7 @@ export default function Header({
 
   return (
     <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b border-gray-200 bg-white/80 px-4 backdrop-blur-md transition-colors dark:border-gray-800 dark:bg-gray-900/80 sm:px-6">
-      {/* Left: Sidebar Toggle & Title */}
+        {/* Left: Sidebar Toggle & Title */}
       <div className="flex items-center gap-3">
         {onToggleSidebar && (
           <button
@@ -77,6 +78,9 @@ export default function Header({
             <span>InHub Outreach</span>
           </div>
         </div>
+
+        {/* Live Slots Capacity Indicator */}
+        <SlotsIndicator />
       </div>
 
       {/* Right Controls */}
@@ -101,20 +105,20 @@ export default function Header({
 
               <div className="space-y-1">
                 <a
-                  href="http://localhost:3001"
+                  href="https://b2c.inhubflow.online"
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-3 rounded-xl p-2.5 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                  className="flex items-center gap-3 rounded-xl p-2.5 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 group"
                 >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
                     <RiMessage3Line size={18} />
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-gray-900 dark:text-white">
-                      InHub Omnichannel
+                      InHub Omnichannel B2C
                     </p>
                     <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                      WhatsApp, Instagram & Live Chat
+                      WhatsApp, Instagram & Chatwoot (4 Agentes)
                     </p>
                   </div>
                 </a>
@@ -126,14 +130,14 @@ export default function Header({
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="text-xs font-semibold text-brand-600 dark:text-brand-400">
-                        InHub Outreach
+                        InHub Outreach B2B
                       </p>
                       <span className="text-[10px] font-bold px-1.5 py-0.2 bg-brand-500 text-white rounded">
                         Activo
                       </span>
                     </div>
                     <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                      LinkedIn & Cold Email B2B
+                      LinkedIn & Cold Email (4 Slots)
                     </p>
                   </div>
                 </div>

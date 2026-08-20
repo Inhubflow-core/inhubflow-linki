@@ -371,14 +371,42 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-base-content/50">LinkedIn accounts used for browser automation</p>
-        <button
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
-          onClick={openCreate}
-        >
-          <RiAddLine size={14} /> Add Account
-        </button>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 p-4 rounded-2xl bg-brand-500/5 border border-brand-500/15 dark:bg-brand-500/10">
+        <div>
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-sm text-gray-900 dark:text-white">Cuentas de LinkedIn (Slots B2B)</h3>
+            <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full ${
+              accounts.length >= 4 
+                ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300' 
+                : 'bg-brand-500/10 text-brand-600 dark:text-brand-400'
+            }`}>
+              {accounts.length} / 4 Slots Utilizados
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            {accounts.length >= 4 
+              ? 'Has alcanzado la capacidad máxima de 4 cuentas para este espacio de trabajo.' 
+              : `Puedes conectar hasta ${4 - accounts.length} cuenta(s) más para automatizar prospección en LinkedIn.`}
+          </p>
+        </div>
+
+        {accounts.length < 4 ? (
+          <button
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-brand-500 text-white hover:bg-brand-600 transition-colors shadow-sm cursor-pointer shrink-0"
+            onClick={openCreate}
+          >
+            <RiAddLine size={15} /> Conectar Nueva Cuenta
+          </button>
+        ) : (
+          <a
+            href="https://inhubflow.online#pricing"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-colors shadow-sm shrink-0"
+          >
+            <span>Mejorar Plan</span>
+          </a>
+        )}
       </div>
 
       {accounts.length === 0 ? (
