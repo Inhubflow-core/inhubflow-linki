@@ -325,25 +325,47 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (!form.name || !form.email) {
+      toast.error("Por favor ingresa un nombre y un correo electrónico");
+      return;
+    }
     setLoading(true);
-    const res = editingAccount
-      ? await fetch(`/api/accounts/${editingAccount.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
-        })
-      : await fetch("/api/accounts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
-        });
-    setLoading(false);
-    if (!res.ok) { toast.error((await res.json()).error ?? "Failed"); return; }
-    toast.success(editingAccount ? "Account updated" : "Account created");
-    setShowModal(false);
-    setEditingAccount(null);
-    setForm(BLANK_LI_FORM);
-    refresh();
+    try {
+      const res = editingAccount
+        ? await fetch(`/api/accounts/${editingAccount.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(form),
+          })
+        : await fetch("/api/accounts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(form),
+          });
+      
+      const data = await res.json();
+      setLoading(false);
+      
+      if (!res.ok) {
+        toast.error(data.error ?? "No se pudo guardar la cuenta");
+        return;
+      }
+
+      toast.success(editingAccount ? "Cuenta actualizada con éxito" : "Cuenta creada con éxito");
+      setShowModal(false);
+      const isNew = !editingAccount;
+      setEditingAccount(null);
+      setForm(BLANK_LI_FORM);
+      await refresh();
+
+      // Automatically open Auth Modal for the newly created account!
+      if (isNew && data && data.id) {
+        openAuthModal(data);
+      }
+    } catch (err: any) {
+      setLoading(false);
+      toast.error(err?.message || "Error al comunicarse con el servidor");
+    }
   }
 
   async function deleteAccount(id: string) {
