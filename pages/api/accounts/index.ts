@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getDb } from "@/lib/db";
 import { randomUUID } from "crypto";
+import { getInstanceSettings } from "@/lib/auto-seed";
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const db = getDb();
@@ -26,16 +27,19 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     if (!name || !email) return res.status(400).json({ error: "name and email required" });
 
     // Check slots limit
-    const { getInstanceSettings } = require("@/lib/auto-seed");
-    const { slotsLimit } = getInstanceSettings(db);
-    const countRow = db.prepare("SELECT COUNT(*) as count FROM accounts").get() as { count: number };
+    try {
+      const { slotsLimit } = getInstanceSettings(db);
+      const countRow = db.prepare("SELECT COUNT(*) as count FROM accounts").get() as { count: number };
 
-    if (countRow && countRow.count >= slotsLimit) {
-      return res.status(403).json({
-        error: `Has alcanzado el límite de ${slotsLimit} slots/cuentas de tu suscripción actual.`,
-        slotsLimit,
-        currentCount: countRow.count,
-      });
+      if (countRow && countRow.count >= slotsLimit) {
+        return res.status(403).json({
+          error: `Has alcanzado el límite de ${slotsLimit} slots/cuentas de tu suscripción actual.`,
+          slotsLimit,
+          currentCount: countRow.count,
+        });
+      }
+    } catch (e) {
+      console.log("Slot check notice:", e);
     }
 
     try {
