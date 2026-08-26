@@ -21,12 +21,16 @@ export async function sendConnectionRequest(page: Page, linkedinUrl: string): Pr
   const isExplicit1st = (/\b1[ºªster°\.]/i.test(mainText) || /•\s*1º/i.test(mainText)) && !isExplicit2ndOr3rd;
   if (isExplicit1st) throw new AlreadyConnectedError("Already connected (1st degree)");
 
-  // Check if invitation is already pending
-  const isPendingText = /Pending|Pendente|Pendiente|Aguardando|En attente/i.test(mainText);
-  const pendingBtn = page.locator(
-    'main button[aria-label*="Pending"]:visible, main button[aria-label*="Pendente"]:visible, main button[aria-label*="Pendiente"]:visible, main button[aria-label*="Aguardando"]:visible, main button:has-text("Pendente"):visible, main button:has-text("Pending"):visible, main button:has-text("Pendiente"):visible'
-  );
-  if (isPendingText || (await pendingBtn.count()) > 0) {
+  // Check if invitation is already pending (strictly check actual button/badge, never loose page text)
+  const pendingBtn = page.locator(`
+    main button.artdeco-button:has-text("Pendente"):visible,
+    main button.artdeco-button:has-text("Pending"):visible,
+    main button.artdeco-button:has-text("Pendiente"):visible,
+    main button[aria-label*="Convite pendente"]:visible,
+    main button[aria-label*="Invitation pending"]:visible,
+    main button[aria-label*="Invitación pendiente"]:visible
+  `).first();
+  if ((await pendingBtn.count()) > 0) {
     throw new PendingInviteError("Invitation already pending");
   }
 
