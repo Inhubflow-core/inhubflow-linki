@@ -1,10 +1,11 @@
 import Head from "next/head";
+import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import { GetServerSideProps } from "next";
 import { useRouter } from "next/router";
 import { getDb } from "@/lib/db";
 import { toast } from "sonner";
-import { RiAddLine, RiDeleteBinLine, RiCloseLine, RiCalendarLine } from "react-icons/ri";
+import { RiAddLine, RiDeleteBinLine, RiCloseLine, RiCalendarLine, RiUserSearchLine } from "react-icons/ri";
 
 interface List {
   id: string;
@@ -139,9 +140,17 @@ export default function ListsPage({ initialLists }: { initialLists: List[] }) {
           <h1 className="text-xl font-semibold">Lists</h1>
           <p className="text-base-content/50 text-sm mt-0.5">Lead lists imported from Sales Navigator</p>
         </div>
-        <button data-tour="lists-new" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors" onClick={() => setShowModal(true)}>
-          <RiAddLine size={15} /> New List
-        </button>
+        <div className="flex items-center gap-2.5">
+          <Link
+            href="/lead-finder"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-rose-500 hover:bg-rose-600 text-white shadow-sm transition-all"
+          >
+            <RiUserSearchLine size={15} /> 🎯 Captar Leads
+          </Link>
+          <button data-tour="lists-new" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors" onClick={() => setShowModal(true)}>
+            <RiAddLine size={15} /> New List
+          </button>
+        </div>
       </div>
 
       {/* Import jobs panel */}
