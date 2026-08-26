@@ -1,11 +1,11 @@
 import Head from "next/head";
 import Link from "next/link";
-import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 import { GetServerSideProps } from "next";
 import { useRouter } from "next/router";
 import { getDb } from "@/lib/db";
 import { toast } from "sonner";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 import {
   RiUserSearchLine,
   RiSearchLine,
@@ -75,6 +75,7 @@ const SAMPLE_LOCATIONS = [
 
 export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinderProps) {
   const router = useRouter();
+  const { t, locale } = useTranslation();
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts);
   const authenticatedAccounts = accounts.filter((a) => a.is_authenticated === 1);
 
@@ -110,14 +111,15 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
   useEffect(() => {
     if (!customListName) {
       const parts = [title.trim(), location.trim()].filter(Boolean);
-      const dateStr = new Date().toLocaleDateString("es-ES", { month: "short", year: "numeric" });
+      const dateLocale = locale === "en" ? "en-US" : locale === "pt-BR" ? "pt-BR" : "es-ES";
+      const dateStr = new Date().toLocaleDateString(dateLocale, { month: "short", year: "numeric" });
       if (parts.length > 0) {
         setListName(`${parts.join(" - ")} (${dateStr})`);
       } else {
-        setListName(`Prospectos LinkedIn (${dateStr})`);
+        setListName(t("leadFinder.defaultListName", { date: dateStr }));
       }
     }
-  }, [title, location, customListName]);
+  }, [title, location, customListName, locale, t]);
 
   // Keep accounts updated if user authenticated elsewhere
   useEffect(() => {
@@ -139,18 +141,18 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
     e.preventDefault();
 
     if (!selectedAccountId) {
-      toast.error("Por favor selecciona una cuenta de LinkedIn conectada.");
+      toast.error(t("leadFinder.toastSelectAccount"));
       return;
     }
 
     const selectedAcc = accounts.find((a) => a.id === selectedAccountId);
     if (!selectedAcc?.is_authenticated) {
-      toast.error("La cuenta seleccionada no está autenticada. Ve a Ajustes para iniciar sesión en LinkedIn.");
+      toast.error(t("leadFinder.toastAuthAccount"));
       return;
     }
 
     if (!title.trim() && !location.trim() && !company.trim()) {
-      toast.error("Por favor ingresa al menos un Cargo o Ubicación para buscar.");
+      toast.error(t("leadFinder.toastFillFields"));
       return;
     }
 
@@ -158,7 +160,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
     setLeads([]);
     setCompletedResult(null);
     setProgressPercent(5);
-    setProgressMessage("Conectando con el navegador seguro de LinkedIn...");
+    setProgressMessage(t("leadFinder.scanningRealtime"));
     setCurrentPage(1);
     setTotalPages(Math.ceil(limit / 10));
 
@@ -226,7 +228,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
             const parsedData = JSON.parse(dataStr);
 
             if (eventName === "init") {
-              setProgressMessage(parsedData.message || "Buscando perfiles...");
+              setProgressMessage(parsedData.message || t("leadFinder.scanningRealtime"));
             } else if (eventName === "progress") {
               if (parsedData.message) setProgressMessage(parsedData.message);
               if (parsedData.page) setCurrentPage(parsedData.page);
@@ -247,14 +249,14 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                 return [...prev, newLead];
               });
             } else if (eventName === "saving") {
-              setProgressMessage(parsedData.message || "Guardando en lista...");
+              setProgressMessage(parsedData.message || "Guardando...");
               setProgressPercent(95);
             } else if (eventName === "complete") {
               setProgressPercent(100);
               const foundCount = parsedData.totalFound || leads.length;
               setProgressMessage(
                 parsedData.message ||
-                  (foundCount > 0 ? "¡Búsqueda y guardado completados!" : "No se encontraron resultados para esta búsqueda.")
+                  (foundCount > 0 ? t("leadFinder.extractionFinished") : t("leadFinder.noResultsTitle"))
               );
               setCompletedResult({
                 listId: parsedData.listId,
@@ -265,12 +267,10 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
               });
               if (foundCount > 0) {
                 toast.success(
-                  `¡Lista "${parsedData.listName}" creada con éxito con ${foundCount} prospectos!`
+                  t("leadFinder.toastSuccess", { name: parsedData.listName, count: String(foundCount) })
                 );
               } else {
-                toast.info(
-                  "No se encontraron perfiles con estos filtros. Prueba simplificar la búsqueda."
-                );
+                toast.info(t("leadFinder.toastNoResults"));
               }
             } else if (eventName === "error") {
               throw new Error(parsedData.error || "Ocurrió un error en la búsqueda de LinkedIn.");
@@ -283,7 +283,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") {
-        toast.info("Búsqueda cancelada por el usuario.");
+        toast.info(t("leadFinder.toastCancelled"));
       } else {
         const msg = err instanceof Error ? err.message : "Error inesperado al buscar en LinkedIn.";
         toast.error(msg);
@@ -306,10 +306,10 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
   return (
     <>
       <Head>
-        <title>Lead Finder — Captador de Prospectos de LinkedIn | InHubFlow</title>
+        <title>{t("leadFinder.title")} — InHubFlow</title>
         <meta
           name="description"
-          content="Busca y extrae prospectos de LinkedIn directamente por Cargo, Ciudad y País y crea listas automáticas sin Sales Navigator."
+          content={t("leadFinder.subtitle")}
         />
       </Head>
 
@@ -319,14 +319,14 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
           <div className="space-y-1">
             <div className="flex items-center gap-2.5">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500 text-white shadow-xs">
-                <RiSparklingLine size={13} /> NATIVO
+                <RiSparklingLine size={13} /> {t("leadFinder.native")}
               </span>
               <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                Lead Finder en LinkedIn
+                {t("leadFinder.title")}
               </h1>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Busca perfiles por Cargo, Ciudad y País y guárdalos automáticamente en una Lista de Linki sin suscripciones externas de pago.
+              {t("leadFinder.subtitle")}
             </p>
           </div>
 
@@ -335,13 +335,13 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
               href="/lists"
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
             >
-              <RiFileList3Line size={16} /> Ver Mis Listas
+              <RiFileList3Line size={16} /> {t("leadFinder.viewLists")}
             </Link>
             <Link
               href="/settings"
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
             >
-              <RiSettings4Line size={16} /> Cuentas
+              <RiSettings4Line size={16} /> {t("leadFinder.accounts")}
             </Link>
           </div>
         </div>
@@ -351,16 +351,16 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
           <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-300">
             <RiAlertLine size={20} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
             <div className="flex-1 text-sm space-y-1">
-              <p className="font-semibold">No tienes ninguna cuenta de LinkedIn autenticada.</p>
+              <p className="font-semibold">{t("leadFinder.noAuthTitle")}</p>
               <p className="text-xs text-amber-700 dark:text-amber-400">
-                Para buscar perfiles en LinkedIn en vivo necesitas conectar e iniciar sesión con al menos una cuenta en la sección de Ajustes.
+                {t("leadFinder.noAuthDesc")}
               </p>
             </div>
             <Link
               href="/settings"
               className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white transition-all shrink-0"
             >
-              Conectar Cuenta
+              {t("leadFinder.connectAccount")}
             </Link>
           </div>
         )}
@@ -371,16 +371,16 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
           <div className="lg:col-span-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 md:p-6 shadow-theme-xs space-y-5">
             <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
               <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                <RiSearchLine className="text-brand-500" /> Criterios de Prospección
+                <RiSearchLine className="text-brand-500" /> {t("leadFinder.searchCriteria")}
               </h2>
-              <span className="text-xs text-gray-400 dark:text-gray-500">Paso 1 de 2</span>
+              <span className="text-xs text-gray-400 dark:text-gray-500">{t("leadFinder.stepIndicator")}</span>
             </div>
 
             <form onSubmit={handleStartSearch} className="space-y-4">
               {/* Account Selector */}
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                  👤 Cuenta de LinkedIn
+                  👤 {t("leadFinder.accountLabel")}
                 </label>
                 <div className="relative">
                   <select
@@ -389,10 +389,10 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     disabled={isSearching}
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm font-medium text-gray-900 transition-all focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                   >
-                    {accounts.length === 0 && <option value="">No hay cuentas registradas</option>}
+                    {accounts.length === 0 && <option value="">{t("leadFinder.noAccounts")}</option>}
                     {accounts.map((acc) => (
                       <option key={acc.id} value={acc.id}>
-                        {acc.name} ({acc.email}) — {acc.is_authenticated ? "🟢 Conectada" : "🔴 Desconectada"}
+                        {acc.name} ({acc.email}) — {acc.is_authenticated ? `🟢 ${t("leadFinder.connected")}` : `🔴 ${t("leadFinder.disconnected")}`}
                       </option>
                     ))}
                   </select>
@@ -401,11 +401,11 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                   <div className="mt-1.5 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                     {accounts.find((a) => a.id === selectedAccountId)?.is_authenticated ? (
                       <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                        <RiShieldCheckLine size={14} /> Sesión activa y segura con Playwright Stealth
+                        <RiShieldCheckLine size={14} /> {t("leadFinder.sessionActive")}
                       </span>
                     ) : (
                       <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                        <RiAlertLine size={14} /> Requiere iniciar sesión en Ajustes
+                        <RiAlertLine size={14} /> {t("leadFinder.sessionRequired")}
                       </span>
                     )}
                   </div>
@@ -415,7 +415,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
               {/* Title / Cargo */}
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                  👔 Cargo / Título Profesional <span className="text-brand-500">*</span>
+                  👔 {t("leadFinder.jobTitleLabel")} <span className="text-brand-500">*</span>
                 </label>
                 <div className="relative">
                   <RiBriefcaseLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
@@ -424,7 +424,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     disabled={isSearching}
-                    placeholder="ej: CEO, Director de Marketing, Dentista, Abogado..."
+                    placeholder={t("leadFinder.jobTitlePlaceholder")}
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                   />
                 </div>
@@ -447,7 +447,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
               {/* Location */}
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                  🏙️ Ubicación (Ciudad, País) <span className="text-brand-500">*</span>
+                  🏙️ {t("leadFinder.locationLabel")} <span className="text-brand-500">*</span>
                 </label>
                 <div className="relative">
                   <RiMapPinLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
@@ -456,7 +456,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                     disabled={isSearching}
-                    placeholder="ej: Madrid, España | São Paulo, Brasil | Bogotá..."
+                    placeholder={t("leadFinder.locationPlaceholder")}
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                   />
                 </div>
@@ -479,7 +479,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
               {/* Company / Industry (Optional) */}
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                  🏢 Empresa o Industria <span className="text-gray-400 font-normal">(Opcional)</span>
+                  🏢 {t("leadFinder.companyLabel")} <span className="text-gray-400 font-normal">{t("leadFinder.optional")}</span>
                 </label>
                 <div className="relative">
                   <RiBuildingLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
@@ -488,7 +488,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     value={company}
                     onChange={(e) => setCompany(e.target.value)}
                     disabled={isSearching}
-                    placeholder="ej: Salud, SaaS, Inmobiliaria, Google..."
+                    placeholder={t("leadFinder.companyPlaceholder")}
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                   />
                 </div>
@@ -497,7 +497,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
               {/* Quantity Limit */}
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                  🔢 Cantidad de Prospectos a Extraer
+                  🔢 {t("leadFinder.quantityLabel")}
                 </label>
                 <div className="grid grid-cols-4 gap-2">
                   {[10, 25, 50, 100].map((val) => (
@@ -512,7 +512,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                           : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-750"
                       }`}
                     >
-                      {val} leads
+                      {t("leadFinder.leadsCount", { count: String(val) })}
                     </button>
                   ))}
                 </div>
@@ -521,7 +521,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
               {/* Target List Name */}
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                  📋 Nombre de la Lista a Crear
+                  📋 {t("leadFinder.listNameLabel")}
                 </label>
                 <div className="relative">
                   <RiFileList3Line className="absolute left-3.5 top-3 text-gray-400" size={16} />
@@ -533,7 +533,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                       setCustomListName(true);
                     }}
                     disabled={isSearching}
-                    placeholder="ej: CEOs Madrid - Agosto 2026"
+                    placeholder={t("leadFinder.listNamePlaceholder")}
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                   />
                 </div>
@@ -547,7 +547,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     disabled={!hasAuthAccount}
                     className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 shadow-md shadow-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform active:scale-[0.99]"
                   >
-                    <RiFlashlightLine size={18} /> Buscar Perfiles y Crear Lista
+                    <RiFlashlightLine size={18} /> {t("leadFinder.searchButton")}
                   </button>
                 ) : (
                   <div className="flex items-center gap-2">
@@ -556,14 +556,15 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                       disabled
                       className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold text-white bg-brand-600 opacity-90 cursor-wait shadow-sm"
                     >
-                      <RiRefreshLine className="animate-spin" size={18} /> Captando Leads ({leads.length}/{limit})...
+                      <RiRefreshLine className="animate-spin" size={18} />{" "}
+                      {t("leadFinder.capturingButton", { current: String(leads.length), total: String(limit) })}
                     </button>
                     <button
                       type="button"
                       onClick={handleCancelSearch}
                       className="py-3 px-4 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                     >
-                      Detener
+                      {t("leadFinder.stopButton")}
                     </button>
                   </div>
                 )}
@@ -590,10 +591,10 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     </div>
                     <div>
                       <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                        {isSearching ? "Escaneando LinkedIn en tiempo real" : "Extracción Finalizada"}
+                        {isSearching ? t("leadFinder.scanningRealtime") : t("leadFinder.extractionFinished")}
                       </h3>
                       <p className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-sm md:max-w-md">
-                        {progressMessage || "Procesando búsqueda..."}
+                        {progressMessage || t("leadFinder.scanningRealtime")}
                       </p>
                     </div>
                   </div>
@@ -603,7 +604,9 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                       {leads.length} / {limit} leads
                     </span>
                     <p className="text-[11px] text-gray-400">
-                      {isSearching ? `Página ${currentPage} de ~${totalPages}` : "100% Completado"}
+                      {isSearching
+                        ? t("leadFinder.pageIndicator", { page: String(currentPage), total: String(totalPages) })
+                        : t("leadFinder.completedPercent")}
                     </p>
                   </div>
                 </div>
@@ -627,10 +630,10 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                       </div>
                       <div>
                         <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
-                          Lista &quot;{completedResult.listName}&quot; lista para prospección
+                          {t("leadFinder.listReady", { name: completedResult.listName })}
                         </p>
                         <p className="text-[11px] text-emerald-700 dark:text-emerald-400">
-                          {completedResult.totalFound} contactos guardados en SQLite
+                          {t("leadFinder.savedContacts", { count: String(completedResult.totalFound) })}
                         </p>
                       </div>
                     </div>
@@ -639,7 +642,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                       href={`/lists/${completedResult.listId}`}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shrink-0 shadow-xs"
                     >
-                      Abrir Lista <RiArrowRightLine size={14} />
+                      {t("leadFinder.openList")} <RiArrowRightLine size={14} />
                     </Link>
                   </div>
                 )}
@@ -648,9 +651,9 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                   <div className="mt-3 p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 flex items-start gap-2.5">
                     <RiAlertLine size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                     <div className="text-xs space-y-1 text-amber-800 dark:text-amber-300">
-                      <p className="font-semibold">No se encontraron perfiles con estos criterios específicos.</p>
+                      <p className="font-semibold">{t("leadFinder.noResultsTitle")}</p>
                       <p className="text-amber-700 dark:text-amber-400">
-                        💡 <strong>Consejo:</strong> Prueba simplificando la búsqueda dejando el campo de Empresa vacío, o usando un cargo más general (ej. <em>CEO</em>, <em>Director</em>, <em>Dentista</em>).
+                        {t("leadFinder.noResultsTip")}
                       </p>
                     </div>
                   </div>
@@ -664,13 +667,13 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                 <div className="flex items-center gap-2">
                   <RiUserSearchLine className="text-brand-500" size={18} />
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                    Resultados Captados ({leads.length})
+                    {t("leadFinder.resultsCaptured", { count: String(leads.length) })}
                   </h3>
                 </div>
 
                 {leads.length > 0 && (
                   <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                    Vista previa en tiempo real
+                    {t("leadFinder.livePreview")}
                   </span>
                 )}
               </div>
@@ -682,22 +685,18 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                   </div>
                   <div className="space-y-1">
                     <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                      Listo para buscar y captar leads
+                      {t("leadFinder.readyToSearchTitle")}
                     </h4>
                     <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mx-auto">
-                      Ingresa el cargo y la ubicación que te interesan en el formulario y haz clic en{" "}
-                      <span className="font-semibold text-brand-600 dark:text-brand-400">
-                        &quot;Buscar Perfiles y Crear Lista&quot;
-                      </span>
-                      .
+                      {t("leadFinder.readyToSearchDesc")}
                     </p>
                   </div>
                   <div className="pt-2 flex items-center justify-center gap-2 text-xs text-gray-400">
                     <span className="flex items-center gap-1">
-                      <RiShieldCheckLine size={13} className="text-emerald-500" /> Sin límites de Sales Navigator
+                      <RiShieldCheckLine size={13} className="text-emerald-500" /> {t("leadFinder.noSalesNavLimits")}
                     </span>
                     <span>•</span>
-                    <span>Modo Stealth Automático</span>
+                    <span>{t("leadFinder.stealthMode")}</span>
                   </div>
                 </div>
               ) : (
@@ -761,7 +760,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                           href={lead.linkedinUrl}
                           target="_blank"
                           rel="noreferrer"
-                          title="Ver perfil en LinkedIn"
+                          title={t("leadFinder.viewProfile")}
                           className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-brand-600 dark:hover:bg-gray-800 dark:hover:text-brand-400 transition-colors"
                         >
                           <RiExternalLinkLine size={16} />

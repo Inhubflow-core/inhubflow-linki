@@ -5,6 +5,7 @@ import { GetServerSideProps } from "next";
 import { useRouter } from "next/router";
 import { getDb } from "@/lib/db";
 import { toast } from "sonner";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { RiAddLine, RiDeleteBinLine, RiCloseLine, RiCalendarLine, RiUserSearchLine } from "react-icons/ri";
 
 interface List {
@@ -57,6 +58,7 @@ export const getServerSideProps: GetServerSideProps = async () => {
 
 export default function ListsPage({ initialLists }: { initialLists: List[] }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [lists, setLists] = useState<List[]>(initialLists);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: "", description: "" });
@@ -145,7 +147,7 @@ export default function ListsPage({ initialLists }: { initialLists: List[] }) {
             href="/lead-finder"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-500 hover:bg-brand-600 text-white shadow-sm transition-all"
           >
-            <RiUserSearchLine size={15} /> Captar Leads
+            <RiUserSearchLine size={15} /> {t("nav.leadFinder")}
           </Link>
           <button data-tour="lists-new" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors" onClick={() => setShowModal(true)}>
             <RiAddLine size={15} /> New List
