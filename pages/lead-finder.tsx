@@ -65,27 +65,53 @@ export const getServerSideProps: GetServerSideProps = async () => {
   return { props: { accounts } };
 };
 
-const SAMPLE_TITLES = ["CEO, Director", "Director de Marketing", "Gerente General", "Founder", "Comercial / Ventas", "Abogado", "Dentista"];
+const SAMPLE_TITLES = [
+  "CEO, Director",
+  "Gerente General",
+  "Director de Marketing",
+  "Founder",
+];
+
 const SAMPLE_LOCATIONS = [
   "Chile",
   "Santiago, Chile",
   "São Paulo, Brasil",
-  "Madrid, España",
-  "Bogotá, Colombia",
-  "Ciudad de México",
-  "Buenos Aires, Argentina",
-  "Miami, Estados Unidos",
+  "Lima, Perú",
 ];
+
 const SAMPLE_INDUSTRIES = [
   "Minería",
+  "Inmobiliaria",
   "SaaS / Software",
   "Marketing & Publicidad",
-  "Salud & Clínicas",
-  "Inmobiliaria",
-  "Fintech",
-  "Construcción",
-  "Logística",
 ];
+
+function toggleOrAppendPill(currentVal: string, pill: string): string {
+  const cleanPill = pill.replace(/^\+/, "").trim();
+  const existingTokens = currentVal
+    .split(/[,;]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const lowerPill = cleanPill.toLowerCase();
+  const foundIndex = existingTokens.findIndex((t) => t.toLowerCase() === lowerPill);
+
+  if (foundIndex >= 0) {
+    existingTokens.splice(foundIndex, 1);
+    return existingTokens.join(", ");
+  } else {
+    return [...existingTokens, cleanPill].join(", ");
+  }
+}
+
+function isPillActive(currentVal: string, pill: string): boolean {
+  const cleanPill = pill.replace(/^\+/, "").trim().toLowerCase();
+  const existingTokens = currentVal
+    .split(/[,;]+/)
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  return existingTokens.includes(cleanPill);
+}
 
 export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinderProps) {
   const router = useRouter();
@@ -442,19 +468,26 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                   />
                 </div>
-                {/* Suggestions */}
+                {/* Suggestions (Max 4, Multi-select) */}
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  {SAMPLE_TITLES.map((st) => (
-                    <button
-                      key={st}
-                      type="button"
-                      onClick={() => setTitle(st)}
-                      disabled={isSearching}
-                      className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400 transition-colors"
-                    >
-                      +{st}
-                    </button>
-                  ))}
+                  {SAMPLE_TITLES.map((st) => {
+                    const active = isPillActive(title, st);
+                    return (
+                      <button
+                        key={st}
+                        type="button"
+                        onClick={() => setTitle(toggleOrAppendPill(title, st))}
+                        disabled={isSearching}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                          active
+                            ? "bg-brand-500 text-white shadow-xs"
+                            : "bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
+                        }`}
+                      >
+                        {active ? `✓ ${st}` : `+${st}`}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -474,19 +507,26 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                   />
                 </div>
-                  {/* Suggestions */}
+                {/* Suggestions (Max 4, Multi-select) */}
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  {SAMPLE_LOCATIONS.map((sl) => (
-                    <button
-                      key={sl}
-                      type="button"
-                      onClick={() => setLocation(sl)}
-                      disabled={isSearching}
-                      className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400 transition-colors"
-                    >
-                      +{sl}
-                    </button>
-                  ))}
+                  {SAMPLE_LOCATIONS.map((sl) => {
+                    const active = isPillActive(location, sl);
+                    return (
+                      <button
+                        key={sl}
+                        type="button"
+                        onClick={() => setLocation(toggleOrAppendPill(location, sl))}
+                        disabled={isSearching}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                          active
+                            ? "bg-brand-500 text-white shadow-xs"
+                            : "bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
+                        }`}
+                      >
+                        {active ? `✓ ${sl}` : `+${sl}`}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -506,19 +546,26 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                   />
                 </div>
-                {/* Industry Suggestions */}
+                {/* Industry Suggestions (Max 4, Multi-select) */}
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  {SAMPLE_INDUSTRIES.map((si) => (
-                    <button
-                      key={si}
-                      type="button"
-                      onClick={() => setCompany(si)}
-                      disabled={isSearching}
-                      className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400 transition-colors"
-                    >
-                      +{si}
-                    </button>
-                  ))}
+                  {SAMPLE_INDUSTRIES.map((si) => {
+                    const active = isPillActive(company, si);
+                    return (
+                      <button
+                        key={si}
+                        type="button"
+                        onClick={() => setCompany(toggleOrAppendPill(company, si))}
+                        disabled={isSearching}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                          active
+                            ? "bg-brand-500 text-white shadow-xs"
+                            : "bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
+                        }`}
+                      >
+                        {active ? `✓ ${si}` : `+${si}`}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

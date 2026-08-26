@@ -152,11 +152,19 @@ export function buildXRayQuery(options: XRaySearchOptions): { query: string; sub
 
   const titleClause = titleTerms.length > 0 ? `(${titleTerms.join(" OR ")})` : "";
 
-  // Industry / Company clause
+  // Industry / Company clause (supports multiple industries separated by commas with OR)
   let industryClause = "";
   if (company.trim()) {
-    const rawComp = company.trim();
-    industryClause = rawComp.startsWith('"') ? rawComp : `"${rawComp}"`;
+    const rawCompTokens = company
+      .split(/[,;/|]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const compTerms = rawCompTokens.map((c) => (c.startsWith('"') ? c : `"${c}"`));
+    if (compTerms.length === 1) {
+      industryClause = compTerms[0];
+    } else if (compTerms.length > 1) {
+      industryClause = `(${compTerms.join(" OR ")})`;
+    }
   }
 
   // City / Specific location clause (extract city if present)
