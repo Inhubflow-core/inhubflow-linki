@@ -306,7 +306,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
   return (
     <>
       <Head>
-        <title>{t("leadFinder.title")} — InHubFlow</title>
+        <title>Lead Finder — Dashboard B2B</title>
         <meta
           name="description"
           content={t("leadFinder.subtitle")}
@@ -318,7 +318,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 border border-brand-500/20 dark:border-brand-500/10 p-5 md:p-6 rounded-2xl">
           <div className="space-y-1">
             <div className="flex items-center gap-2.5">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500 text-white shadow-xs">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500 !text-white shadow-xs">
                 <RiSparklingLine size={13} /> {t("leadFinder.native")}
               </span>
               <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
@@ -508,7 +508,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                       disabled={isSearching}
                       className={`py-2 rounded-xl text-xs font-semibold border transition-all ${
                         limit === val
-                          ? "bg-brand-500 border-brand-500 text-white shadow-xs"
+                          ? "bg-brand-500 border-brand-500 !text-white shadow-xs"
                           : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-750"
                       }`}
                     >
@@ -545,7 +545,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                   <button
                     type="submit"
                     disabled={!hasAuthAccount}
-                    className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 shadow-md shadow-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform active:scale-[0.99]"
+                    className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold !text-white bg-brand-500 hover:bg-brand-600 shadow-md shadow-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform active:scale-[0.99]"
                   >
                     <RiFlashlightLine size={18} /> {t("leadFinder.searchButton")}
                   </button>
@@ -554,7 +554,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     <button
                       type="button"
                       disabled
-                      className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold text-white bg-brand-600 opacity-90 cursor-wait shadow-sm"
+                      className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold !text-white bg-brand-600 opacity-90 cursor-wait shadow-sm"
                     >
                       <RiRefreshLine className="animate-spin" size={18} />{" "}
                       {t("leadFinder.capturingButton", { current: String(leads.length), total: String(limit) })}
@@ -625,7 +625,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                 {completedResult && completedResult.totalFound > 0 && (
                   <div className="mt-3 p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="h-7 w-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
+                      <div className="h-7 w-7 rounded-full bg-emerald-500 !text-white flex items-center justify-center shrink-0">
                         <RiCheckLine size={16} />
                       </div>
                       <div>
@@ -640,7 +640,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
 
                     <Link
                       href={`/lists/${completedResult.listId}`}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shrink-0 shadow-xs"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 !text-white transition-colors shrink-0 shadow-xs"
                     >
                       {t("leadFinder.openList")} <RiArrowRightLine size={14} />
                     </Link>

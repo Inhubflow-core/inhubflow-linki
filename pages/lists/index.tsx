@@ -145,7 +145,7 @@ export default function ListsPage({ initialLists }: { initialLists: List[] }) {
         <div className="flex items-center gap-2.5">
           <Link
             href="/lead-finder"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-500 hover:bg-brand-600 text-white shadow-sm transition-all"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary hover:bg-primary/90 !text-white text-primary-content transition-colors shadow-xs"
           >
             <RiUserSearchLine size={15} /> {t("nav.leadFinder")}
           </Link>
