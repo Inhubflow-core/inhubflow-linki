@@ -1443,6 +1443,10 @@ export async function forceRunStep(
   }
 
   if (targetId) {
+    // Reset connection_requested_at if target is not actually connected (degree != 1)
+    // so runner will actually perform the connect step
+    db.prepare("UPDATE targets SET connection_requested_at = NULL WHERE id = ? AND degree != 1").run(targetId);
+
     db.prepare(`
       UPDATE run_profile_tracks SET
         state = 'in_progress',
@@ -1453,6 +1457,11 @@ export async function forceRunStep(
       ) AND state NOT IN ('completed')
     `).run(runId, targetId);
   } else {
+    db.prepare(`
+      UPDATE targets SET connection_requested_at = NULL
+      WHERE id IN (SELECT target_id FROM run_profiles WHERE run_id = ?) AND degree != 1
+    `).run(runId);
+
     db.prepare(`
       UPDATE run_profile_tracks SET
         state = 'in_progress',

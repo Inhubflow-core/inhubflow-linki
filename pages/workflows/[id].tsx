@@ -2632,6 +2632,122 @@ function AnalyticsPanel({ workflowId, days: initialDays }: { workflowId: string;
   );
 }
 
+interface LogRow {
+  id: string;
+  run_id: string;
+  target_id: string | null;
+  level: "info" | "warn" | "error";
+  message: string;
+  created_at: string;
+  target_name: string | null;
+  target_url: string | null;
+}
+
+function LogsPanel({ workflowId }: { workflowId: string }) {
+  const [logs, setLogs] = useState<LogRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchLogs = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/workflows/${workflowId}/logs`);
+      if (res.ok) {
+        const data = await res.json();
+        setLogs(data.logs);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [workflowId]);
+
+  useEffect(() => {
+    fetchLogs();
+    const interval = setInterval(fetchLogs, 4000);
+    return () => clearInterval(interval);
+  }, [fetchLogs]);
+
+  return (
+    <div className="space-y-4 pb-8 pl-11 pr-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-semibold">Registro de Actividad en Vivo</h2>
+          <p className="text-xs text-base-content/50">Historial detallado de todas las acciones ejecutadas por el bot en LinkedIn y Email</p>
+        </div>
+        <button
+          onClick={() => { setLoading(true); fetchLogs(); }}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-base-200 text-base-content/70 hover:bg-base-300 transition-colors"
+        >
+          <RiRefreshLine size={13} className={loading ? "animate-spin" : ""} /> Actualizar logs
+        </button>
+      </div>
+
+      <div className="bg-base-200 border border-base-300/50 rounded-xl overflow-hidden shadow-xs">
+        <div className="overflow-x-auto max-h-[calc(100vh-230px)]">
+          <table className="table table-sm w-full">
+            <thead className="sticky top-0 bg-base-200 z-10">
+              <tr className="border-b border-base-300/60 text-[11px] text-base-content/40 uppercase tracking-wider">
+                <th className="w-36">Hora</th>
+                <th className="w-24">Nivel</th>
+                <th className="w-56">Prospecto</th>
+                <th>Acción / Mensaje del Bot</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-base-300/30 text-xs">
+              {logs.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="text-center py-16 text-base-content/30">
+                    No hay registros de actividad aún en esta campaña.
+                  </td>
+                </tr>
+              ) : (
+                logs.map((log) => {
+                  const levelColors = {
+                    info: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+                    warn: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+                    error: "bg-red-500/10 text-red-500 border-red-500/20",
+                  };
+                  const date = new Date(log.created_at);
+                  const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+                  const dateStr = date.toLocaleDateString([], { month: "short", day: "numeric" });
+
+                  return (
+                    <tr key={log.id} className="hover:bg-base-300/40 transition-colors">
+                      <td className="text-base-content/40 whitespace-nowrap text-[11px] font-mono">
+                        {dateStr} {timeStr}
+                      </td>
+                      <td>
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase border ${levelColors[log.level] ?? levelColors.info}`}>
+                          {log.level}
+                        </span>
+                      </td>
+                      <td className="font-medium text-base-content/90 whitespace-nowrap">
+                        {log.target_name ? (
+                          <a
+                            href={log.target_url || "#"}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="hover:underline text-primary inline-flex items-center gap-1"
+                          >
+                            {log.target_name}
+                          </a>
+                        ) : (
+                          <span className="text-base-content/30">—</span>
+                        )}
+                      </td>
+                      <td className="text-base-content/80 font-mono text-[11px]">
+                        {log.message}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function WorkflowDetailPage({
@@ -2663,7 +2779,7 @@ export default function WorkflowDetailPage({
   const [showWizard, setShowWizard] = useState(autoSetup || initial.steps.length === 0);
   const [wizardMode, setWizardMode] = useState<WizardMode>("launch");
   const [showStop, setShowStop] = useState(false);
-  const [activeTab, setActiveTab] = useState<"prospects" | "analytics">("prospects");
+  const [activeTab, setActiveTab] = useState<"prospects" | "analytics" | "logs">("prospects");
   const [days] = useState(30);
   const [errorModal, setErrorModal] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -3039,17 +3155,21 @@ export default function WorkflowDetailPage({
 
       {/* Tab switcher */}
       <div className="flex items-center gap-1 border-b border-base-300/30 mb-0 -mb-px pl-11">
-        {(["prospects", "analytics"] as const).map(tab => (
+        {[
+          { id: "prospects", label: "Prospects" },
+          { id: "analytics", label: "Analytics" },
+          { id: "logs", label: "Activity Logs (En Vivo)" },
+        ].map((tab) => (
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${
-              activeTab === tab
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as "prospects" | "analytics" | "logs")}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === tab.id
                 ? "border-primary text-primary"
                 : "border-transparent text-base-content/40 hover:text-base-content/70"
             }`}
           >
-            {tab}
+            {tab.label}
           </button>
         ))}
       </div>
@@ -3401,6 +3521,11 @@ export default function WorkflowDetailPage({
       {/* ── Analytics tab ── */}
       {activeTab === "analytics" && (
         <AnalyticsPanel workflowId={initial.id} days={days} />
+      )}
+
+      {/* ── Activity Logs tab ── */}
+      {activeTab === "logs" && (
+        <LogsPanel workflowId={initial.id} />
       )}
 
       {/* Wizard */}
