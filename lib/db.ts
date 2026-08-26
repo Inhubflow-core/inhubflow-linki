@@ -266,8 +266,9 @@ function runMigrations(db: Database.Database) {
     "ALTER TABLE targets ADD COLUMN positions_json TEXT",
     "ALTER TABLE targets ADD COLUMN skills_json TEXT",
     "ALTER TABLE targets ADD COLUMN enriched_profile_at TEXT",
-    // Email outreach fields
+    // Email & Phone outreach fields
     "ALTER TABLE targets ADD COLUMN email TEXT",
+    "ALTER TABLE targets ADD COLUMN phone TEXT",
     "ALTER TABLE targets ADD COLUMN email_replied_at TEXT",
     "ALTER TABLE targets ADD COLUMN company_id TEXT",
     // Email account on runs (nullable — only needed when workflow has email steps)

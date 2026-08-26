@@ -25,6 +25,8 @@ import {
   RiRefreshLine,
   RiCheckLine,
   RiSettings4Line,
+  RiMailLine,
+  RiPhoneLine,
 } from "react-icons/ri";
 
 interface Account {
@@ -42,6 +44,8 @@ interface Lead {
   title: string | null;
   company: string | null;
   location: string | null;
+  email?: string | null;
+  phone?: string | null;
   profileImageUrl: string | null;
   degree: number | null;
   summary: string | null;
@@ -775,6 +779,21 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                           <p className="text-[11px] text-gray-400 flex items-center gap-1">
                             <RiMapPinLine size={12} /> {lead.location}
                           </p>
+                        )}
+
+                        {(lead.email || lead.phone) && (
+                          <div className="flex items-center gap-2 pt-0.5 flex-wrap">
+                            {lead.email && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                <RiMailLine size={11} /> {lead.email}
+                              </span>
+                            )}
+                            {lead.phone && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
+                                <RiPhoneLine size={11} /> {lead.phone}
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
 

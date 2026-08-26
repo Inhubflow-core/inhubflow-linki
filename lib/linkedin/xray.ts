@@ -212,15 +212,37 @@ function normalizeXRayUrl(rawUrl: string): string | null {
   }
 }
 
+export function extractContactDetails(
+  text: string
+): { email: string | null; phone: string | null } {
+  if (!text) return { email: null, phone: null };
+
+  const emailMatch = text.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
+  const email = emailMatch ? emailMatch[1].toLowerCase() : null;
+
+  const phoneMatch = text.match(/(\+?\d{1,3}[\s-]?\(?\d{1,4}\)?[\s-]?\d{3,5}[\s-]?\d{3,5})/);
+  const phone = phoneMatch ? phoneMatch[1].trim() : null;
+
+  return { email, phone };
+}
+
 /**
  * Parses Google Search Snippet title (e.g. "Marko Didyk - Director Mineria en CODELCO | LinkedIn")
- * into clean Name, Headline, and Company.
+ * into clean Name, Headline, Company, Email, and Phone.
  */
 export function parseXRaySnippet(
   rawTitle: string,
   rawSnippet?: string,
   defaultCompany?: string
-): { fullName: string; firstName: string | null; lastName: string | null; title: string | null; company: string | null } {
+): {
+  fullName: string;
+  firstName: string | null;
+  lastName: string | null;
+  title: string | null;
+  company: string | null;
+  email: string | null;
+  phone: string | null;
+} {
   let clean = rawTitle.replace(/\s*\|\s*LinkedIn.*$/i, "").replace(/\s*-\s*LinkedIn.*$/i, "").trim();
   const parts = clean.split(/\s+[-–—]\s+/);
 
@@ -246,12 +268,16 @@ export function parseXRaySnippet(
   const firstName = nameParts[0] || null;
   const lastName = nameParts.slice(1).join(" ") || null;
 
+  const { email, phone } = extractContactDetails(`${rawTitle} ${rawSnippet || ""}`);
+
   return {
     fullName,
     firstName,
     lastName,
     title,
     company,
+    email,
+    phone,
   };
 }
 
@@ -356,11 +382,15 @@ export async function searchLinkedInWithXRay(
 
         seenUrls.add(cleanUrl);
 
-        const { fullName, firstName, lastName, title: parsedTitle, company: parsedCompany } = parseXRaySnippet(
-          res.rawTitle,
-          res.rawSnippet,
-          company || undefined
-        );
+        const {
+          fullName,
+          firstName,
+          lastName,
+          title: parsedTitle,
+          company: parsedCompany,
+          email: foundEmail,
+          phone: foundPhone,
+        } = parseXRaySnippet(res.rawTitle, res.rawSnippet, company || undefined);
 
         if (!fullName || fullName === "LinkedIn" || fullName === "Prospecto de LinkedIn") {
           continue;
@@ -374,6 +404,8 @@ export async function searchLinkedInWithXRay(
           title: parsedTitle,
           company: parsedCompany,
           location: location || countryName,
+          email: foundEmail,
+          phone: foundPhone,
           profileImageUrl: null,
           degree: 2,
           summary: res.rawSnippet || null,
@@ -387,7 +419,7 @@ export async function searchLinkedInWithXRay(
           totalPages: estimatedPages,
           totalFound: collectedLeads.length,
           currentLead: lead,
-          message: `[Google X-Ray] ${lead.fullName} (${lead.title || "Directivo"})`,
+          message: `[Google X-Ray] ${lead.fullName} (${lead.title || "Directivo"})${lead.email ? ` [${lead.email}]` : ""}`,
         });
       }
 

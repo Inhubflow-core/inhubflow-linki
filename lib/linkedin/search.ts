@@ -14,6 +14,8 @@ export interface SearchLead {
   title: string | null;
   company: string | null;
   location: string | null;
+  email?: string | null;
+  phone?: string | null;
   profileImageUrl: string | null;
   degree: number | null;
   summary: string | null;
@@ -1034,9 +1036,9 @@ export function saveProfilesToList(
   const insertTarget = db.prepare(`
     INSERT INTO targets (
       id, linkedin_url, full_name, first_name, last_name,
-      title, company, location, profile_image_url, degree, created_at
+      title, company, location, email, phone, profile_image_url, degree, created_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
   `);
 
   const updateTarget = db.prepare(`
@@ -1047,6 +1049,8 @@ export function saveProfilesToList(
       title = COALESCE(?, title),
       company = COALESCE(?, company),
       location = COALESCE(?, location),
+      email = COALESCE(?, email),
+      phone = COALESCE(?, phone),
       profile_image_url = COALESCE(?, profile_image_url),
       degree = COALESCE(?, degree)
     WHERE id = ?
@@ -1077,6 +1081,8 @@ export function saveProfilesToList(
           lead.title,
           lead.company,
           lead.location,
+          lead.email || null,
+          lead.phone || null,
           lead.profileImageUrl,
           lead.degree,
           targetId
@@ -1093,6 +1099,8 @@ export function saveProfilesToList(
           lead.title,
           lead.company,
           lead.location,
+          lead.email || null,
+          lead.phone || null,
           lead.profileImageUrl,
           lead.degree
         );
