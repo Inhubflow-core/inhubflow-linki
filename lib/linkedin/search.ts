@@ -182,37 +182,33 @@ const COUNTRY_WORDS = new Set([
 ]);
 
 /**
- * Builds a Boolean OR group from a list of user tokens (e.g. ['ceo', 'director'] -> (CEO OR Director OR ...))
+ * Expands a single user token or term using the dictionary.
  */
-function buildOrGroup(tokens: string[], expansionDict: Record<string, string[]>): string | null {
-  const terms: string[] = [];
-  for (const t of tokens) {
-    const rawClean = t.trim();
-    if (!rawClean) continue;
-    const expanded = expansionDict[rawClean.toLowerCase()];
-    if (expanded && expanded.length > 0) {
-      for (const exp of expanded) {
-        if (!terms.includes(exp)) terms.push(exp);
-      }
-    } else {
-      const cap = rawClean.length > 3 ? rawClean.charAt(0).toUpperCase() + rawClean.slice(1) : rawClean.toUpperCase();
-      if (!terms.includes(cap)) terms.push(cap);
-    }
+function expandTerm(term: string, expansionDict: Record<string, string[]>): string[] {
+  const clean = term.trim().toLowerCase();
+  if (!clean) return [];
+  const expanded = expansionDict[clean];
+  if (expanded && expanded.length > 0) {
+    // Strip quotes and return clean words
+    return expanded.map((e) => e.replace(/["()]/g, "").trim()).filter(Boolean);
   }
-  if (terms.length === 0) return null;
-  if (terms.length === 1) return terms[0];
-  return `(${terms.join(" OR ")})`;
+  const cap = clean.length > 3 ? clean.charAt(0).toUpperCase() + clean.slice(1) : clean.toUpperCase();
+  return [cap];
 }
 
 /**
- * Builds prioritized Boolean and keyword query variations for LinkedIn ICP search.
- * Handles:
- *  - Multiple Titles: "CEOs, Directores" -> (CEO OR Director OR Directores OR Diretor)
- *  - Industries/Niches: "Minería" -> (Minería OR Minera OR Mining)
- *  - Locations: "Chile" / "Santiago, Chile" -> Chile / Santiago
+ * Builds prioritized, clean keyword combinations for LinkedIn search without broken boolean syntax.
+ * Example for Titles: ["CEO", "Director"], Industry: "Inmobiliaria", Location: "Santiago, Chile":
+ * 1. "CEO Inmobiliaria Santiago"
+ * 2. "Director Inmobiliaria Santiago"
+ * 3. "CEO Inmobiliaria Chile"
+ * 4. "Director Inmobiliaria Chile"
+ * 5. "Gerente Inmobiliaria Santiago"
+ * 6. "Inmobiliaria Santiago"
+ * 7. "CEO Santiago"
+ * 8. "Director Santiago"
  */
 export function buildQueryVariants(filters: SearchFilters): string[] {
-  // Split multiple titles separated by comma, slash, or semicolons
   const rawTitles = (filters.title || "")
     .split(/[,;/|]+/)
     .map((s) => s.trim())
@@ -228,56 +224,95 @@ export function buildQueryVariants(filters: SearchFilters): string[] {
   const locTokens = cleanTokens(filters.location || "");
   const kwTokens = cleanTokens(filters.keywords || "");
 
-  // City vs Country handling
+  // City vs Country
   const locCityOnly = locTokens.filter((t) => !COUNTRY_WORDS.has(t));
-  const effectiveLoc = locCityOnly.length > 0 ? locCityOnly.join(" ") : locTokens.join(" ");
-  const fullLoc = locTokens.join(" ");
+  const cityStr = locCityOnly.length > 0 ? locCityOnly.join(" ") : "";
+  const fullLocStr = locTokens.join(" ");
 
-  const titleOrGroup = buildOrGroup(rawTitles.length > 0 ? rawTitles : titleTokens, TITLE_EXPANSIONS);
-  const industryOrGroup = buildOrGroup(rawCompanies.length > 0 ? rawCompanies : compTokens, INDUSTRY_EXPANSIONS);
-
-  const variants: string[] = [];
-  const add = (v: string | null) => {
-    if (!v) return;
-    const trimmed = v.trim();
-    if (trimmed && !variants.includes(trimmed)) variants.push(trimmed);
-  };
-
-  // 1. Full Boolean ICP Query: (Title OR Group) (Industry OR Group) Location
-  if (titleOrGroup && industryOrGroup && (effectiveLoc || fullLoc)) {
-    add(`${titleOrGroup} ${industryOrGroup} ${effectiveLoc || fullLoc}`);
-    if (fullLoc && fullLoc !== effectiveLoc) {
-      add(`${titleOrGroup} ${industryOrGroup} ${fullLoc}`);
+  // Expand titles and industries into clean words
+  const titlesList: string[] = [];
+  const inputTitles = rawTitles.length > 0 ? rawTitles : titleTokens;
+  for (const t of inputTitles) {
+    const ex = expandTerm(t, TITLE_EXPANSIONS);
+    for (const word of ex) {
+      if (!titlesList.includes(word)) titlesList.push(word);
     }
   }
-
-  // 2. Boolean Title + Location (without industry constraints)
-  if (titleOrGroup && (effectiveLoc || fullLoc)) {
-    add(`${titleOrGroup} ${effectiveLoc || fullLoc}`);
+  if (titlesList.length === 0 && titleTokens.length > 0) {
+    titlesList.push(titleTokens.join(" "));
   }
 
-  // 3. Simple Keyword variations for each title + industry token
-  if (titleTokens.length > 0 && compTokens.length > 0 && (effectiveLoc || fullLoc)) {
-    for (const tt of titleTokens) {
-      for (const ct of compTokens) {
-        add(`${tt} ${ct} ${effectiveLoc || fullLoc}`);
+  const industryList: string[] = [];
+  const inputCompanies = rawCompanies.length > 0 ? rawCompanies : compTokens;
+  for (const c of inputCompanies) {
+    const ex = expandTerm(c, INDUSTRY_EXPANSIONS);
+    for (const word of ex) {
+      if (!industryList.includes(word)) industryList.push(word);
+    }
+  }
+  if (industryList.length === 0 && compTokens.length > 0) {
+    industryList.push(compTokens.join(" "));
+  }
+
+  const variants: string[] = [];
+  const add = (parts: Array<string | undefined | null>) => {
+    const cleanStr = parts
+      .filter(Boolean)
+      .join(" ")
+      .replace(/[,;":.?¿!¡#+()/*\\&]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (cleanStr && !variants.includes(cleanStr)) {
+      variants.push(cleanStr);
+    }
+  };
+
+  const kwStr = kwTokens.length > 0 ? kwTokens.join(" ") : null;
+
+  // Tier 1: Title + Industry + City (Most Specific & Exact ICP)
+  if (titlesList.length > 0 && industryList.length > 0 && cityStr) {
+    for (const t of titlesList.slice(0, 3)) {
+      for (const ind of industryList.slice(0, 2)) {
+        add([t, ind, cityStr, kwStr]);
       }
     }
   }
 
-  // 4. Industry + Location
-  if (industryOrGroup && (effectiveLoc || fullLoc)) {
-    add(`${industryOrGroup} ${effectiveLoc || fullLoc}`);
+  // Tier 2: Title + Industry + Full Location (Country level fallback)
+  if (titlesList.length > 0 && industryList.length > 0 && fullLocStr && fullLocStr !== cityStr) {
+    for (const t of titlesList.slice(0, 2)) {
+      for (const ind of industryList.slice(0, 2)) {
+        add([t, ind, fullLocStr, kwStr]);
+      }
+    }
   }
 
-  // 5. Title + Industry (Location optional)
-  if (titleOrGroup && industryOrGroup) {
-    add(`${titleOrGroup} ${industryOrGroup}`);
+  // Tier 3: Title + City (Broad baseline)
+  if (titlesList.length > 0 && cityStr) {
+    for (const t of titlesList.slice(0, 3)) {
+      add([t, cityStr, kwStr]);
+    }
   }
 
-  // 6. Basic Title tokens + Location
-  if (titleTokens.length > 0 && (effectiveLoc || fullLoc)) {
-    add(`${titleTokens.join(" ")} ${effectiveLoc || fullLoc}`);
+  // Tier 4: Title + Full Location
+  if (titlesList.length > 0 && fullLocStr && fullLocStr !== cityStr) {
+    for (const t of titlesList.slice(0, 2)) {
+      add([t, fullLocStr, kwStr]);
+    }
+  }
+
+  // Tier 5: Industry + Location (if title was too restrictive)
+  if (industryList.length > 0 && (cityStr || fullLocStr)) {
+    for (const ind of industryList.slice(0, 2)) {
+      add([ind, cityStr || fullLocStr, kwStr]);
+    }
+  }
+
+  // Tier 6: Just Titles or Keywords
+  if (titlesList.length > 0) {
+    for (const t of titlesList.slice(0, 2)) {
+      add([t, kwStr]);
+    }
   }
 
   return variants.length > 0 ? variants : ["CEO"];
@@ -613,6 +648,9 @@ export async function searchLinkedInProfiles(
             `La sesión de LinkedIn se ha cerrado o requiere verificación (${currentUrl}). Por favor re-autentica tu cuenta en Ajustes.`
           );
         }
+
+        // Wait for React SPA hydration and search results network traffic
+        await page.waitForTimeout(2500 + Math.random() * 1000);
 
         // ─── TIER 1: In-Page Voyager API ─────────────────────────────────────────
         try {
