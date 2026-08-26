@@ -61,16 +61,26 @@ export const getServerSideProps: GetServerSideProps = async () => {
   return { props: { accounts } };
 };
 
-const SAMPLE_TITLES = ["CEO", "Director de Marketing", "Dentista", "Abogado", "CTO", "Founder", "Gerente de Ventas"];
+const SAMPLE_TITLES = ["CEO, Director", "Director de Marketing", "Gerente General", "Founder", "Comercial / Ventas", "Abogado", "Dentista"];
 const SAMPLE_LOCATIONS = [
-  "Madrid, España",
-  "Barcelona, España",
+  "Chile",
+  "Santiago, Chile",
   "São Paulo, Brasil",
+  "Madrid, España",
   "Bogotá, Colombia",
   "Ciudad de México",
   "Buenos Aires, Argentina",
-  "Santiago, Chile",
   "Miami, Estados Unidos",
+];
+const SAMPLE_INDUSTRIES = [
+  "Minería",
+  "SaaS / Software",
+  "Marketing & Publicidad",
+  "Salud & Clínicas",
+  "Inmobiliaria",
+  "Fintech",
+  "Construcción",
+  "Logística",
 ];
 
 export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinderProps) {
@@ -491,6 +501,20 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     placeholder={t("leadFinder.companyPlaceholder")}
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                   />
+                </div>
+                {/* Industry Suggestions */}
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {SAMPLE_INDUSTRIES.map((si) => (
+                    <button
+                      key={si}
+                      type="button"
+                      onClick={() => setCompany(si)}
+                      disabled={isSearching}
+                      className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400 transition-colors"
+                    >
+                      +{si}
+                    </button>
+                  ))}
                 </div>
               </div>
 

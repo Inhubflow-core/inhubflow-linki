@@ -95,20 +95,86 @@ function sanitizeTerm(term: string): string {
   return tokens.join(" ");
 }
 
-const SYNONYMS: Record<string, string> = {
-  director: "diretor",
-  diretor: "director",
-  abogado: "advogado",
-  advogado: "abogado",
-  ingeniero: "engenheiro",
-  engenheiro: "ingeniero",
-  desarrollador: "desenvolvedor",
-  desenvolvedor: "desarrollador",
-  ventas: "vendas",
-  vendas: "ventas",
-  comercial: "sales",
-  gerente: "manager",
-  fundador: "founder",
+const INDUSTRY_EXPANSIONS: Record<string, string[]> = {
+  // Minería / Mining
+  mineria: ["Minería", "Minera", "Minero", "Mining"],
+  minera: ["Minería", "Minera", "Minero", "Mining"],
+  mining: ["Mining", "Minería", "Minera"],
+
+  // Marketing & Publicidad / Agencias
+  marketing: ["Marketing", "Agencia", "Agência", "Publicidad", "Digital"],
+  agencia: ["Agencia", "Agência", "Marketing", "Advertising", "Digital"],
+  agencias: ["Agencia", "Agência", "Marketing", "Advertising", "Digital"],
+  publicidad: ["Publicidad", "Advertising", "Marketing", "Agencia"],
+
+  // Software & Tecnología / SaaS
+  saas: ["SaaS", "Software", "Tech", "Tecnologia", "Cloud"],
+  software: ["Software", "SaaS", "Tech", "Tecnologia", "TI"],
+  tech: ["Tech", "Tecnología", "Tecnologia", "Software", "SaaS"],
+  tecnologia: ["Tecnología", "Tecnologia", "Software", "Tech", "SaaS"],
+  ia: ["IA", "AI", '"Inteligencia Artificial"', '"Machine Learning"'],
+  ai: ["AI", "IA", '"Artificial Intelligence"', '"Machine Learning"'],
+
+  // Salud & Farmacia
+  salud: ["Salud", "Saúde", "Médica", "Médico", "Clínica", "Hospital", "Healthcare"],
+  saude: ["Saúde", "Salud", "Médica", "Médico", "Clínica", "Hospital", "Healthcare"],
+  medica: ["Médica", "Médico", "Salud", "Clínica", "Hospital"],
+  clinica: ["Clínica", "Salud", "Hospital", "Médica"],
+  hospital: ["Hospital", "Salud", "Clínica", "Healthcare"],
+  farmaceutica: ["Farmacéutica", "Farmacêutica", "Pharma", "Laboratorio"],
+
+  // Inmobiliaria & Construcción
+  inmobiliaria: ["Inmobiliaria", "Imobiliária", '"Real Estate"', "Propiedades"],
+  imobiliaria: ["Imobiliária", "Inmobiliaria", '"Real Estate"', "Propriedades"],
+  construccion: ["Construcción", "Construção", "Construction", "Obras", "Edificación"],
+  construcao: ["Construção", "Construcción", "Construction", "Obras"],
+
+  // Finanzas & Fintech
+  fintech: ["Fintech", "Finanzas", "Finanças", "Banca", "Banking", "Finance"],
+  finanzas: ["Finanzas", "Finanças", "Finance", "Banca", "Inversiones"],
+  financas: ["Finanças", "Finanzas", "Finance", "Bancos", "Investimentos"],
+  banca: ["Banca", "Banking", "Finanzas", "Banco"],
+
+  // Logística & Transporte
+  logistica: ["Logística", "Logistics", "Transporte", '"Supply Chain"', "Operaciones"],
+  transporte: ["Transporte", "Logística", "Transportes", "Freight"],
+
+  // Legal
+  legal: ["Legal", "Abogados", "Advogados", "Jurídico", "Law"],
+  abogados: ["Abogado", "Abogados", "Advogado", "Advogados", "Legal", "Derecho"],
+  advogados: ["Advogado", "Advogados", "Abogado", "Legal", "Direito"],
+
+  // Recursos Humanos
+  rrhh: ["RRHH", '"Recursos Humanos"', "RH", "HR", '"Talent Acquisition"'],
+  rh: ["RH", "RRHH", '"Recursos Humanos"', "HR"],
+
+  // Retail & E-commerce
+  ecommerce: ["E-commerce", "Ecommerce", '"Comercio Electrónico"', "Retail"],
+  retail: ["Retail", "Comercio", "Varejo", "E-commerce"],
+
+  // Alimentos & Agro
+  agro: ["Agro", "Agrícola", "Agricultura", "Agribusiness", "Agropecuaria"],
+  agricola: ["Agrícola", "Agro", "Agricultura", "Agribusiness"],
+  alimentos: ["Alimentos", "Food", '"Food & Beverage"', "Bebidas", "Alimentaria"],
+};
+
+const TITLE_EXPANSIONS: Record<string, string[]> = {
+  ceo: ["CEO", "Founder", "Fundador", '"Director General"', '"Gerente General"', '"Diretor Geral"'],
+  ceos: ["CEO", "Founder", "Fundador", '"Director General"', '"Gerente General"'],
+  director: ["Director", "Directora", "Directores", "Diretor", "Diretora", "Head", "VP"],
+  directores: ["Director", "Directores", "Diretor", "Diretores", "Head", "VP"],
+  diretor: ["Diretor", "Diretora", "Diretores", "Director", "Head", "VP"],
+  diretores: ["Diretor", "Diretores", "Director", "Directores", "Head", "VP"],
+  founder: ["Founder", '"Co-Founder"', "Fundador", "CEO"],
+  fundador: ["Fundador", "Founder", '"Co-Founder"', "CEO"],
+  gerente: ["Gerente", "Manager", "Head", '"Gerente General"'],
+  comercial: ["Comercial", "Ventas", "Vendas", "Sales", '"Business Development"'],
+  ventas: ["Ventas", "Vendas", "Sales", "Comercial"],
+  vendas: ["Vendas", "Ventas", "Sales", "Comercial"],
+  abogado: ["Abogado", "Abogados", "Advogado", "Advogados", "Legal"],
+  advogado: ["Advogado", "Advogados", "Abogado", "Abogados", "Legal"],
+  dentista: ["Dentista", "Odontólogo", "Odontologista", "Dentistry"],
+  odontologo: ["Odontólogo", "Dentista", "Odontologia"],
 };
 
 const COUNTRY_WORDS = new Set([
@@ -116,60 +182,102 @@ const COUNTRY_WORDS = new Set([
 ]);
 
 /**
- * Builds prioritized query variations from filters with zero-result fallback.
- * Generates bilingual and broadened combinations for high recall.
+ * Builds a Boolean OR group from a list of user tokens (e.g. ['ceo', 'director'] -> (CEO OR Director OR ...))
+ */
+function buildOrGroup(tokens: string[], expansionDict: Record<string, string[]>): string | null {
+  const terms: string[] = [];
+  for (const t of tokens) {
+    const rawClean = t.trim();
+    if (!rawClean) continue;
+    const expanded = expansionDict[rawClean.toLowerCase()];
+    if (expanded && expanded.length > 0) {
+      for (const exp of expanded) {
+        if (!terms.includes(exp)) terms.push(exp);
+      }
+    } else {
+      const cap = rawClean.length > 3 ? rawClean.charAt(0).toUpperCase() + rawClean.slice(1) : rawClean.toUpperCase();
+      if (!terms.includes(cap)) terms.push(cap);
+    }
+  }
+  if (terms.length === 0) return null;
+  if (terms.length === 1) return terms[0];
+  return `(${terms.join(" OR ")})`;
+}
+
+/**
+ * Builds prioritized Boolean and keyword query variations for LinkedIn ICP search.
+ * Handles:
+ *  - Multiple Titles: "CEOs, Directores" -> (CEO OR Director OR Directores OR Diretor)
+ *  - Industries/Niches: "Minería" -> (Minería OR Minera OR Mining)
+ *  - Locations: "Chile" / "Santiago, Chile" -> Chile / Santiago
  */
 export function buildQueryVariants(filters: SearchFilters): string[] {
+  // Split multiple titles separated by comma, slash, or semicolons
+  const rawTitles = (filters.title || "")
+    .split(/[,;/|]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
   const titleTokens = cleanTokens(filters.title || "");
-  const locTokens = cleanTokens(filters.location || "");
+
+  const rawCompanies = (filters.company || "")
+    .split(/[,;/|]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
   const compTokens = cleanTokens(filters.company || "");
+
+  const locTokens = cleanTokens(filters.location || "");
   const kwTokens = cleanTokens(filters.keywords || "");
 
-  // City-only location tokens (drops generic country names to match LinkedIn regional strings)
+  // City vs Country handling
   const locCityOnly = locTokens.filter((t) => !COUNTRY_WORDS.has(t));
-  const effectiveLocTokens = locCityOnly.length > 0 ? locCityOnly : locTokens;
+  const effectiveLoc = locCityOnly.length > 0 ? locCityOnly.join(" ") : locTokens.join(" ");
+  const fullLoc = locTokens.join(" ");
 
-  // Bilingual title synonym tokens (e.g. Director -> Diretor)
-  const titleSynonyms = titleTokens.map((t) => SYNONYMS[t] || t);
-  const hasSynonym = titleSynonyms.some((t, i) => t !== titleTokens[i]);
+  const titleOrGroup = buildOrGroup(rawTitles.length > 0 ? rawTitles : titleTokens, TITLE_EXPANSIONS);
+  const industryOrGroup = buildOrGroup(rawCompanies.length > 0 ? rawCompanies : compTokens, INDUSTRY_EXPANSIONS);
 
   const variants: string[] = [];
-  const add = (tokens: string[]) => {
-    const v = tokens.join(" ").trim();
-    if (v && !variants.includes(v)) variants.push(v);
+  const add = (v: string | null) => {
+    if (!v) return;
+    const trimmed = v.trim();
+    if (trimmed && !variants.includes(trimmed)) variants.push(trimmed);
   };
 
-  // 1. Title (Synonym/Localized) + City Location
-  if (hasSynonym && effectiveLocTokens.length > 0) {
-    add([...titleSynonyms, ...effectiveLocTokens, ...kwTokens]);
-  }
-
-  // 2. Title + City Location (Clean, Highest recall in LinkedIn)
-  if (titleTokens.length > 0 && effectiveLocTokens.length > 0) {
-    add([...titleTokens, ...effectiveLocTokens, ...kwTokens]);
-  }
-
-  // 3. Title + City Location + Salient Company/Industry Token (e.g. Marketing)
-  if (compTokens.length > 0) {
-    for (const ct of compTokens) {
-      add([...titleTokens, ...effectiveLocTokens, ct, ...kwTokens]);
-      if (hasSynonym) add([...titleSynonyms, ...effectiveLocTokens, ct, ...kwTokens]);
+  // 1. Full Boolean ICP Query: (Title OR Group) (Industry OR Group) Location
+  if (titleOrGroup && industryOrGroup && (effectiveLoc || fullLoc)) {
+    add(`${titleOrGroup} ${industryOrGroup} ${effectiveLoc || fullLoc}`);
+    if (fullLoc && fullLoc !== effectiveLoc) {
+      add(`${titleOrGroup} ${industryOrGroup} ${fullLoc}`);
     }
   }
 
-  // 4. Title + Full Location (with country)
-  if (locTokens.length > effectiveLocTokens.length) {
-    add([...titleTokens, ...locTokens, ...kwTokens]);
+  // 2. Boolean Title + Location (without industry constraints)
+  if (titleOrGroup && (effectiveLoc || fullLoc)) {
+    add(`${titleOrGroup} ${effectiveLoc || fullLoc}`);
   }
 
-  // 5. Title + Company
-  if (titleTokens.length > 0 && compTokens.length > 0) {
-    add([...titleTokens, ...compTokens, ...kwTokens]);
+  // 3. Simple Keyword variations for each title + industry token
+  if (titleTokens.length > 0 && compTokens.length > 0 && (effectiveLoc || fullLoc)) {
+    for (const tt of titleTokens) {
+      for (const ct of compTokens) {
+        add(`${tt} ${ct} ${effectiveLoc || fullLoc}`);
+      }
+    }
   }
 
-  // 6. Just Title or Keywords
-  if (titleTokens.length > 0) {
-    add([...titleTokens, ...kwTokens]);
+  // 4. Industry + Location
+  if (industryOrGroup && (effectiveLoc || fullLoc)) {
+    add(`${industryOrGroup} ${effectiveLoc || fullLoc}`);
+  }
+
+  // 5. Title + Industry (Location optional)
+  if (titleOrGroup && industryOrGroup) {
+    add(`${titleOrGroup} ${industryOrGroup}`);
+  }
+
+  // 6. Basic Title tokens + Location
+  if (titleTokens.length > 0 && (effectiveLoc || fullLoc)) {
+    add(`${titleTokens.join(" ")} ${effectiveLoc || fullLoc}`);
   }
 
   return variants.length > 0 ? variants : ["CEO"];
