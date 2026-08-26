@@ -6,83 +6,153 @@ export class PendingInviteError extends Error {}
 
 /**
  * Sends a LinkedIn connection request without a note.
- * Navigates to the profile page and clicks the Connect button.
- * Throws WeeklyLimitError if the weekly limit popup appears.
- * Throws AlreadyConnectedError / PendingInviteError if already in that state.
+ * Handles all UI languages (Portuguese, Spanish, English, etc.)
+ * Supports direct Connect buttons and "..." More/Mais dropdown menus.
  */
 export async function sendConnectionRequest(page: Page, linkedinUrl: string): Promise<void> {
-  await page.goto(linkedinUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
-  await page.waitForTimeout(2000 + Math.random() * 1000);
+  await page.goto(linkedinUrl, { waitUntil: "domcontentloaded", timeout: 35000 });
+  await page.waitForTimeout(2500 + Math.random() * 1500);
 
-  // Already connected? Primary signal: presence of the profile's "Message" link
-  // (only shown to 1st-degree connections) — an href attribute, not a CSS class
-  // or translated text, so it survives LinkedIn's class-name hashing and non-
-  // English UI languages. Falls back to the old text-scrape for accounts/layouts
-  // where that link isn't found as a plain <a href>.
-  //
-  // MUST be scoped to the visited person's own intro/top card — a page-wide
-  // search also matches "Message" links / "1st" badges belonging to OTHER
-  // people rendered elsewhere on the page (sidebar modules like "People also
-  // viewed"). For a non-connected target this false-positived AlreadyConnected,
-  // which skipped the real invite AND (via the message step that follows) sent
-  // a message to a random unrelated 1st-degree connection instead of the
-  // target — see CLAUDE.md / memory for the Jul 2026 incident. The top card is
-  // identified structurally as the section containing the page's own <h1> name
-  // heading, robust to class-name hashing. Mirrors the same fix in visit.ts.
+  // Identify top card containing person's name <h1>
   const topCard = page.locator("main section").filter({ has: page.locator("h1") }).first();
-  const hasMessageLink = await topCard.locator('a[href*="/messaging/compose"]').first().count() > 0;
-  if (hasMessageLink) throw new AlreadyConnectedError("Already connected");
   const pageText = await topCard.innerText().catch(() => "");
-  if (/\b1st\b/.test(pageText)) throw new AlreadyConnectedError("Already connected");
 
-  // Pending?
-  if (/\bPending\b/.test(pageText)) throw new PendingInviteError("Invitation already pending");
-  const pendingBtn = page.locator('button[aria-label*="Pending"]:visible');
-  if (await pendingBtn.count() > 0) throw new PendingInviteError("Invitation already pending");
+  // Check degree: 1st vs 2nd / 3rd
+  const isExplicit2ndOr3rd = /\b[23][ºªndrdth°\.]/i.test(pageText) || /•\s*[23]º/i.test(pageText);
+  const isExplicit1st = (/\b1[ºªster°\.]/i.test(pageText) || /•\s*1º/i.test(pageText)) && !isExplicit2ndOr3rd;
+  if (isExplicit1st) throw new AlreadyConnectedError("Already connected (1st degree)");
 
-  // Case 1: Direct Connect link (primary CTA) — navigate to its href directly.
-  // Clicking fails because the Sales Nav overlay SVG intercepts pointer events.
-  const directConnect = page.locator('a[aria-label*="Invite"][aria-label*="to connect"]:visible, a[href*="custom-invite"]:visible').first();
-  if (await directConnect.count() > 0) {
-    const href = await directConnect.getAttribute("href");
-    if (!href) throw new Error("Connect link has no href");
-    const inviteUrl = href.startsWith("http") ? href : `https://www.linkedin.com${href}`;
-    await page.goto(inviteUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
-    await page.waitForTimeout(1000);
-  } else {
-    // Case 2: Connect is inside the "..." More menu
-    // LinkedIn has two "More" buttons on page: [0] = nav bar, [1] = profile card
-    const moreBtn = page.locator('button[aria-label="More"]:visible').nth(1);
-    await moreBtn.click();
-    await page.waitForTimeout(800);
-
-    // Check for Pending in the menu — means invite was already sent
-    const pendingMenuItem = page.locator('[role="menuitem"]:has-text("Pending"):visible');
-    if (await pendingMenuItem.count() > 0) throw new PendingInviteError("Invitation already pending (found in More menu)");
-
-    const connectOption = page.locator('[role="menuitem"]:has-text("Connect"):visible');
-    if (await connectOption.count() === 0) throw new Error("Connect option not found in More menu");
-    await connectOption.first().click();
-  }
-
-  await page.waitForTimeout(1000);
-
-  // Click "Send without a note" / "Send now"
-  const sendBtn = page.locator(
-    'button:has-text("Send now"), button[aria-label*="Send without"], button[aria-label*="Send invitation"]:not([aria-label*="note"])'
+  // Check if invitation is already pending
+  const isPendingText = /Pending|Pendente|Pendiente|Aguardando|En attente/i.test(pageText);
+  const pendingBtn = topCard.locator(
+    'button[aria-label*="Pending"]:visible, button[aria-label*="Pendente"]:visible, button[aria-label*="Pendiente"]:visible, button[aria-label*="Aguardando"]:visible, button:has-text("Pendente"):visible, button:has-text("Pending"):visible, button:has-text("Pendiente"):visible'
   );
-  if (await sendBtn.count() > 0) {
-    await sendBtn.first().click({ force: true });
-    await page.waitForTimeout(1500);
+  if (isPendingText || (await pendingBtn.count()) > 0) {
+    throw new PendingInviteError("Invitation already pending");
   }
 
-  // Check for weekly limit popup
-  const limitPopup = page.locator('div[class*="ip-fuse-limit-alert__warning"]');
-  if (await limitPopup.count() > 0) throw new WeeklyLimitError("Weekly connection limit reached");
+  // Strategy 1: Look for direct Connect button/link in top card
+  const directConnect = topCard.locator(`
+    button:has-text("Conectar"):visible,
+    button:has-text("Connect"):visible,
+    button:has-text("Se connecter"):visible,
+    button:has-text("Vernetzen"):visible,
+    a[aria-label*="Conectar"]:visible,
+    a[aria-label*="Connect"]:visible,
+    a[aria-label*="Convidar"]:visible,
+    a[aria-label*="Invitar"]:visible,
+    a[aria-label*="Invite"][aria-label*="to connect"]:visible,
+    a[href*="custom-invite"]:visible
+  `).first();
 
-  // Check for error toast
+  let clickedConnect = false;
+
+  if ((await directConnect.count()) > 0) {
+    const tagName = await directConnect.evaluate((el) => el.tagName.toLowerCase()).catch(() => "");
+    const href = await directConnect.getAttribute("href").catch(() => null);
+
+    if (tagName === "a" && href && href.includes("custom-invite")) {
+      const inviteUrl = href.startsWith("http") ? href : `https://www.linkedin.com${href}`;
+      await page.goto(inviteUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+      await page.waitForTimeout(1200);
+      clickedConnect = true;
+    } else {
+      await directConnect.click({ force: true });
+      await page.waitForTimeout(1000);
+      clickedConnect = true;
+    }
+  }
+
+  // Strategy 2: If no direct Connect button, open "..." (Mais / Más / More) dropdown
+  if (!clickedConnect) {
+    const moreBtn = topCard.locator(`
+      button[aria-label*="Mais"]:visible,
+      button[aria-label*="Más"]:visible,
+      button[aria-label*="More"]:visible,
+      button[aria-label*="ações"]:visible,
+      button[aria-label*="acciones"]:visible,
+      button[aria-label*="actions"]:visible,
+      button:has-text("Mais"):visible,
+      button:has-text("Más"):visible,
+      button:has-text("More"):visible,
+      div.artdeco-dropdown button:visible
+    `).first();
+
+    if ((await moreBtn.count()) === 0) {
+      throw new Error("No Connect button or More menu found on profile");
+    }
+
+    await moreBtn.click({ force: true });
+    await page.waitForTimeout(1000);
+
+    // Check for Pending in the opened dropdown menu
+    const pendingMenuItem = page.locator(
+      '[role="menuitem"]:has-text("Pending"):visible, [role="menuitem"]:has-text("Pendente"):visible, [role="menuitem"]:has-text("Pendiente"):visible, div.artdeco-dropdown__item:has-text("Pendente"):visible'
+    );
+    if ((await pendingMenuItem.count()) > 0) {
+      throw new PendingInviteError("Invitation already pending (found in More menu)");
+    }
+
+    // Click "Conectar" / "Connect" from dropdown
+    const connectOption = page.locator(`
+      [role="menuitem"]:has-text("Conectar"):visible,
+      [role="menuitem"]:has-text("Connect"):visible,
+      [role="menuitem"]:has-text("Se connecter"):visible,
+      [role="menuitem"]:has-text("Vernetzen"):visible,
+      div.artdeco-dropdown__item:has-text("Conectar"):visible,
+      div.artdeco-dropdown__item:has-text("Connect"):visible
+    `).first();
+
+    if ((await connectOption.count()) === 0) {
+      throw new Error("Connect option not found in More/Mais menu");
+    }
+
+    await connectOption.click({ force: true });
+    await page.waitForTimeout(1200);
+  }
+
+  // Step 3: Handle invitation modal (Send without note / Enviar sem nota / Enviar agora)
+  const sendBtn = page.locator(`
+    div[role="dialog"] button:has-text("Enviar agora"):visible,
+    div[role="dialog"] button:has-text("Enviar sem nota"):visible,
+    div[role="dialog"] button:has-text("Send now"):visible,
+    div[role="dialog"] button:has-text("Send without a note"):visible,
+    div[role="dialog"] button:has-text("Enviar"):visible,
+    div[role="dialog"] button:has-text("Send"):visible,
+    button[aria-label*="Enviar sem"]:visible,
+    button[aria-label*="Send without"]:visible,
+    button[aria-label*="Enviar agora"]:visible,
+    button[aria-label*="Send now"]:visible,
+    button[aria-label*="Enviar convite"]:visible,
+    button[aria-label*="Send invitation"]:not([aria-label*="note"]):not([aria-label*="nota"]):visible
+  `).first();
+
+  try {
+    if ((await sendBtn.count()) > 0) {
+      await sendBtn.click({ force: true });
+      await page.waitForTimeout(2000);
+    }
+  } catch (err) {
+    console.warn("[connect] Warning while clicking send modal button:", err);
+  }
+
+  // Step 4: Check if email prompt appeared ("Para conectar, digite o e-mail")
+  const emailPrompt = page.locator('input[type="email"]:visible, input#email:visible');
+  if ((await emailPrompt.count()) > 0) {
+    const closeBtn = page.locator('button[aria-label*="Dismiss"]:visible, button[aria-label*="Fechar"]:visible, button[aria-label*="Cerrar"]:visible').first();
+    if ((await closeBtn.count()) > 0) await closeBtn.click().catch(() => {});
+    throw new Error("LinkedIn requires email address to connect with this target");
+  }
+
+  // Step 5: Check for weekly limit popup
+  const limitPopup = page.locator('div[class*="ip-fuse-limit-alert__warning"], div:has-text("weekly limit"), div:has-text("limite semanal")');
+  if ((await limitPopup.count()) > 0) {
+    throw new WeeklyLimitError("Weekly connection limit reached");
+  }
+
+  // Step 6: Check for error toast
   const errorToast = page.locator('div[data-test-artdeco-toast-item-type="error"]:visible');
-  if (await errorToast.count() > 0) {
+  if ((await errorToast.count()) > 0) {
     const msg = await errorToast.innerText();
     throw new Error(`Connection error: ${msg.trim()}`);
   }
