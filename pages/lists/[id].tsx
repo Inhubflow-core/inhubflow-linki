@@ -631,7 +631,8 @@ export default function ListDetailPage({
                   <th>Title</th>
                   <th>Company</th>
                   <th>Location</th>
-                  <th className="w-20"></th>
+                  <th>Email</th>
+                  <th className="w-16">Status</th>
                   <th></th>
                 </tr>
               </thead>
@@ -655,6 +656,21 @@ export default function ListDetailPage({
                     <td className="text-base-content/60">{t.company ?? "—"}</td>
                     <td className="text-base-content/40 text-xs">{t.location ?? "—"}</td>
                     <td onClick={(e) => e.stopPropagation()}>
+                      {t.email ? (
+                        <a
+                          href={`mailto:${t.email}`}
+                          className="inline-flex items-center gap-1 text-xs font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded hover:underline max-w-[180px] truncate"
+                          title={t.email}
+                        >
+                          <RiMailLine size={11} className="shrink-0" /> {t.email}
+                        </a>
+                      ) : t.apollo_enriched_at ? (
+                        <span className="text-[11px] text-base-content/30 italic">No email</span>
+                      ) : (
+                        <span className="text-[11px] text-base-content/25">—</span>
+                      )}
+                    </td>
+                    <td onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-2">
                         <ConnectionIcon t={t} />
                         {t.message_sent_at && (
@@ -675,11 +691,6 @@ export default function ListDetailPage({
                         {t.email && t.email_status !== "verified" && (
                           <span title={`Email (${t.email_status ?? "unverified"}): ${t.email}`} className="text-warning">
                             <RiAtLine size={14} />
-                          </span>
-                        )}
-                        {t.apollo_enriched_at && !t.email && (
-                          <span title="Apollo enriched — no email found" className="text-base-content/20">
-                            <RiMailLine size={14} />
                           </span>
                         )}
                       </div>

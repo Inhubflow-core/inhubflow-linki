@@ -8,6 +8,7 @@ export interface ApolloMatchResult {
   functions: string[] | null;
   departments: string[] | null;
   email: string | null;
+  phone: string | null;
   email_status: string | null;
   email_domain_catchall: boolean;
   city: string | null;
@@ -38,10 +39,20 @@ export async function matchPerson(
   linkedinUrl: string,
   apiKey: string
 ): Promise<ApolloMatchResult | null> {
+  // Normalize URL to standard www.linkedin.com/in/... (Apollo works best with standard domain)
+  const normalizedUrl = linkedinUrl
+    .trim()
+    .replace(/https?:\/\/[a-z0-9.-]*linkedin\.com\/in\//i, "https://www.linkedin.com/in/")
+    .replace(/\/+$/, "");
+
   const res = await fetch(`${APOLLO_BASE}/people/match`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Api-Key": apiKey },
-    body: JSON.stringify({ linkedin_url: linkedinUrl, reveal_personal_emails: false }),
+    body: JSON.stringify({
+      linkedin_url: normalizedUrl,
+      reveal_personal_emails: true,
+      reveal_phone_number: true,
+    }),
   });
 
   if (!res.ok) return null;
@@ -69,15 +80,35 @@ export async function matchPerson(
     positions_json = JSON.stringify(positions);
   }
 
+  // Extract email (avoid placeholder strings like "email_not_unlocked@...")
+  let email: string | null = null;
+  if (p.email && typeof p.email === "string" && !p.email.includes("email_not_unlocked")) {
+    email = p.email.toLowerCase().trim();
+  } else if (Array.isArray(p.personal_emails) && p.personal_emails.length > 0) {
+    email = String(p.personal_emails[0]).toLowerCase().trim();
+  }
+
+  // Extract phone number
+  let phone: string | null = null;
+  if (p.sanitized_phone) {
+    phone = String(p.sanitized_phone).trim();
+  } else if (Array.isArray(p.phone_numbers) && p.phone_numbers.length > 0) {
+    const firstPhone = p.phone_numbers[0];
+    phone = (firstPhone.sanitized_number || firstPhone.raw_number || "").trim() || null;
+  } else if (org?.phone || org?.sanitized_phone) {
+    phone = String(org.phone || org.sanitized_phone).trim();
+  }
+
   return {
     apollo_id: p.id,
-    linkedin_url: p.linkedin_url ?? null,
+    linkedin_url: p.linkedin_url ?? normalizedUrl,
     headline: p.headline ?? null,
     seniority: p.seniority ?? null,
     functions: Array.isArray(p.functions) && p.functions.length > 0 ? p.functions : null,
     departments: Array.isArray(p.departments) && p.departments.length > 0 ? p.departments : null,
-    email: p.email ?? null,
-    email_status: p.email_status ?? null,
+    email,
+    phone,
+    email_status: p.email_status ?? (email ? "verified" : null),
     email_domain_catchall: p.email_domain_catchall === true,
     city: p.city ?? null,
     country: p.country ?? null,
