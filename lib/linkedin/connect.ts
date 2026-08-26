@@ -1,4 +1,4 @@
-import type { Locator, Page, Response } from "playwright";
+import type { Locator, Page } from "playwright";
 
 export class WeeklyLimitError extends Error {}
 export class AlreadyConnectedError extends Error {}
@@ -15,8 +15,9 @@ const TOAST_SELECTOR = [
 
 const CONNECT_LABEL_RE = /^(?:conectar|connect|se connecter|vernetzen|convidar|invitar|invite)$/i;
 const MORE_LABEL_RE = /^(?:mais|mais ações|mais a[cç][õo]es|mais opções|mais op[cç][õo]es|más|más acciones|more|more actions|more options|actions|options)$/i;
-const PENDING_LABEL_RE = /(?:convite pendente|invitation pending|invitación pendiente|pendente|pending|pendiente|aguardando|invitation sent|convite enviado|invitación enviada|cancelar convite|retirar convite|withdraw invitation|cancelar invitación|retirar invitación)/i;
+const PENDING_LABEL_RE = /(?:convite pendente|invitation pending|invitación pendiente|pendente|pending|pendiente|aguardando|invitation sent|convite enviado|invitación enviada|cancelar convite|retirar convite|remover convite|cancelar solicitação|retirar solicitação|withdraw invitation|withdraw request|cancelar invitación|retirar invitación)/i;
 const SENT_LABEL_RE = /(?:convite enviado|invitation sent|invitación enviada|solicitação enviada|pedido enviado|request sent|connection request sent|conexão enviada)/i;
+const ERROR_LABEL_RE = /(?:algo deu errado|ocorreu um erro|não foi possível|nao foi possivel|tente novamente|could not|couldn't|unable to|something went wrong|try again|no se pudo|ocurrió un error|inténtalo de nuevo)/i;
 const LIMIT_RE = /(?:weekly connection limit|weekly limit|limite semanal|limite de convites|atingiu o limite|reached the limit)/i;
 const EMAIL_PROMPT_RE = /(?:digite|insira|informe|enter|provide).*e-?mail|e-?mail.*(?:para conectar|to connect|connection)/i;
 const ADD_NOTE_RE = /^(?:adicionar uma nota|adicionar nota|add a note|add note|adicionar mensagem|add message)$/i;
@@ -145,7 +146,7 @@ async function visibleError(page: Page): Promise<string | null> {
       throw new WeeklyLimitError("Weekly connection limit reached");
     }
     const type = await item.getAttribute("data-test-artdeco-toast-item-type").catch(() => "");
-    if (type?.toLowerCase() === "error") return text.trim();
+    if (type?.toLowerCase() === "error" || ERROR_LABEL_RE.test(normalizeLabel(text))) return text.trim();
   }
   return null;
 }
@@ -387,55 +388,59 @@ async function hasPendingInMoreMenu(page: Page, scope: Locator): Promise<boolean
   return false;
 }
 
-async function confirmOnProfile(page: Page, linkedinUrl: string): Promise<boolean> {
+async function profileShowsPending(page: Page): Promise<boolean> {
   const scope = await profileActionScope(page);
-  if (await hasPendingProfileAction(scope) || await hasPendingInMoreMenu(page, scope)) return true;
-
-  await page.goto(linkedinUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
-  await page.waitForTimeout(1500);
-  const refreshedScope = await profileActionScope(page);
-  return await hasPendingProfileAction(refreshedScope) || await hasPendingInMoreMenu(page, refreshedScope);
+  return await hasPendingProfileAction(scope) || await hasPendingInMoreMenu(page, scope);
 }
 
-async function confirmConnectionRequest(
-  page: Page,
-  linkedinUrl: string,
-  responseSeen: () => boolean
-): Promise<void> {
-  const deadline = Date.now() + 15000;
-  let modalClosedAt: number | null = null;
-  let profileChecked = false;
+async function confirmOnProfile(page: Page, linkedinUrl: string): Promise<boolean> {
+  await page.goto(linkedinUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+  await page.waitForTimeout(2000);
+  return profileShowsPending(page);
+}
 
-  while (Date.now() < deadline) {
+async function confirmConnectionRequest(page: Page, linkedinUrl: string): Promise<void> {
+  const modalDeadline = Date.now() + 15000;
+  let modalClosedAt: number | null = null;
+  let sawSentToast = false;
+
+  while (Date.now() < modalDeadline) {
     const limit = await visibleWeeklyLimit(page);
     if (limit) throw new WeeklyLimitError(limit);
 
     const error = await visibleError(page);
     if (error) throw new Error(`Connection error: ${error}`);
 
-    if (await visibleToastMatching(page, SENT_LABEL_RE)) return;
+    if (await visibleToastMatching(page, SENT_LABEL_RE)) sawSentToast = true;
+
     if (await findInvitationModal(page)) {
       modalClosedAt = null;
     } else if (modalClosedAt === null) {
       modalClosedAt = Date.now();
     }
 
-    if (modalClosedAt !== null && responseSeen()) return;
-
-    // Give the invitation request time to finish before reloading the profile;
-    // navigating immediately when the modal closes can cancel an in-flight POST.
-    if (modalClosedAt !== null && !profileChecked && Date.now() - modalClosedAt >= 2500) {
-      profileChecked = true;
-      if (await confirmOnProfile(page, linkedinUrl)) return;
-    }
+    // Keep the page alive long enough for LinkedIn's create-invitation request
+    // to finish; the runner closes this page as soon as this function returns.
+    if (modalClosedAt !== null && Date.now() - modalClosedAt >= 4000) break;
     await page.waitForTimeout(300);
   }
 
-  const limit = await visibleWeeklyLimit(page);
-  if (limit) throw new WeeklyLimitError(limit);
-  const error = await visibleError(page);
-  if (error) throw new Error(`Connection error: ${error}`);
-  throw new Error("LinkedIn did not confirm that the connection request was sent");
+  if (modalClosedAt === null) {
+    throw new Error("LinkedIn did not close the connection invitation modal after clicking send");
+  }
+
+  // A 2xx Voyager response is not sufficient proof: LinkedIn also returns 2xx
+  // for quota/preload calls that do not create an invitation. Require the
+  // persisted profile state after a fresh navigation instead.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (await confirmOnProfile(page, linkedinUrl)) return;
+    if (attempt === 0) await page.waitForTimeout(2500);
+  }
+
+  const signal = sawSentToast
+    ? "LinkedIn showed a sent notification, but the profile still offers Connect"
+    : "LinkedIn closed the invitation modal, but the profile still offers Connect";
+  throw new Error(`${signal}; the connection request was not confirmed`);
 }
 
 /**
@@ -504,32 +509,11 @@ export async function sendConnectionRequest(page: Page, linkedinUrl: string): Pr
     throw new Error("LinkedIn connection send button remained disabled");
   }
 
-  let responseSeen = false;
-  const responseHandler = (response: Response) => {
-    try {
-      const request = response.request();
-      if (
-        request.method() === "POST" &&
-        response.status() >= 200 &&
-        response.status() < 300 &&
-        /linkedin\.com\/voyager\/api\/.*(?:relationship|invitation|connection)/i.test(response.url())
-      ) {
-        responseSeen = true;
-      }
-    } catch {
-      // ignore
-    }
-  };
-  page.on("response", responseHandler);
-
   try {
-    try {
-      await sendButton.click({ force: true, timeout: 10000 });
-    } catch (error) {
-      throw new Error(`Could not click LinkedIn's send-without-note button: ${error instanceof Error ? error.message : String(error)}`);
-    }
-    await confirmConnectionRequest(page, linkedinUrl, () => responseSeen);
-  } finally {
-    page.off("response", responseHandler);
+    await sendButton.click({ force: true, timeout: 10000 });
+  } catch (error) {
+    throw new Error(`Could not click LinkedIn's send-without-note button: ${error instanceof Error ? error.message : String(error)}`);
   }
+
+  await confirmConnectionRequest(page, linkedinUrl);
 }
