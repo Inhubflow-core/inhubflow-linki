@@ -17,6 +17,7 @@ const CONNECT_LABEL_RE = /^(?:conectar|connect|se connecter|vernetzen|convidar|i
 const MORE_LABEL_RE = /^(?:mais|mais ações|mais a[cç][õo]es|mais opções|mais op[cç][õo]es|más|más acciones|more|more actions|more options|actions|options)$/i;
 const PENDING_LABEL_RE = /(?:convite pendente|invitation pending|invitación pendiente|pendente|pending|pendiente|aguardando|invitation sent|convite enviado|invitación enviada|cancelar convite|retirar convite|remover convite|cancelar solicitação|retirar solicitação|withdraw invitation|withdraw request|cancelar invitación|retirar invitación)/i;
 const SENT_LABEL_RE = /(?:convite enviado|invitation sent|invitación enviada|solicitação enviada|pedido enviado|request sent|connection request sent|conexão enviada)/i;
+const NEGATED_SENT_RE = /(?:não (?:foi )?enviado|nao (?:foi )?enviado|não conseguimos enviar|nao conseguimos enviar|not sent|was not sent|wasn't sent|could not send|couldn't send|no (?:se )?(?:envió|envio)|no pudimos enviar)/i;
 const ERROR_LABEL_RE = /(?:algo deu errado|ocorreu um erro|não foi possível|nao foi possivel|tente novamente|could not|couldn't|unable to|something went wrong|try again|no se pudo|ocurrió un error|inténtalo de nuevo)/i;
 const LIMIT_RE = /(?:weekly connection limit|weekly limit|limite semanal|limite de convites|atingiu o limite|reached the limit)/i;
 const EMAIL_PROMPT_RE = /(?:digite|insira|informe|enter|provide).*e-?mail|e-?mail.*(?:para conectar|to connect|connection)/i;
@@ -107,14 +108,17 @@ async function hasPendingProfileAction(scope: Locator): Promise<boolean> {
   return action !== null;
 }
 
-async function visibleToastMatching(page: Page, expression: RegExp): Promise<string | null> {
+async function visibleSentToast(page: Page): Promise<string | null> {
   const toasts = page.locator(TOAST_SELECTOR);
   const count = await toasts.count().catch(() => 0);
   for (let index = 0; index < count; index++) {
     const toast = toasts.nth(index);
     if (!(await toast.isVisible().catch(() => false))) continue;
     const text = await toast.innerText().catch(() => "");
-    if (expression.test(normalizeLabel(text))) return text.trim();
+    const label = normalizeLabel(text);
+    if (SENT_LABEL_RE.test(label) && !NEGATED_SENT_RE.test(label) && !ERROR_LABEL_RE.test(label)) {
+      return text.trim();
+    }
   }
   return null;
 }
@@ -141,12 +145,15 @@ async function visibleError(page: Page): Promise<string | null> {
     if (!(await item.isVisible().catch(() => false))) continue;
     const text = await item.innerText().catch(() => "");
     if (!text.trim()) continue;
-    if (SENT_LABEL_RE.test(normalizeLabel(text))) continue;
-    if (LIMIT_RE.test(normalizeLabel(text))) {
+    const label = normalizeLabel(text);
+    if (LIMIT_RE.test(label)) {
       throw new WeeklyLimitError("Weekly connection limit reached");
     }
     const type = await item.getAttribute("data-test-artdeco-toast-item-type").catch(() => "");
-    if (type?.toLowerCase() === "error" || ERROR_LABEL_RE.test(normalizeLabel(text))) return text.trim();
+    if (type?.toLowerCase() === "error" || ERROR_LABEL_RE.test(label) || NEGATED_SENT_RE.test(label)) {
+      return text.trim();
+    }
+    if (SENT_LABEL_RE.test(label)) continue;
   }
   return null;
 }
@@ -228,20 +235,41 @@ async function waitForEnabled(button: Locator, timeoutMs = 8000): Promise<boolea
   return false;
 }
 
-function customInviteUrl(href: string, currentUrl: string): string {
+function profileVanityName(profileUrl: string): string | null {
+  try {
+    const match = new URL(profileUrl).pathname.match(/^\/in\/([^/?#]+)/i);
+    return match ? decodeURIComponent(match[1]).toLocaleLowerCase("en-US") : null;
+  } catch {
+    return null;
+  }
+}
+
+function customInviteUrl(href: string, currentUrl: string, expectedProfileUrl: string): string {
   const url = new URL(href, currentUrl);
   if (!/(^|\.)linkedin\.com$/i.test(url.hostname)) {
     throw new Error(`Refusing to navigate custom invite URL outside LinkedIn: ${url.hostname}`);
   }
+
+  const expectedVanity = profileVanityName(expectedProfileUrl);
+  const inviteVanity = url.searchParams.get("vanityName")?.toLocaleLowerCase("en-US") ?? null;
+  if (expectedVanity && inviteVanity && expectedVanity !== inviteVanity) {
+    throw new Error(
+      `LinkedIn's Connect menu pointed to a different profile (${inviteVanity}) instead of ${expectedVanity}`
+    );
+  }
   return url.toString();
 }
 
-async function activateConnectAction(page: Page, action: Locator): Promise<void> {
+async function activateConnectAction(
+  page: Page,
+  action: Locator,
+  expectedProfileUrl: string
+): Promise<void> {
   const href = await action.getAttribute("href").catch(() => null);
   const nestedHref = href || await action.locator('a[href*="custom-invite"]').getAttribute("href").catch(() => null);
 
   if (nestedHref?.includes("custom-invite")) {
-    const inviteUrl = customInviteUrl(nestedHref, page.url());
+    const inviteUrl = customInviteUrl(nestedHref, page.url(), expectedProfileUrl);
     // Clicking preserves LinkedIn's SPA behavior and its analytics. The
     // navigation fallback handles DOM variants where the anchor has no click
     // handler and the preload route must be opened directly.
@@ -258,26 +286,28 @@ async function activateConnectAction(page: Page, action: Locator): Promise<void>
 }
 
 async function findConnectInOpenMenu(page: Page): Promise<Locator | null> {
-  const customLink = await visibleCustomInvite(page.locator("body"));
-  if (customLink) return customLink;
-
   const menus = page.locator(MENU_SELECTOR);
   const menuCount = await menus.count().catch(() => 0);
   for (let index = 0; index < menuCount; index++) {
+    const menu = menus.nth(index);
+    const customLink = await visibleCustomInvite(menu);
+    if (customLink) return customLink;
+
     const option = await visibleAction(
-      menus.nth(index),
+      menu,
       (text, aria, title) => isConnectAction(text, aria, title),
       'a, button, [role="menuitem"], [role="button"], .artdeco-dropdown__item'
     );
     if (option) return option;
   }
 
-  // A few LinkedIn builds omit role="menu" but retain menuitem/Artdeco item
-  // classes. These are safe to inspect only after a trigger has been clicked.
+  // Some LinkedIn builds omit a menu wrapper but keep visible menuitem or
+  // Artdeco-item semantics. Never search arbitrary links in the full body: a
+  // recommendation card can contain another person's custom-invite URL.
   return visibleAction(
     page.locator("body"),
     (text, aria, title) => isConnectAction(text, aria, title),
-    '[role="menuitem"], .artdeco-dropdown__item, [data-control-name*="connect" i]'
+    '[role="menuitem"]:visible, .artdeco-dropdown__item:visible'
   );
 }
 
@@ -411,7 +441,7 @@ async function confirmConnectionRequest(page: Page, linkedinUrl: string): Promis
     const error = await visibleError(page);
     if (error) throw new Error(`Connection error: ${error}`);
 
-    if (await visibleToastMatching(page, SENT_LABEL_RE)) sawSentToast = true;
+    if (await visibleSentToast(page)) sawSentToast = true;
 
     if (await findInvitationModal(page)) {
       modalClosedAt = null;
@@ -469,13 +499,13 @@ export async function sendConnectionRequest(page: Page, linkedinUrl: string): Pr
   }
 
   if (connectAction) {
-    await activateConnectAction(page, connectAction);
+    await activateConnectAction(page, connectAction, linkedinUrl);
   } else {
     const menuConnect = await clickConnectFromMoreMenu(page, topCard);
     if (!menuConnect) {
       throw new Error("Could not find the LinkedIn More/Mais menu or its Connect/Conectar option");
     }
-    await activateConnectAction(page, menuConnect);
+    await activateConnectAction(page, menuConnect, linkedinUrl);
   }
 
   const modal = await waitForInvitationModal(page);
