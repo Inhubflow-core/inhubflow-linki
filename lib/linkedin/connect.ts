@@ -244,20 +244,24 @@ function profileVanityName(profileUrl: string): string | null {
   }
 }
 
-function customInviteUrl(href: string, currentUrl: string, expectedProfileUrl: string): string {
-  const url = new URL(href, currentUrl);
-  if (!/(^|\.)linkedin\.com$/i.test(url.hostname)) {
-    throw new Error(`Refusing to navigate custom invite URL outside LinkedIn: ${url.hostname}`);
+function resolveCustomInvite(
+  href: string,
+  currentUrl: string,
+  expectedProfileUrl: string
+): { url: string; clickCandidate: boolean } {
+  const candidateUrl = new URL(href, currentUrl);
+  if (!/(^|\.)linkedin\.com$/i.test(candidateUrl.hostname)) {
+    throw new Error(`Refusing to navigate custom invite URL outside LinkedIn: ${candidateUrl.hostname}`);
   }
 
   const expectedVanity = profileVanityName(expectedProfileUrl);
-  const inviteVanity = url.searchParams.get("vanityName")?.toLocaleLowerCase("en-US") ?? null;
+  const inviteVanity = candidateUrl.searchParams.get("vanityName")?.toLocaleLowerCase("en-US") ?? null;
   if (expectedVanity && inviteVanity && expectedVanity !== inviteVanity) {
-    throw new Error(
-      `LinkedIn's Connect menu pointed to a different profile (${inviteVanity}) instead of ${expectedVanity}`
-    );
+    const expectedUrl = new URL("/preload/custom-invite/", candidateUrl.origin);
+    expectedUrl.searchParams.set("vanityName", expectedVanity);
+    return { url: expectedUrl.toString(), clickCandidate: false };
   }
-  return url.toString();
+  return { url: candidateUrl.toString(), clickCandidate: true };
 }
 
 async function activateConnectAction(
@@ -269,15 +273,16 @@ async function activateConnectAction(
   const nestedHref = href || await action.locator('a[href*="custom-invite"]').getAttribute("href").catch(() => null);
 
   if (nestedHref?.includes("custom-invite")) {
-    const inviteUrl = customInviteUrl(nestedHref, page.url(), expectedProfileUrl);
-    // Clicking preserves LinkedIn's SPA behavior and its analytics. The
-    // navigation fallback handles DOM variants where the anchor has no click
-    // handler and the preload route must be opened directly.
-    await action.click({ force: true, noWaitAfter: true }).catch(() => {});
-    await page.waitForTimeout(1200);
-    if (!(await findInvitationModal(page))) {
-      await page.goto(inviteUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+    const invite = resolveCustomInvite(nestedHref, page.url(), expectedProfileUrl);
+    // Click only when the menu link belongs to the expected profile. LinkedIn
+    // pages can expose custom-invite links for recommendation cards; when that
+    // happens, navigate to the deterministic invite URL for the target instead.
+    if (invite.clickCandidate) {
+      await action.click({ force: true, noWaitAfter: true }).catch(() => {});
+      await page.waitForTimeout(1200);
+      if (await findInvitationModal(page)) return;
     }
+    await page.goto(invite.url, { waitUntil: "domcontentloaded", timeout: 30000 });
     return;
   }
 
