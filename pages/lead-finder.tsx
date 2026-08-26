@@ -470,9 +470,9 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                   />
                 </div>
-                {/* Suggestions */}
+                  {/* Suggestions */}
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  {SAMPLE_LOCATIONS.slice(0, 4).map((sl) => (
+                  {SAMPLE_LOCATIONS.map((sl) => (
                     <button
                       key={sl}
                       type="button"

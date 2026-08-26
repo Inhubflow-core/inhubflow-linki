@@ -181,6 +181,78 @@ const COUNTRY_WORDS = new Set([
   "brasil", "brazil", "chile", "espana", "españa", "spain", "colombia", "mexico", "méxico", "argentina", "peru", "perú", "uruguay", "usa", "eeuu"
 ]);
 
+const LINKEDIN_GEO_URNS: Record<string, string> = {
+  // Chile
+  chile: "104621610",
+  santiago: "105741643",
+  valparaiso: "104621610",
+  concepcion: "104621610",
+
+  // Brasil
+  brasil: "106057199",
+  brazil: "106057199",
+  "sao paulo": "104746682",
+  "são paulo": "104746682",
+  "rio de janeiro": "106057199",
+  "belo horizonte": "106057199",
+  curitiba: "106057199",
+
+  // Peru
+  peru: "102927786",
+  perú: "102927786",
+  lima: "105333783",
+
+  // Colombia
+  colombia: "100876405",
+  bogota: "101784918",
+  bogotá: "101784918",
+  medellin: "100876405",
+  medellín: "100876405",
+  cali: "100876405",
+
+  // España
+  espana: "105646813",
+  españa: "105646813",
+  spain: "105646813",
+  madrid: "100878084",
+  barcelona: "105646813",
+  valencia: "105646813",
+
+  // Mexico
+  mexico: "103323778",
+  méxico: "103323778",
+  "ciudad de mexico": "103323778",
+  "ciudad de méxico": "103323778",
+  cdmx: "103323778",
+  monterrey: "103323778",
+  guadalajara: "103323778",
+
+  // Argentina
+  argentina: "100446943",
+  "buenos aires": "100446943",
+  cordoba: "100446943",
+
+  // USA
+  usa: "103644278",
+  "estados unidos": "103644278",
+  "united states": "103644278",
+  miami: "103644278",
+  florida: "103644278",
+  "new york": "103644278",
+  california: "103644278",
+};
+
+export function resolveGeoUrn(loc: string): string | null {
+  if (!loc) return null;
+  const clean = loc.toLowerCase().replace(/[,.;:/\\-]/g, " ").trim();
+  for (const [key, urn] of Object.entries(LINKEDIN_GEO_URNS)) {
+    if (clean.includes(key)) {
+      return urn;
+    }
+  }
+  return null;
+}
+
 /**
  * Expands a single user token or term using the dictionary.
  */

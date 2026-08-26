@@ -6,6 +6,7 @@ import {
   SearchProgressEvent,
   SearchLead,
 } from "@/lib/linkedin/search";
+import { searchLinkedInWithXRay } from "@/lib/linkedin/xray";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -23,10 +24,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     listName,
     stream = true,
   } = req.body || {};
-
-  if (!accountId) {
-    return res.status(400).json({ error: "Se requiere accountId de LinkedIn." });
-  }
 
   if (!title && !location && !company && !keywords) {
     return res.status(400).json({
@@ -62,7 +59,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
 
     sendEvent("init", {
-      message: "Conectado al motor de búsqueda de LinkedIn...",
+      message: "Conectado al motor Google X-Ray Search para LinkedIn...",
       filters: { title, location, company, keywords },
       limit: numericLimit,
       listName: cleanListName,
@@ -70,19 +67,53 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     try {
       const db = getDb();
-      const profiles: SearchLead[] = await searchLinkedInProfiles(
-        {
-          accountId,
-          filters: { title, location, company, keywords },
-          limit: numericLimit,
-        },
-        (progress: SearchProgressEvent) => {
-          sendEvent("progress", progress);
-          if (progress.currentLead) {
-            sendEvent("lead", progress.currentLead);
+      let profiles: SearchLead[] = [];
+
+      // ─── TIER 1: High-Precision Google X-Ray Search ─────────────────────────
+      try {
+        profiles = await searchLinkedInWithXRay(
+          {
+            title,
+            location,
+            company,
+            keywords,
+            limit: numericLimit,
+          },
+          (progress: SearchProgressEvent) => {
+            sendEvent("progress", progress);
+            if (progress.currentLead) {
+              sendEvent("lead", progress.currentLead);
+            }
           }
-        }
-      );
+        );
+      } catch (xrayErr) {
+        console.warn("[search-and-import] Google X-Ray notice, falling back to LinkedIn session:", xrayErr);
+      }
+
+      // ─── TIER 2: Fallback to LinkedIn Stealth Session if X-Ray yielded 0 ───
+      if (profiles.length === 0 && accountId) {
+        sendEvent("progress", {
+          phase: "navigating",
+          page: 1,
+          totalPages: Math.ceil(numericLimit / 10),
+          totalFound: 0,
+          message: "Consultando motor nativo de LinkedIn con sesión Stealth...",
+        });
+
+        profiles = await searchLinkedInProfiles(
+          {
+            accountId,
+            filters: { title, location, company, keywords },
+            limit: numericLimit,
+          },
+          (progress: SearchProgressEvent) => {
+            sendEvent("progress", progress);
+            if (progress.currentLead) {
+              sendEvent("lead", progress.currentLead);
+            }
+          }
+        );
+      }
 
       sendEvent("saving", {
         message: `Guardando ${profiles.length} prospectos en la lista "${cleanListName}"...`,
@@ -93,7 +124,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (profiles.length > 0) {
         saveResult = saveProfilesToList(db, {
           listName: cleanListName,
-          description: `Búsqueda Lead Finder: ${[title, location, company].filter(Boolean).join(" | ")}`,
+          description: `Búsqueda X-Ray: ${[title, location, company].filter(Boolean).join(" | ")}`,
           profiles,
         });
       }
@@ -124,17 +155,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Non-streaming JSON response
   try {
     const db = getDb();
-    const profiles = await searchLinkedInProfiles({
-      accountId,
-      filters: { title, location, company, keywords },
-      limit: numericLimit,
-    });
+    let profiles: SearchLead[] = [];
+
+    try {
+      profiles = await searchLinkedInWithXRay({
+        title,
+        location,
+        company,
+        keywords,
+        limit: numericLimit,
+      });
+    } catch {
+      if (accountId) {
+        profiles = await searchLinkedInProfiles({
+          accountId,
+          filters: { title, location, company, keywords },
+          limit: numericLimit,
+        });
+      }
+    }
 
     let saveResult = { listId: "", listName: cleanListName, importedCount: 0, updatedCount: 0 };
     if (profiles.length > 0) {
       saveResult = saveProfilesToList(db, {
         listName: cleanListName,
-        description: `Búsqueda Lead Finder: ${[title, location, company].filter(Boolean).join(" | ")}`,
+        description: `Búsqueda X-Ray: ${[title, location, company].filter(Boolean).join(" | ")}`,
         profiles,
       });
     }
