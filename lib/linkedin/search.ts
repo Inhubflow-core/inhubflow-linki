@@ -95,13 +95,29 @@ function sanitizeTerm(term: string): string {
   return tokens.join(" ");
 }
 
+const SYNONYMS: Record<string, string> = {
+  director: "diretor",
+  diretor: "director",
+  abogado: "advogado",
+  advogado: "abogado",
+  ingeniero: "engenheiro",
+  engenheiro: "ingeniero",
+  desarrollador: "desenvolvedor",
+  desenvolvedor: "desarrollador",
+  ventas: "vendas",
+  vendas: "ventas",
+  comercial: "sales",
+  gerente: "manager",
+  fundador: "founder",
+};
+
+const COUNTRY_WORDS = new Set([
+  "brasil", "brazil", "chile", "espana", "españa", "spain", "colombia", "mexico", "méxico", "argentina", "peru", "perú", "uruguay", "usa", "eeuu"
+]);
+
 /**
  * Builds prioritized query variations from filters with zero-result fallback.
- * Example for Title: "CEO", Location: "Santiago, Chile", Company: "Agencias de Marketing":
- * 1. "CEO Santiago Chile agencia marketing"
- * 2. "CEO Santiago Chile marketing"
- * 3. "CEO Santiago Chile agencia"
- * 4. "CEO Santiago Chile"
+ * Generates bilingual and broadened combinations for high recall.
  */
 export function buildQueryVariants(filters: SearchFilters): string[] {
   const titleTokens = cleanTokens(filters.title || "");
@@ -109,33 +125,49 @@ export function buildQueryVariants(filters: SearchFilters): string[] {
   const compTokens = cleanTokens(filters.company || "");
   const kwTokens = cleanTokens(filters.keywords || "");
 
+  // City-only location tokens (drops generic country names to match LinkedIn regional strings)
+  const locCityOnly = locTokens.filter((t) => !COUNTRY_WORDS.has(t));
+  const effectiveLocTokens = locCityOnly.length > 0 ? locCityOnly : locTokens;
+
+  // Bilingual title synonym tokens (e.g. Director -> Diretor)
+  const titleSynonyms = titleTokens.map((t) => SYNONYMS[t] || t);
+  const hasSynonym = titleSynonyms.some((t, i) => t !== titleTokens[i]);
+
   const variants: string[] = [];
   const add = (tokens: string[]) => {
     const v = tokens.join(" ").trim();
     if (v && !variants.includes(v)) variants.push(v);
   };
 
-  // 1. Full combo
-  add([...titleTokens, ...locTokens, ...compTokens, ...kwTokens]);
+  // 1. Title (Synonym/Localized) + City Location
+  if (hasSynonym && effectiveLocTokens.length > 0) {
+    add([...titleSynonyms, ...effectiveLocTokens, ...kwTokens]);
+  }
 
-  // 2. Individual company/industry tokens (e.g. "marketing" or "agencia")
-  if (compTokens.length > 1) {
+  // 2. Title + City Location (Clean, Highest recall in LinkedIn)
+  if (titleTokens.length > 0 && effectiveLocTokens.length > 0) {
+    add([...titleTokens, ...effectiveLocTokens, ...kwTokens]);
+  }
+
+  // 3. Title + City Location + Salient Company/Industry Token (e.g. Marketing)
+  if (compTokens.length > 0) {
     for (const ct of compTokens) {
-      add([...titleTokens, ...locTokens, ct, ...kwTokens]);
+      add([...titleTokens, ...effectiveLocTokens, ct, ...kwTokens]);
+      if (hasSynonym) add([...titleSynonyms, ...effectiveLocTokens, ct, ...kwTokens]);
     }
   }
 
-  // 3. Title + Location + Keywords (Broad baseline)
-  if (titleTokens.length > 0 || locTokens.length > 0) {
+  // 4. Title + Full Location (with country)
+  if (locTokens.length > effectiveLocTokens.length) {
     add([...titleTokens, ...locTokens, ...kwTokens]);
   }
 
-  // 4. Title + Company (if location was too restrictive)
+  // 5. Title + Company
   if (titleTokens.length > 0 && compTokens.length > 0) {
     add([...titleTokens, ...compTokens, ...kwTokens]);
   }
 
-  // 5. Just Title or Keywords
+  // 6. Just Title or Keywords
   if (titleTokens.length > 0) {
     add([...titleTokens, ...kwTokens]);
   }
