@@ -32,12 +32,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const numericLimit = Math.min(Math.max(parseInt(String(limit), 10) || 25, 5), 100);
+  const parts = [title?.trim(), location?.trim(), company?.trim()].filter(Boolean);
   const cleanListName =
     listName?.trim() ||
-    `${title ? title.trim() : "Prospectos"} ${location ? location.trim() : ""} - ${new Date().toLocaleDateString(
-      "es-ES",
-      { month: "short", year: "numeric" }
-    )}`.trim();
+    `${parts.length > 0 ? parts.join(" - ") : "Prospectos"} (${new Date().toLocaleDateString("es-ES", {
+      month: "short",
+      year: "numeric",
+    })})`.trim();
 
   // If streaming is requested (via body or Accept header)
   if (stream || req.headers.accept?.includes("text/event-stream")) {

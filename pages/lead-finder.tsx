@@ -150,7 +150,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
   // Auto-generate a list name based on filters if user hasn't explicitly customized it
   useEffect(() => {
     if (!customListName) {
-      const parts = [title.trim(), location.trim()].filter(Boolean);
+      const parts = [title.trim(), location.trim(), company.trim()].filter(Boolean);
       const dateLocale = locale === "en" ? "en-US" : locale === "pt-BR" ? "pt-BR" : "es-ES";
       const dateStr = new Date().toLocaleDateString(dateLocale, { month: "short", year: "numeric" });
       if (parts.length > 0) {
@@ -159,7 +159,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
         setListName(t("leadFinder.defaultListName", { date: dateStr }));
       }
     }
-  }, [title, location, customListName, locale, t]);
+  }, [title, location, company, customListName, locale, t]);
 
   // Keep accounts updated if user authenticated elsewhere
   useEffect(() => {
@@ -179,17 +179,6 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
 
   async function handleStartSearch(e: React.FormEvent) {
     e.preventDefault();
-
-    if (!selectedAccountId) {
-      toast.error(t("leadFinder.toastSelectAccount"));
-      return;
-    }
-
-    const selectedAcc = accounts.find((a) => a.id === selectedAccountId);
-    if (!selectedAcc?.is_authenticated) {
-      toast.error(t("leadFinder.toastAuthAccount"));
-      return;
-    }
 
     if (!title.trim() && !location.trim() && !company.trim()) {
       toast.error(t("leadFinder.toastFillFields"));
@@ -386,25 +375,6 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
           </div>
         </div>
 
-        {/* Warning if no authenticated account */}
-        {!hasAuthAccount && (
-          <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-300">
-            <RiAlertLine size={20} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
-            <div className="flex-1 text-sm space-y-1">
-              <p className="font-semibold">{t("leadFinder.noAuthTitle")}</p>
-              <p className="text-xs text-amber-700 dark:text-amber-400">
-                {t("leadFinder.noAuthDesc")}
-              </p>
-            </div>
-            <Link
-              href="/settings"
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white transition-all shrink-0"
-            >
-              {t("leadFinder.connectAccount")}
-            </Link>
-          </div>
-        )}
-
         {/* 2-Column Grid: Form & Results */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left Column: Search Form (5 cols on lg) */}
@@ -417,40 +387,6 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
             </div>
 
             <form onSubmit={handleStartSearch} className="space-y-4">
-              {/* Account Selector */}
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                  👤 {t("leadFinder.accountLabel")}
-                </label>
-                <div className="relative">
-                  <select
-                    value={selectedAccountId}
-                    onChange={(e) => setSelectedAccountId(e.target.value)}
-                    disabled={isSearching}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm font-medium text-gray-900 transition-all focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
-                  >
-                    {accounts.length === 0 && <option value="">{t("leadFinder.noAccounts")}</option>}
-                    {accounts.map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        {acc.name} ({acc.email}) — {acc.is_authenticated ? `🟢 ${t("leadFinder.connected")}` : `🔴 ${t("leadFinder.disconnected")}`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {accounts.length > 0 && selectedAccountId && (
-                  <div className="mt-1.5 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                    {accounts.find((a) => a.id === selectedAccountId)?.is_authenticated ? (
-                      <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                        <RiShieldCheckLine size={14} /> {t("leadFinder.sessionActive")}
-                      </span>
-                    ) : (
-                      <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                        <RiAlertLine size={14} /> {t("leadFinder.sessionRequired")}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
 
               {/* Title / Cargo */}
               <div>
