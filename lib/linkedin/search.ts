@@ -756,88 +756,76 @@ export async function searchLinkedInProfiles(
             rawSummary: string | null;
           }> = [];
 
-          // All modern LinkedIn search card selectors
-          const cardSelectors = [
-            "li.reusable-search__result-container",
-            "div[data-view-name*='search-entity-result']",
-            "div.entity-result",
-            "ul.reusable-search__entity-result-list > li",
-            "div[data-chameleon-result-urn]",
-            "li.artdeco-list__item",
-            "div.search-results-container li",
-          ];
+          const allLinks = Array.from(document.querySelectorAll("a[href*='/in/']")) as HTMLAnchorElement[];
+          const seenCardUrls = new Set<string>();
 
-          let cards: Element[] = [];
-          for (const sel of cardSelectors) {
-            const found = Array.from(document.querySelectorAll(sel));
-            if (found.length > 0) {
-              cards = found;
-              break;
+          for (const a of allLinks) {
+            const rawUrl = a.href || "";
+            if (!rawUrl.includes("/in/")) continue;
+            const cleanPath = rawUrl.split("?")[0].split("#")[0].replace(/\/+$/, "");
+            if (
+              cleanPath.endsWith("/in") ||
+              cleanPath.includes("/in/me") ||
+              cleanPath.includes("/in/unavailable") ||
+              cleanPath.includes("/in/edit") ||
+              seenCardUrls.has(cleanPath)
+            ) {
+              continue;
             }
-          }
+            seenCardUrls.add(cleanPath);
 
-          // Fallback: locate cards by searching parent of valid profile links
-          if (cards.length === 0) {
-            const allLinks = Array.from(document.querySelectorAll("a[href*='/in/']"));
-            const parentContainers = new Set<Element>();
-            for (const a of allLinks) {
-              const card =
-                a.closest("li") ||
-                a.closest("div.entity-result") ||
-                a.closest("div.mb1") ||
-                a.closest("div[data-chameleon-result-urn]");
-              if (card) parentContainers.add(card);
-            }
-            cards = Array.from(parentContainers);
-          }
-
-          for (const el of cards) {
-            const linkEl = el.querySelector("a[href*='/in/']") as HTMLAnchorElement | null;
-            const rawUrl = linkEl ? linkEl.href : null;
-            if (!rawUrl || rawUrl.includes("/in/unavailable")) continue;
+            const card =
+              a.closest("li") ||
+              a.closest("div.entity-result") ||
+              a.closest("div[data-view-name*='search']") ||
+              a.closest("div[data-chameleon-result-urn]") ||
+              a.parentElement?.parentElement ||
+              a;
 
             // Name
             let rawName: string | null = null;
-            const titleSpan =
-              el.querySelector("span.entity-result__title-text a span[aria-hidden='true']") ||
-              el.querySelector("a[href*='/in/'] span[aria-hidden='true']") ||
-              el.querySelector("a[href*='/in/'] span[dir='ltr']") ||
-              el.querySelector(".entity-result__title-text a") ||
-              el.querySelector("a[href*='/in/']");
+            const nameEl =
+              card.querySelector("span.entity-result__title-text a span[aria-hidden='true']") ||
+              card.querySelector("a[href*='/in/'] span[aria-hidden='true']") ||
+              card.querySelector(".entity-result__title-text a") ||
+              a.querySelector("span[aria-hidden='true']") ||
+              a;
 
-            if (titleSpan) {
-              rawName = titleSpan.textContent?.trim() || null;
+            if (nameEl) {
+              rawName = nameEl.textContent?.trim() || null;
             }
 
-            // Headline
+            // Headline / Title
             const headlineEl =
-              el.querySelector(".entity-result__primary-subtitle") ||
-              el.querySelector("div[data-view-name*='search'] .entity-result__primary-subtitle") ||
-              el.querySelector("div.t-14.t-black.t-normal") ||
-              el.querySelector("p.entity-result__summary") ||
-              el.querySelector(".entity-result__summary");
+              card.querySelector(".entity-result__primary-subtitle") ||
+              card.querySelector("div[data-view-name*='search'] .entity-result__primary-subtitle") ||
+              card.querySelector("div.t-14.t-black.t-normal") ||
+              card.querySelector("div.t-14.t-normal") ||
+              card.querySelector("p.entity-result__summary") ||
+              card.querySelector(".entity-result__summary");
             const rawHeadline = headlineEl ? headlineEl.textContent?.trim() || null : null;
 
             // Location
             const locEl =
-              el.querySelector(".entity-result__secondary-subtitle") ||
-              el.querySelector("div[data-view-name*='search'] .entity-result__secondary-subtitle") ||
-              el.querySelector("div.t-12.t-normal") ||
-              el.querySelector("div.t-black--light");
+              card.querySelector(".entity-result__secondary-subtitle") ||
+              card.querySelector("div[data-view-name*='search'] .entity-result__secondary-subtitle") ||
+              card.querySelector("div.t-12.t-normal") ||
+              card.querySelector("div.t-black--light");
             const rawLocation = locEl ? locEl.textContent?.trim() || null : null;
 
             // Avatar Image
             const imgEl =
-              (el.querySelector("img[src*='licdn.com']") as HTMLImageElement | null) ||
-              (el.querySelector("img.presence-entity__image") as HTMLImageElement | null) ||
-              (el.querySelector("img.evi-image") as HTMLImageElement | null);
+              (card.querySelector("img[src*='licdn.com']") as HTMLImageElement | null) ||
+              (card.querySelector("img.presence-entity__image") as HTMLImageElement | null) ||
+              (card.querySelector("img.evi-image") as HTMLImageElement | null) ||
+              (card.querySelector("img") as HTMLImageElement | null);
             const rawImage = imgEl ? imgEl.src : null;
 
-            // Degree badge
+            // Degree
             const badgeEl =
-              el.querySelector(".entity-result__badge-text") ||
-              el.querySelector("span.dist-value") ||
-              el.querySelector("span.artdeco-badge__text");
+              card.querySelector(".entity-result__badge-text") ||
+              card.querySelector("span.dist-value") ||
+              card.querySelector("span.artdeco-badge__text");
             const rawDegree = badgeEl ? badgeEl.textContent?.trim() || null : null;
 
             items.push({
