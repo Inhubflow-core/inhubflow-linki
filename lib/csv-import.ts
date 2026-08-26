@@ -52,9 +52,51 @@ export interface CsvImportResult {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const FIELD_ALIASES: Record<string, string[]> = {
+  linkedin_url: [
+    "linkedin_url",
+    "person_linkedin_url",
+    "person_linkedin",
+    "contact_linkedin_url",
+    "contact_linkedin",
+    "linkedin_profile_url",
+    "linkedin_profile",
+    "linkedin",
+    "profile_url",
+  ],
+  sales_nav_url: ["sales_nav_url", "sales_navigator_url", "salesnav_url", "sales_nav"],
+  email: ["email", "email_address", "contact_email", "work_email", "personal_email", "e-mail"],
+  first_name: ["first_name", "firstname", "first", "given_name", "nombre"],
+  last_name: ["last_name", "lastname", "last", "surname", "family_name", "apellido", "apellidos"],
+  title: ["title", "job_title", "position", "role", "cargo", "puesto", "titular"],
+  company: ["company", "company_name", "organization", "organization_name", "account_name", "empresa"],
+  location: ["location", "city_state", "full_location", "ubicacion", "localizacao"],
+  city: ["city", "ciudad", "cidade"],
+  country: ["country", "pais", "país"],
+  phone: ["phone", "phone_number", "mobile", "mobile_phone", "work_phone", "telefono", "telefone"],
+  headline: ["headline", "sub_headline", "header"],
+  summary: ["summary", "about", "bio", "resumen", "resumo"],
+  notes: ["notes", "note", "notas", "comentarios"],
+};
+
+function getField(row: Record<string, string>, field: string): string | null {
+  const aliases = FIELD_ALIASES[field] || [field];
+  for (const alias of aliases) {
+    const v = row[alias];
+    if (typeof v === "string" && v.trim().length > 0) {
+      return v.trim();
+    }
+  }
+  return null;
+}
+
 function normalizeLinkedinUrl(raw: string): string | null {
-  const trimmed = raw.trim();
-  if (!trimmed || !trimmed.includes("linkedin.com/in/")) return null;
+  let trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+    trimmed = `https://${trimmed}`;
+  }
+  if (!trimmed.includes("linkedin.com/in/")) return null;
   return trimmed;
 }
 
@@ -66,17 +108,11 @@ interface ParsedRow {
   fields: Record<EditableField, string | null>;
 }
 
-function get(row: Record<string, string>, key: string): string | null {
-  const v = row[key];
-  const t = typeof v === "string" ? v.trim() : "";
-  return t.length > 0 ? t : null;
-}
-
 export function importCsv(db: DB, listId: string, csvText: string): CsvImportResult {
   const parsed = Papa.parse<Record<string, string>>(csvText, {
     header: true,
     skipEmptyLines: true,
-    transformHeader: (h) => h.trim().toLowerCase().replace(/\s+/g, "_"),
+    transformHeader: (h) => h.trim().toLowerCase().replace(/[\s-]+/g, "_"),
   });
 
   const errors: string[] = [];
@@ -87,19 +123,27 @@ export function importCsv(db: DB, listId: string, csvText: string): CsvImportRes
   const rows: ParsedRow[] = [];
   parsed.data.forEach((raw, idx) => {
     const rowNum = idx + 2; // header is row 1
-    const fields = Object.fromEntries(EDITABLE_FIELDS.map((f) => [f, get(raw, f)])) as Record<EditableField, string | null>;
+    const fields = Object.fromEntries(
+      EDITABLE_FIELDS.map((f) => [f, getField(raw, f)])
+    ) as Record<EditableField, string | null>;
     const full_name = [fields.first_name, fields.last_name].filter(Boolean).join(" ") || null;
 
-    const rawUrl = get(raw, "linkedin_url");
+    const rawUrl = getField(raw, "linkedin_url");
     const linkedin_url = rawUrl ? normalizeLinkedinUrl(rawUrl) : null;
-    if (rawUrl && !linkedin_url) { errors.push(`Row ${rowNum}: "${rawUrl}" is not a valid linkedin.com/in/ URL`); return; }
+    if (rawUrl && !linkedin_url) {
+      errors.push(`Row ${rowNum}: "${rawUrl}" is not a valid linkedin.com/in/ URL`);
+      return;
+    }
 
-    const sales_nav_url = get(raw, "sales_nav_url");
+    const sales_nav_url = getField(raw, "sales_nav_url");
 
-    const rawEmail = get(raw, "email");
+    const rawEmail = getField(raw, "email");
     let email: string | null = null;
     if (rawEmail) {
-      if (!EMAIL_RE.test(rawEmail)) { errors.push(`Row ${rowNum}: "${rawEmail}" is not a valid email`); return; }
+      if (!EMAIL_RE.test(rawEmail)) {
+        errors.push(`Row ${rowNum}: "${rawEmail}" is not a valid email`);
+        return;
+      }
       email = rawEmail.toLowerCase();
     }
 
