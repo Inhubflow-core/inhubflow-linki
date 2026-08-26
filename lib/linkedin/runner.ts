@@ -278,9 +278,9 @@ function enforceSchedule(
 async function resolveLinkedinUrl(db: ReturnType<typeof getDb>, target: Target, accountId: string): Promise<string> {
   if (target.linkedin_url?.includes("/in/")) return target.linkedin_url;
   const salesNavUrl = target.sales_nav_url ?? target.linkedin_url;
-  if (!salesNavUrl) throw new Error(`${target.full_name ?? target.id} has no Sales Nav URL to resolve from`);
+  if (!salesNavUrl) throw new Error(`${target.full_name ?? target.id} no tiene una URL de LinkedIn (linkedin.com/in/...) configurada.`);
   const leadMatch = salesNavUrl.match(/\/sales\/lead\/(.+)/);
-  if (!leadMatch) throw new Error(`${target.full_name ?? target.id} has no Sales Nav lead URL — cannot resolve LinkedIn URL`);
+  if (!leadMatch) throw new Error(`${target.full_name ?? target.id} no tiene una URL válida de LinkedIn ni de Sales Navigator.`);
 
   const page = await getSessionPage(accountId);
   let profileJson: Record<string, unknown> | null = null;
