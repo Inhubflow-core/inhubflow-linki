@@ -3143,12 +3143,22 @@ export default function WorkflowDetailPage({
             </button>
           )}
           {!isActive && (
-            <button
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
-              onClick={() => { setWizardMode("launch"); setShowWizard(true); }}
-            >
-              <RiAddLine size={14} /> Add Prospects
-            </button>
+            <>
+              {(activeRun?.id || displayStats.active_run?.id) && (
+                <button
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition-colors"
+                  onClick={() => forceStep((activeRun?.id || displayStats.active_run?.id)!)}
+                >
+                  <RiFlashlightLine size={14} className="text-amber-500" /> Run all now
+                </button>
+              )}
+              <button
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
+                onClick={() => { setWizardMode(displayStats.total_prospects > 0 ? "add-contacts" : "launch"); setShowWizard(true); }}
+              >
+                <RiAddLine size={14} /> {displayStats.total_prospects > 0 ? "Add contacts" : "Add Prospects"}
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -3454,7 +3464,7 @@ export default function WorkflowDetailPage({
                         </td>
                         <td onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center gap-1">
-                            {isActive && p.state !== "completed" && (
+                            {p.state !== "completed" && (
                               <button
                                 title="Ejecutar este paso ahora mismo para este prospecto (sin esperar al horario programado)"
                                 onClick={() => forceStep(p.run_id, p.target_id)}
