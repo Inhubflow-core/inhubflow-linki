@@ -1443,34 +1443,46 @@ export async function forceRunStep(
   }
 
   if (targetId) {
-    // Reset connection_requested_at if target is not actually connected (degree != 1)
-    // so runner will actually perform the connect step
-    db.prepare("UPDATE targets SET connection_requested_at = NULL WHERE id = ? AND degree != 1").run(targetId);
+    // Reset connection state so connect step executes freshly
+    db.prepare("UPDATE targets SET connection_requested_at = NULL, connected_at = NULL, degree = 0 WHERE id = ?").run(targetId);
+
+    // Find connect step index if any
+    const connectStep = db.prepare(
+      "SELECT step_order FROM workflow_steps ws JOIN runs r ON r.workflow_id = ws.workflow_id WHERE r.id = ? AND ws.track = 'linkedin' AND ws.step_type = 'connect' ORDER BY ws.step_order LIMIT 1"
+    ).get(runId) as { step_order: number } | undefined;
+    const targetStepIdx = connectStep ? connectStep.step_order - 1 : 0;
 
     db.prepare(`
       UPDATE run_profile_tracks SET
+        current_step = ?,
         state = 'in_progress',
         next_step_at = datetime('now'),
         error_message = NULL
       WHERE run_profile_id IN (
         SELECT id FROM run_profiles WHERE run_id = ? AND target_id = ?
       ) AND state NOT IN ('completed')
-    `).run(runId, targetId);
+    `).run(targetStepIdx, runId, targetId);
   } else {
     db.prepare(`
-      UPDATE targets SET connection_requested_at = NULL
-      WHERE id IN (SELECT target_id FROM run_profiles WHERE run_id = ?) AND degree != 1
+      UPDATE targets SET connection_requested_at = NULL, connected_at = NULL, degree = 0
+      WHERE id IN (SELECT target_id FROM run_profiles WHERE run_id = ?)
     `).run(runId);
+
+    const connectStep = db.prepare(
+      "SELECT step_order FROM workflow_steps ws JOIN runs r ON r.workflow_id = ws.workflow_id WHERE r.id = ? AND ws.track = 'linkedin' AND ws.step_type = 'connect' ORDER BY ws.step_order LIMIT 1"
+    ).get(runId) as { step_order: number } | undefined;
+    const targetStepIdx = connectStep ? connectStep.step_order - 1 : 0;
 
     db.prepare(`
       UPDATE run_profile_tracks SET
+        current_step = ?,
         state = 'in_progress',
         next_step_at = datetime('now'),
         error_message = NULL
       WHERE run_profile_id IN (
         SELECT id FROM run_profiles WHERE run_id = ?
       ) AND state NOT IN ('completed')
-    `).run(runId);
+    `).run(targetStepIdx, runId);
   }
 
   db.prepare("UPDATE runs SET status = 'running', started_at = COALESCE(started_at, datetime('now')) WHERE id = ?").run(runId);
