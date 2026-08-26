@@ -45,29 +45,39 @@ export interface SearchProgressEvent {
 export type SearchProgressCallback = (event: SearchProgressEvent) => void;
 
 /**
- * Builds an optimized LinkedIn search query string from structured filters.
+ * Clean words from punctuation so LinkedIn search tokens match naturally.
+ */
+function sanitizeTerm(term: string): string {
+  return term
+    .replace(/[,;":.?¿!¡#+]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Builds an optimized, high-recall LinkedIn search query string from structured filters.
  */
 export function buildSearchQuery(filters: SearchFilters): string {
   const parts: string[] = [];
 
   if (filters.title && filters.title.trim()) {
-    const cleanTitle = filters.title.trim();
-    // Wrap multi-word titles in quotes for exact phrase matching if not already quoted
-    parts.push(cleanTitle.includes(" ") && !cleanTitle.startsWith('"') ? `"${cleanTitle}"` : cleanTitle);
+    const cleanTitle = sanitizeTerm(filters.title);
+    if (cleanTitle) parts.push(cleanTitle);
   }
 
   if (filters.location && filters.location.trim()) {
-    const cleanLoc = filters.location.trim();
-    parts.push(cleanLoc);
+    const cleanLoc = sanitizeTerm(filters.location);
+    if (cleanLoc) parts.push(cleanLoc);
   }
 
   if (filters.company && filters.company.trim()) {
-    const cleanComp = filters.company.trim();
-    parts.push(cleanComp.includes(" ") && !cleanComp.startsWith('"') ? `"${cleanComp}"` : cleanComp);
+    const cleanComp = sanitizeTerm(filters.company);
+    if (cleanComp) parts.push(cleanComp);
   }
 
   if (filters.keywords && filters.keywords.trim()) {
-    parts.push(filters.keywords.trim());
+    const cleanKw = sanitizeTerm(filters.keywords);
+    if (cleanKw) parts.push(cleanKw);
   }
 
   return parts.join(" ");
@@ -81,7 +91,13 @@ function normalizeProfileUrl(raw: string): string | null {
   try {
     const parsed = new URL(raw.startsWith("http") ? raw : `https://${raw}`);
     const pathname = parsed.pathname.replace(/\/+$/, "");
-    if (!pathname.startsWith("/in/") || pathname === "/in/unavailable" || pathname === "/in/") {
+    if (
+      !pathname.startsWith("/in/") ||
+      pathname === "/in/unavailable" ||
+      pathname === "/in/" ||
+      pathname.includes("/edit/") ||
+      pathname.includes("/detail/")
+    ) {
       return null;
     }
     return `https://www.linkedin.com${pathname}/`;
@@ -106,7 +122,6 @@ function parseName(fullName: string | null): { firstName: string | null; lastNam
 
 /**
  * Try to extract company name from headline string if not present as a separate field.
- * e.g., "CEO at InHubFlow", "Director de Marketing en Acme Inc", "Software Engineer @ Google"
  */
 function extractCompanyFromHeadline(headline: string | null): string | null {
   if (!headline) return null;
@@ -115,8 +130,138 @@ function extractCompanyFromHeadline(headline: string | null): string | null {
 }
 
 /**
+ * Extracts vector image URL from LinkedIn Voyager image representation.
+ */
+function resolveVectorImage(vectorImage: unknown): string | null {
+  if (!vectorImage || typeof vectorImage !== "object") return null;
+  const vi = vectorImage as { rootUrl?: string; artifacts?: Array<{ fileIdentifyingUrlPathSegment?: string }> };
+  if (vi.rootUrl && vi.artifacts && vi.artifacts.length > 0) {
+    const lastArtifact = vi.artifacts[vi.artifacts.length - 1];
+    if (lastArtifact?.fileIdentifyingUrlPathSegment) {
+      return `${vi.rootUrl}${lastArtifact.fileIdentifyingUrlPathSegment}`;
+    }
+  }
+  return null;
+}
+
+/**
+ * Direct Voyager Search API fetch via page context (inherits session cookies & CSRF token).
+ */
+async function fetchVoyagerSearchPage(
+  page: Page,
+  keywords: string,
+  start: number,
+  count: number = 10
+): Promise<SearchLead[] | null> {
+  return page.evaluate(
+    async ({ keywords, start, count }): Promise<SearchLead[] | null> => {
+      const cookies = document.cookie.split("; ").reduce((a: Record<string, string>, c) => {
+        const i = c.indexOf("=");
+        if (i > 0) a[c.slice(0, i)] = c.slice(i + 1);
+        return a;
+      }, {});
+      const csrf = (cookies["JSESSIONID"] || "").replace(/"/g, "");
+
+      const url =
+        `https://www.linkedin.com/voyager/api/search/dash/clusters` +
+        `?decorationId=com.linkedin.voyager.dash.deco.search.SearchClusterCollection-194` +
+        `&origin=GLOBAL_SEARCH_HEADER&q=all` +
+        `&query=(keywords:${encodeURIComponent(keywords)})` +
+        `&start=${start}&count=${count}`;
+
+      try {
+        const r = await fetch(url, {
+          headers: {
+            "csrf-token": csrf,
+            accept: "application/vnd.linkedin.normalized+json+2.1",
+            "x-restli-protocol-version": "2.0.0",
+            "x-li-lang": "en_US",
+          },
+          credentials: "include",
+        });
+
+        if (!r.ok) return null;
+        const json = (await r.json()) as {
+          included?: Array<Record<string, unknown>>;
+          data?: Record<string, unknown>;
+        };
+
+        const included = json.included || [];
+        const leads: SearchLead[] = [];
+
+        for (const item of included) {
+          const type = (item.$type as string) || "";
+          if (type.includes("EntityResultViewModel")) {
+            const titleObj = item.title as { text?: string } | undefined;
+            const primarySubtitleObj = item.primarySubtitle as { text?: string } | undefined;
+            const secondarySubtitleObj = item.secondarySubtitle as { text?: string } | undefined;
+            const summaryObj = item.summary as { text?: string } | undefined;
+            const navUrl = (item.navigationUrl as string) || "";
+            const badgeText = (item.badgeText as string) || "";
+
+            if (navUrl && navUrl.includes("linkedin.com/in/")) {
+              const fullName = titleObj?.text?.trim() || "Prospecto de LinkedIn";
+              const title = primarySubtitleObj?.text?.trim() || null;
+              const location = secondarySubtitleObj?.text?.trim() || null;
+              const summary = summaryObj?.text?.trim() || null;
+
+              let degree: number | null = null;
+              if (badgeText) {
+                if (/1st|1\.º/i.test(badgeText)) degree = 1;
+                else if (/2nd|2\.º/i.test(badgeText)) degree = 2;
+                else if (/3rd|3\.º/i.test(badgeText)) degree = 3;
+              }
+
+              // Extract image if available
+              let profileImageUrl: string | null = null;
+              const imgObj = item.image as {
+                attributes?: Array<{
+                  detailData?: {
+                    nonEntityProfilePicture?: { vectorImage?: unknown };
+                  };
+                }>;
+              } | undefined;
+              const vi = imgObj?.attributes?.[0]?.detailData?.nonEntityProfilePicture?.vectorImage;
+              if (vi) {
+                // @ts-expect-error in-browser vector parsing
+                if (vi.rootUrl && vi.artifacts?.length) {
+                  // @ts-expect-error in-browser vector parsing
+                  profileImageUrl = `${vi.rootUrl}${vi.artifacts[vi.artifacts.length - 1].fileIdentifyingUrlPathSegment}`;
+                }
+              }
+
+              const parts = fullName.split(/\s+/);
+              const firstName = parts[0] || null;
+              const lastName = parts.slice(1).join(" ") || null;
+
+              leads.push({
+                linkedinUrl: navUrl.split("?")[0].replace(/\/+$/, "") + "/",
+                fullName,
+                firstName,
+                lastName,
+                title,
+                company: null,
+                location,
+                profileImageUrl,
+                degree,
+                summary,
+              });
+            }
+          }
+        }
+
+        return leads;
+      } catch {
+        return null;
+      }
+    },
+    { keywords, start, count }
+  );
+}
+
+/**
  * Executes a LinkedIn people search using the account's stealth browser context,
- * progressively scrolling each page, extracting candidate cards, and yielding progress.
+ * employing Voyager API, Network Interception, and DOM Extraction with virtual scrolling.
  */
 export async function searchLinkedInProfiles(
   options: SearchOptions,
@@ -142,7 +287,6 @@ export async function searchLinkedInProfiles(
     throw new Error(`La cuenta ${account.name} no está autenticada. Inicia sesión en Ajustes primero.`);
   }
 
-  // Calculate approximate total pages needed (LinkedIn returns ~10 results per page)
   const estimatedPages = Math.min(Math.ceil(limit / 10), 10);
   const collectedLeads: SearchLead[] = [];
   const seenUrls = new Set<string>();
@@ -157,6 +301,65 @@ export async function searchLinkedInProfiles(
 
   const page = await getSessionPage(accountId);
 
+  // Network interception buffer for Voyager responses
+  const networkLeads: SearchLead[] = [];
+  page.on("response", async (response) => {
+    const url = response.url();
+    if (
+      (url.includes("voyager/api/search/dash/clusters") || url.includes("voyager/api/graphql")) &&
+      response.status() === 200
+    ) {
+      try {
+        const json = (await response.json()) as { included?: Array<Record<string, unknown>> };
+        const included = json?.included || [];
+        for (const item of included) {
+          const type = (item?.$type as string) || "";
+          if (type.includes("EntityResultViewModel")) {
+            const titleObj = item.title as { text?: string } | undefined;
+            const primarySubtitleObj = item.primarySubtitle as { text?: string } | undefined;
+            const secondarySubtitleObj = item.secondarySubtitle as { text?: string } | undefined;
+            const summaryObj = item.summary as { text?: string } | undefined;
+            const navUrl = (item.navigationUrl as string) || "";
+            const badgeText = (item.badgeText as string) || "";
+
+            if (navUrl && navUrl.includes("linkedin.com/in/")) {
+              const cleanUrl = normalizeProfileUrl(navUrl);
+              if (!cleanUrl) continue;
+
+              const fullName = titleObj?.text?.trim() || "Prospecto de LinkedIn";
+              const { firstName, lastName } = parseName(fullName);
+              const title = primarySubtitleObj?.text?.trim() || null;
+              const location = secondarySubtitleObj?.text?.trim() || null;
+              const summary = summaryObj?.text?.trim() || null;
+
+              let degree: number | null = null;
+              if (badgeText) {
+                if (/1st|1\.º/i.test(badgeText)) degree = 1;
+                else if (/2nd|2\.º/i.test(badgeText)) degree = 2;
+                else if (/3rd|3\.º/i.test(badgeText)) degree = 3;
+              }
+
+              networkLeads.push({
+                linkedinUrl: cleanUrl,
+                fullName,
+                firstName,
+                lastName,
+                title,
+                company: extractCompanyFromHeadline(title),
+                location,
+                profileImageUrl: null,
+                degree,
+                summary,
+              });
+            }
+          }
+        }
+      } catch {
+        /* ignore parse errors */
+      }
+    }
+  });
+
   try {
     for (let pageNum = 1; pageNum <= estimatedPages; pageNum++) {
       if (collectedLeads.length >= limit) break;
@@ -170,7 +373,7 @@ export async function searchLinkedInProfiles(
         page: pageNum,
         totalPages: estimatedPages,
         totalFound: collectedLeads.length,
-        message: `Explorando página ${pageNum} de ${estimatedPages}...`,
+        message: `Navegando a la página ${pageNum} de ${estimatedPages} ("${query}")...`,
       });
 
       await page.goto(searchUrl, {
@@ -178,10 +381,7 @@ export async function searchLinkedInProfiles(
         timeout: 35000,
       });
 
-      // Randomized human delay
-      await page.waitForTimeout(2000 + Math.random() * 1500);
-
-      // Check for authwall / checkpoint / login redirect
+      // Check for authwall / login wall
       const currentUrl = page.url();
       if (/\/login|\/authwall|\/checkpoint|\/uas\//.test(currentUrl)) {
         await markNeedsReauth(accountId);
@@ -190,25 +390,75 @@ export async function searchLinkedInProfiles(
         );
       }
 
-      // Check if no results found on page
-      const noResults = await page.evaluate(() => {
-        const bodyText = document.body.innerText;
-        return (
-          bodyText.includes("No matching results found") ||
-          bodyText.includes("No se encontraron resultados") ||
-          bodyText.includes("Nenhum resultado encontrado")
-        );
-      });
+      // ─── TIER 1: In-Page Voyager API ─────────────────────────────────────────
+      try {
+        const startOffset = (pageNum - 1) * 10;
+        const apiResults = await fetchVoyagerSearchPage(page, query, startOffset, 10);
+        if (apiResults && apiResults.length > 0) {
+          for (const item of apiResults) {
+            if (collectedLeads.length >= limit) break;
+            const cleanUrl = normalizeProfileUrl(item.linkedinUrl);
+            if (!cleanUrl || seenUrls.has(cleanUrl)) continue;
 
-      if (noResults) {
-        onProgress?.({
-          phase: "extracting",
-          page: pageNum,
-          totalPages: estimatedPages,
-          totalFound: collectedLeads.length,
-          message: `No se encontraron más resultados en la página ${pageNum}.`,
-        });
-        break;
+            seenUrls.add(cleanUrl);
+            const lead: SearchLead = {
+              ...item,
+              linkedinUrl: cleanUrl,
+              company: filters.company?.trim() || extractCompanyFromHeadline(item.title),
+            };
+            collectedLeads.push(lead);
+
+            onProgress?.({
+              phase: "extracting",
+              page: pageNum,
+              totalPages: estimatedPages,
+              totalFound: collectedLeads.length,
+              currentLead: lead,
+              message: `[Voyager API] Prospecto captado: ${lead.fullName} (${lead.title || "Sin cargo"})`,
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("[search] Voyager API fetch notice:", err);
+      }
+
+      // ─── TIER 2: Intercepted Network Responses ──────────────────────────────
+      if (networkLeads.length > 0) {
+        for (const item of networkLeads) {
+          if (collectedLeads.length >= limit) break;
+          if (seenUrls.has(item.linkedinUrl)) continue;
+
+          seenUrls.add(item.linkedinUrl);
+          const lead: SearchLead = {
+            ...item,
+            company: filters.company?.trim() || item.company,
+          };
+          collectedLeads.push(lead);
+
+          onProgress?.({
+            phase: "extracting",
+            page: pageNum,
+            totalPages: estimatedPages,
+            totalFound: collectedLeads.length,
+            currentLead: lead,
+            message: `[Network] Prospecto captado: ${lead.fullName}`,
+          });
+        }
+        networkLeads.length = 0;
+      }
+
+      // If we already collected enough leads from APIs, proceed to next page or finish
+      if (collectedLeads.length >= limit) break;
+
+      // ─── TIER 3: DOM Rendering & Progressive Scroll Extraction ──────────────
+      // Wait for results container or profiles to hydrate in DOM
+      try {
+        await page.waitForSelector(
+          "a[href*='/in/'], .search-results-container, div[data-view-name*='search'], li.reusable-search__result-container, div.entity-result",
+          { timeout: 8000 }
+        );
+      } catch {
+        /* continue to evaluate whatever is rendered */
       }
 
       onProgress?.({
@@ -216,32 +466,24 @@ export async function searchLinkedInProfiles(
         page: pageNum,
         totalPages: estimatedPages,
         totalFound: collectedLeads.length,
-        message: `Desplazando página ${pageNum} para cargar avatares e información...`,
+        message: `Desplazando página ${pageNum} para cargar perfiles y fotos...`,
       });
 
-      // Smooth human-like scroll down the page to trigger dynamic card & avatar loading
+      // Smooth scroll to load dynamic elements
       await page.evaluate(async () => {
         const totalHeight = document.body.scrollHeight;
-        const step = 450;
+        const step = 400;
         let pos = 0;
         while (pos < totalHeight) {
           window.scrollBy(0, step);
           pos += step;
-          await new Promise((r) => setTimeout(r, 200 + Math.random() * 100));
+          await new Promise((r) => setTimeout(r, 180));
         }
       });
 
-      await page.waitForTimeout(1000 + Math.random() * 500);
+      await page.waitForTimeout(1200 + Math.random() * 600);
 
-      onProgress?.({
-        phase: "extracting",
-        page: pageNum,
-        totalPages: estimatedPages,
-        totalFound: collectedLeads.length,
-        message: `Extrayendo perfiles de la página ${pageNum}...`,
-      });
-
-      // Extract raw data from the DOM
+      // Extract leads from DOM
       const extractedRaw = await page.evaluate(() => {
         const items: Array<{
           rawUrl: string | null;
@@ -253,44 +495,52 @@ export async function searchLinkedInProfiles(
           rawSummary: string | null;
         }> = [];
 
-        // Universal selectors matching LinkedIn's various search container formats
-        const selectors = [
+        // All modern LinkedIn search card selectors
+        const cardSelectors = [
           "li.reusable-search__result-container",
-          "div[data-view-name='search-entity-result-universal-template']",
+          "div[data-view-name*='search-entity-result']",
           "div.entity-result",
           "ul.reusable-search__entity-result-list > li",
+          "div[data-chameleon-result-urn]",
+          "li.artdeco-list__item",
+          "div.search-results-container li",
         ];
 
-        let elements: Element[] = [];
-        for (const sel of selectors) {
+        let cards: Element[] = [];
+        for (const sel of cardSelectors) {
           const found = Array.from(document.querySelectorAll(sel));
           if (found.length > 0) {
-            elements = found;
+            cards = found;
             break;
           }
         }
 
-        // Fallback: search by link containing /in/
-        if (elements.length === 0) {
-          const links = Array.from(document.querySelectorAll("a[href*='/in/']"));
+        // Fallback: locate cards by searching parent of valid profile links
+        if (cards.length === 0) {
+          const allLinks = Array.from(document.querySelectorAll("a[href*='/in/']"));
           const parentContainers = new Set<Element>();
-          for (const a of links) {
-            const card = a.closest("li") || a.closest("div.entity-result") || a.closest("div.mb1");
+          for (const a of allLinks) {
+            const card =
+              a.closest("li") ||
+              a.closest("div.entity-result") ||
+              a.closest("div.mb1") ||
+              a.closest("div[data-chameleon-result-urn]");
             if (card) parentContainers.add(card);
           }
-          elements = Array.from(parentContainers);
+          cards = Array.from(parentContainers);
         }
 
-        for (const el of elements) {
-          // Link
+        for (const el of cards) {
           const linkEl = el.querySelector("a[href*='/in/']") as HTMLAnchorElement | null;
           const rawUrl = linkEl ? linkEl.href : null;
+          if (!rawUrl || rawUrl.includes("/in/unavailable")) continue;
 
           // Name
           let rawName: string | null = null;
           const titleSpan =
             el.querySelector("span.entity-result__title-text a span[aria-hidden='true']") ||
             el.querySelector("a[href*='/in/'] span[aria-hidden='true']") ||
+            el.querySelector("a[href*='/in/'] span[dir='ltr']") ||
             el.querySelector(".entity-result__title-text a") ||
             el.querySelector("a[href*='/in/']");
 
@@ -298,53 +548,50 @@ export async function searchLinkedInProfiles(
             rawName = titleSpan.textContent?.trim() || null;
           }
 
-          // Subtitle / Headline
+          // Headline
           const headlineEl =
             el.querySelector(".entity-result__primary-subtitle") ||
-            el.querySelector("div[data-view-name='search-entity-result-universal-template'] .entity-result__primary-subtitle") ||
-            el.querySelector("div.t-14.t-black.t-normal");
+            el.querySelector("div[data-view-name*='search'] .entity-result__primary-subtitle") ||
+            el.querySelector("div.t-14.t-black.t-normal") ||
+            el.querySelector("p.entity-result__summary") ||
+            el.querySelector(".entity-result__summary");
           const rawHeadline = headlineEl ? headlineEl.textContent?.trim() || null : null;
 
-          // Secondary Subtitle / Location
+          // Location
           const locEl =
             el.querySelector(".entity-result__secondary-subtitle") ||
-            el.querySelector("div[data-view-name='search-entity-result-universal-template'] .entity-result__secondary-subtitle") ||
-            el.querySelector("div.t-12.t-normal");
+            el.querySelector("div[data-view-name*='search'] .entity-result__secondary-subtitle") ||
+            el.querySelector("div.t-12.t-normal") ||
+            el.querySelector("div.t-black--light");
           const rawLocation = locEl ? locEl.textContent?.trim() || null : null;
 
-          // Image / Avatar
+          // Avatar Image
           const imgEl =
-            (el.querySelector("img.presence-entity__image") as HTMLImageElement | null) ||
-            (el.querySelector("img.evi-image") as HTMLImageElement | null) ||
             (el.querySelector("img[src*='licdn.com']") as HTMLImageElement | null) ||
-            (el.querySelector("img[alt*='profile']") as HTMLImageElement | null);
+            (el.querySelector("img.presence-entity__image") as HTMLImageElement | null) ||
+            (el.querySelector("img.evi-image") as HTMLImageElement | null);
           const rawImage = imgEl ? imgEl.src : null;
 
           // Degree badge
-          const badgeEl = el.querySelector(".entity-result__badge-text") || el.querySelector("span.dist-value");
+          const badgeEl =
+            el.querySelector(".entity-result__badge-text") ||
+            el.querySelector("span.dist-value") ||
+            el.querySelector("span.artdeco-badge__text");
           const rawDegree = badgeEl ? badgeEl.textContent?.trim() || null : null;
 
-          // Summary / snippet
-          const summaryEl = el.querySelector(".entity-result__summary") || el.querySelector(".entity-result__simple-insight");
-          const rawSummary = summaryEl ? summaryEl.textContent?.trim() || null : null;
-
-          if (rawUrl) {
-            items.push({
-              rawUrl,
-              rawName,
-              rawHeadline,
-              rawLocation,
-              rawImage,
-              rawDegree,
-              rawSummary,
-            });
-          }
+          items.push({
+            rawUrl,
+            rawName,
+            rawHeadline,
+            rawLocation,
+            rawImage,
+            rawDegree,
+            rawSummary: null,
+          });
         }
 
         return items;
       });
-
-      let pageAddedCount = 0;
 
       for (const item of extractedRaw) {
         if (collectedLeads.length >= limit) break;
@@ -355,16 +602,21 @@ export async function searchLinkedInProfiles(
 
         seenUrls.add(cleanUrl);
 
-        // Clean name (strip "• 1st", "• 2nd", "• 3rd+", "• 1.º", "• 2.º", "• 3.º", etc.)
-        let cleanName = item.rawName ? item.rawName.replace(/\s*•\s*(1st|2nd|3rd\+?|1\.º|2\.º|3\.º).*$/i, "").trim() : null;
-        if (cleanName && (cleanName.toLowerCase().includes("linkedin member") || cleanName.toLowerCase().includes("usuario de linkedin"))) {
-          // Out of network profile
+        let cleanName = item.rawName
+          ? item.rawName.replace(/\s*•\s*(1st|2nd|3rd\+?|1\.º|2\.º|3\.º).*$/i, "").trim()
+          : null;
+
+        if (
+          cleanName &&
+          (cleanName.toLowerCase().includes("linkedin member") ||
+            cleanName.toLowerCase().includes("usuario de linkedin") ||
+            cleanName.toLowerCase().includes("usuário do linkedin"))
+        ) {
           cleanName = "Miembro de LinkedIn";
         }
 
         const { firstName, lastName } = parseName(cleanName);
 
-        // Parse degree
         let degree: number | null = null;
         if (item.rawDegree) {
           if (/1st|1\.º/i.test(item.rawDegree)) degree = 1;
@@ -372,10 +624,8 @@ export async function searchLinkedInProfiles(
           else if (/3rd|3\.º/i.test(item.rawDegree)) degree = 3;
         }
 
-        // Company resolution
         const detectedCompany = filters.company?.trim() || extractCompanyFromHeadline(item.rawHeadline);
 
-        // Image validation (ignore SVGs or data uris unless valid)
         let finalImage: string | null = null;
         if (item.rawImage && item.rawImage.startsWith("http") && item.rawImage.includes("licdn.com")) {
           finalImage = item.rawImage;
@@ -395,7 +645,6 @@ export async function searchLinkedInProfiles(
         };
 
         collectedLeads.push(lead);
-        pageAddedCount++;
 
         onProgress?.({
           phase: "extracting",
@@ -403,18 +652,18 @@ export async function searchLinkedInProfiles(
           totalPages: estimatedPages,
           totalFound: collectedLeads.length,
           currentLead: lead,
-          message: `Prospecto captado: ${lead.fullName} (${lead.title || "Sin cargo"})`,
+          message: `[DOM] Prospecto captado: ${lead.fullName} (${lead.title || "Sin cargo"})`,
         });
       }
 
-      // If no new leads were added from this page, we might have reached the end of search
-      if (pageAddedCount === 0 && extractedRaw.length === 0) {
-        break;
+      // If after all 3 tiers we found no leads on page 1 and no results container exists, break
+      if (collectedLeads.length === 0 && extractedRaw.length === 0 && pageNum === 1) {
+        // Wait 2 more seconds in case of slow network/rendering before exiting
+        await page.waitForTimeout(2000);
       }
 
-      // Gentle pause before next page
       if (pageNum < estimatedPages && collectedLeads.length < limit) {
-        await page.waitForTimeout(1500 + Math.random() * 1500);
+        await page.waitForTimeout(1500 + Math.random() * 1000);
       }
     }
 
@@ -423,7 +672,7 @@ export async function searchLinkedInProfiles(
       page: estimatedPages,
       totalPages: estimatedPages,
       totalFound: collectedLeads.length,
-      message: `Búsqueda finalizada con éxito. Se encontraron ${collectedLeads.length} prospectos.`,
+      message: `Búsqueda finalizada. Se extrajeron ${collectedLeads.length} prospectos.`,
     });
 
     return collectedLeads;

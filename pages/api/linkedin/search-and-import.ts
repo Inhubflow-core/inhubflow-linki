@@ -106,7 +106,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         updatedCount: saveResult.updatedCount,
         totalFound: profiles.length,
         profiles,
-        message: `¡Lista "${cleanListName}" creada exitosamente con ${profiles.length} prospectos!`,
+        message:
+          profiles.length > 0
+            ? `¡Lista "${cleanListName}" creada exitosamente con ${profiles.length} prospectos!`
+            : "No se encontraron perfiles con estos criterios específicos. Prueba simplificando la búsqueda.",
       });
 
       res.end();

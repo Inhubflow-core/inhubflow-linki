@@ -251,17 +251,27 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
               setProgressPercent(95);
             } else if (eventName === "complete") {
               setProgressPercent(100);
-              setProgressMessage(parsedData.message || "¡Búsqueda y guardado completados!");
+              const foundCount = parsedData.totalFound || leads.length;
+              setProgressMessage(
+                parsedData.message ||
+                  (foundCount > 0 ? "¡Búsqueda y guardado completados!" : "No se encontraron resultados para esta búsqueda.")
+              );
               setCompletedResult({
                 listId: parsedData.listId,
                 listName: parsedData.listName,
-                totalFound: parsedData.totalFound || leads.length,
+                totalFound: foundCount,
                 importedCount: parsedData.importedCount || 0,
                 updatedCount: parsedData.updatedCount || 0,
               });
-              toast.success(
-                `¡Lista "${parsedData.listName}" creada con éxito con ${parsedData.totalFound || leads.length} prospectos!`
-              );
+              if (foundCount > 0) {
+                toast.success(
+                  `¡Lista "${parsedData.listName}" creada con éxito con ${foundCount} prospectos!`
+                );
+              } else {
+                toast.info(
+                  "No se encontraron perfiles con estos filtros. Prueba simplificar la búsqueda."
+                );
+              }
             } else if (eventName === "error") {
               throw new Error(parsedData.error || "Ocurrió un error en la búsqueda de LinkedIn.");
             }
@@ -609,7 +619,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                 </div>
 
                 {/* Completion Action Banner */}
-                {completedResult && (
+                {completedResult && completedResult.totalFound > 0 && (
                   <div className="mt-3 p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
                       <div className="h-7 w-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
@@ -631,6 +641,18 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     >
                       Abrir Lista <RiArrowRightLine size={14} />
                     </Link>
+                  </div>
+                )}
+
+                {completedResult && completedResult.totalFound === 0 && (
+                  <div className="mt-3 p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 flex items-start gap-2.5">
+                    <RiAlertLine size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div className="text-xs space-y-1 text-amber-800 dark:text-amber-300">
+                      <p className="font-semibold">No se encontraron perfiles con estos criterios específicos.</p>
+                      <p className="text-amber-700 dark:text-amber-400">
+                        💡 <strong>Consejo:</strong> Prueba simplificando la búsqueda dejando el campo de Empresa vacío, o usando un cargo más general (ej. <em>CEO</em>, <em>Director</em>, <em>Dentista</em>).
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
