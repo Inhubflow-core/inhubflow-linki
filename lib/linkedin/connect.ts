@@ -15,12 +15,12 @@ const TOAST_SELECTOR = [
 
 const CONNECT_LABEL_RE = /^(?:conectar|connect|se connecter|vernetzen|convidar|invitar|invite)$/i;
 const MORE_LABEL_RE = /^(?:mais|mais ações|mais a[cç][õo]es|mais opções|mais op[cç][õo]es|más|más acciones|more|more actions|more options|actions|options)$/i;
-const PENDING_LABEL_RE = /(?:convite pendente|invitation pending|invitación pendiente|pendente|pending|pendiente|aguardando|invitation sent|convite enviado|invitación enviada|cancelar convite|withdraw invitation|cancelar invitación)/i;
+const PENDING_LABEL_RE = /(?:convite pendente|invitation pending|invitación pendiente|pendente|pending|pendiente|aguardando|invitation sent|convite enviado|invitación enviada|cancelar convite|retirar convite|withdraw invitation|cancelar invitación|retirar invitación)/i;
 const SENT_LABEL_RE = /(?:convite enviado|invitation sent|invitación enviada|solicitação enviada|pedido enviado|request sent|connection request sent|conexão enviada)/i;
 const LIMIT_RE = /(?:weekly connection limit|weekly limit|limite semanal|limite de convites|atingiu o limite|reached the limit)/i;
 const EMAIL_PROMPT_RE = /(?:digite|insira|informe|enter|provide).*e-?mail|e-?mail.*(?:para conectar|to connect|connection)/i;
 const ADD_NOTE_RE = /^(?:adicionar uma nota|adicionar nota|add a note|add note|adicionar mensagem|add message)$/i;
-const SEND_WITHOUT_NOTE_RE = /^(?:enviar sem nota|enviar sem uma nota|enviar agora|send without a note|send without note|send now|send invitation without a note|enviar sin nota|enviar sin una nota)$/i;
+const SEND_WITHOUT_NOTE_RE = /^(?:enviar sem nota|enviar sem uma nota|enviar agora|enviar convite|enviar convite agora|send without a note|send without note|send now|send invitation|send invitation without a note|enviar sin nota|enviar sin una nota)$/i;
 const GENERIC_SEND_RE = /^(?:enviar|send)$/i;
 
 function normalizeLabel(value: string | null | undefined): string {
@@ -72,11 +72,18 @@ async function visibleCustomInvite(scope: Locator): Promise<Locator | null> {
 }
 
 function isConnectAction(text: string, aria: string, title: string): boolean {
-  return [text, aria, title].some((value) => matchesLabel(value, CONNECT_LABEL_RE));
+  if (matchesLabel(text, CONNECT_LABEL_RE)) return true;
+  return [aria, title].some((value) => {
+    const label = normalizeLabel(value);
+    return CONNECT_LABEL_RE.test(label) || /(?:^|\s)(?:conectar|connect|convidar|invitar|invite)(?:\s|$)/i.test(label);
+  });
 }
 
 function isMoreTrigger(text: string, aria: string, title: string, className: string): boolean {
-  if ([text, aria, title].some((value) => matchesLabel(value, MORE_LABEL_RE))) return true;
+  if ([text, aria, title].some((value) => {
+    const label = normalizeLabel(value);
+    return MORE_LABEL_RE.test(label) || /^(?:mais a[cç][õo]es|mais op[cç][õo]es|más acciones|more actions|more options)(?:\s+(?:para|de|for|on)\b.*)?$/i.test(label);
+  })) return true;
   return /artdeco-dropdown__trigger|profile-actions__overflow/i.test(className);
 }
 
@@ -85,7 +92,7 @@ function isPendingAction(text: string, aria: string, title: string): boolean {
 }
 
 async function profileActionScope(page: Page): Promise<Locator> {
-  const topCard = page.locator("main section").filter({ has: page.locator("h1") }).first();
+  const topCard = page.locator("main section:has(h1):visible").first();
   if ((await topCard.count().catch(() => 0)) > 0) return topCard;
   return page.locator("main").first();
 }
@@ -99,18 +106,30 @@ async function hasPendingProfileAction(scope: Locator): Promise<boolean> {
   return action !== null;
 }
 
-async function visibleText(scope: Locator, expression: RegExp): Promise<string | null> {
-  const nodes = scope.locator("*:visible");
-  const count = await nodes.count().catch(() => 0);
+async function visibleToastMatching(page: Page, expression: RegExp): Promise<string | null> {
+  const toasts = page.locator(TOAST_SELECTOR);
+  const count = await toasts.count().catch(() => 0);
   for (let index = 0; index < count; index++) {
-    const text = await nodes.nth(index).innerText().catch(() => "");
+    const toast = toasts.nth(index);
+    if (!(await toast.isVisible().catch(() => false))) continue;
+    const text = await toast.innerText().catch(() => "");
     if (expression.test(normalizeLabel(text))) return text.trim();
   }
   return null;
 }
 
-async function visibleToastMatching(page: Page, expression: RegExp): Promise<string | null> {
-  return visibleText(page.locator(TOAST_SELECTOR), expression);
+async function visibleWeeklyLimit(page: Page): Promise<string | null> {
+  const surfaces = page.locator(`
+    div[class*="ip-fuse-limit-alert__warning"]:visible,
+    ${MODAL_SELECTOR},
+    ${TOAST_SELECTOR}
+  `);
+  const count = await surfaces.count().catch(() => 0);
+  for (let index = 0; index < count; index++) {
+    const text = await surfaces.nth(index).innerText().catch(() => "");
+    if (LIMIT_RE.test(normalizeLabel(text))) return text.trim() || "Weekly connection limit reached";
+  }
+  return null;
 }
 
 async function visibleError(page: Page): Promise<string | null> {
@@ -150,8 +169,7 @@ async function findInvitationModal(page: Page): Promise<Locator | null> {
       (buttonText, aria, title) =>
         SEND_WITHOUT_NOTE_RE.test(normalizeLabel(buttonText)) ||
         SEND_WITHOUT_NOTE_RE.test(normalizeLabel(aria)) ||
-        GENERIC_SEND_RE.test(normalizeLabel(buttonText)) ||
-        GENERIC_SEND_RE.test(normalizeLabel(aria)),
+        SEND_WITHOUT_NOTE_RE.test(normalizeLabel(title)),
       'button, [role="button"]'
     );
     if (EMAIL_PROMPT_RE.test(normalizeLabel(text)) || /(?:adicionar|add).*nota|sem nota|without.*note|enviar agora|send now|convite|invitation/i.test(normalizeLabel(text)) || sendButton) {
@@ -174,7 +192,6 @@ async function waitForInvitationModal(page: Page, timeoutMs = 15000): Promise<Lo
       const text = normalizeLabel(await modal.innerText().catch(() => ""));
       const emailInput = modal.locator('input[type="email"]:visible, input#email:visible');
       if (EMAIL_PROMPT_RE.test(text) || (await emailInput.count().catch(() => 0)) > 0) return modal;
-      if (await visibleText(modal, /(?:adicionar|add).*nota|sem nota|without.*note|enviar agora|send now/i)) return modal;
     }
     await page.waitForTimeout(250);
   }
@@ -263,6 +280,40 @@ async function findConnectInOpenMenu(page: Page): Promise<Locator | null> {
   );
 }
 
+async function findPendingInOpenMenu(page: Page): Promise<Locator | null> {
+  const menus = page.locator(MENU_SELECTOR);
+  const menuCount = await menus.count().catch(() => 0);
+  for (let index = 0; index < menuCount; index++) {
+    const pending = await visibleAction(
+      menus.nth(index),
+      (text, aria, title) => isPendingAction(text, aria, title),
+      'a, button, [role="menuitem"], [role="button"], .artdeco-dropdown__item'
+    );
+    if (pending) return pending;
+  }
+
+  return visibleAction(
+    page.locator("body"),
+    (text, aria, title) => isPendingAction(text, aria, title),
+    '[role="menuitem"], .artdeco-dropdown__item'
+  );
+}
+
+async function waitForOpenMenuAction(
+  page: Page,
+  timeoutMs = 2500
+): Promise<{ connect: Locator | null; pending: Locator | null }> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const pending = await findPendingInOpenMenu(page);
+    if (pending) return { connect: null, pending };
+    const connect = await findConnectInOpenMenu(page);
+    if (connect) return { connect, pending: null };
+    await page.waitForTimeout(150);
+  }
+  return { connect: null, pending: null };
+}
+
 async function clickConnectFromMoreMenu(page: Page, scope: Locator): Promise<Locator | null> {
   const triggerCandidates = scope.locator(`
     button[aria-haspopup="menu"],
@@ -288,9 +339,11 @@ async function clickConnectFromMoreMenu(page: Page, scope: Locator): Promise<Loc
     if (!isMoreTrigger(text, aria ?? "", title ?? "", className ?? "")) continue;
 
     await trigger.click({ force: true }).catch(() => {});
-    await page.waitForTimeout(500);
-    const option = await findConnectInOpenMenu(page);
-    if (option) return option;
+    const menuAction = await waitForOpenMenuAction(page);
+    if (menuAction.pending) {
+      throw new PendingInviteError("Invitation already pending (found in More/Mais menu)");
+    }
+    if (menuAction.connect) return menuAction.connect;
 
     // Do not let a failed candidate leave a different popover open while the
     // next DOM variant is tried.
@@ -301,40 +354,85 @@ async function clickConnectFromMoreMenu(page: Page, scope: Locator): Promise<Loc
   return null;
 }
 
+async function hasPendingInMoreMenu(page: Page, scope: Locator): Promise<boolean> {
+  const triggers = scope.locator(`
+    button[aria-haspopup="menu"],
+    [role="button"][aria-haspopup="menu"],
+    button.artdeco-dropdown__trigger,
+    [role="button"].artdeco-dropdown__trigger,
+    button[aria-label],
+    button[title],
+    [role="button"][aria-label],
+    [role="button"][title]
+  `);
+  const count = await triggers.count().catch(() => 0);
+
+  for (let index = 0; index < count; index++) {
+    const trigger = triggers.nth(index);
+    if (!(await trigger.isVisible().catch(() => false))) continue;
+    const [text, aria, title, className] = await Promise.all([
+      trigger.innerText().catch(() => ""),
+      trigger.getAttribute("aria-label").then((value) => value ?? "").catch(() => ""),
+      trigger.getAttribute("title").then((value) => value ?? "").catch(() => ""),
+      trigger.getAttribute("class").then((value) => value ?? "").catch(() => ""),
+    ]);
+    if (!isMoreTrigger(text, aria, title, className)) continue;
+
+    await trigger.click({ force: true }).catch(() => {});
+    const menuAction = await waitForOpenMenuAction(page);
+    if (menuAction.pending) return true;
+    await page.keyboard.press("Escape").catch(() => {});
+  }
+
+  return false;
+}
+
 async function confirmOnProfile(page: Page, linkedinUrl: string): Promise<boolean> {
   const scope = await profileActionScope(page);
-  if (await hasPendingProfileAction(scope)) return true;
+  if (await hasPendingProfileAction(scope) || await hasPendingInMoreMenu(page, scope)) return true;
 
   await page.goto(linkedinUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
   await page.waitForTimeout(1500);
   const refreshedScope = await profileActionScope(page);
-  return hasPendingProfileAction(refreshedScope);
+  return await hasPendingProfileAction(refreshedScope) || await hasPendingInMoreMenu(page, refreshedScope);
 }
 
 async function confirmConnectionRequest(
   page: Page,
   linkedinUrl: string,
-  responseSeen: boolean
+  responseSeen: () => boolean
 ): Promise<void> {
-  const deadline = Date.now() + 12000;
-  let modalClosed = false;
+  const deadline = Date.now() + 15000;
+  let modalClosedAt: number | null = null;
+  let profileChecked = false;
 
   while (Date.now() < deadline) {
+    const limit = await visibleWeeklyLimit(page);
+    if (limit) throw new WeeklyLimitError(limit);
+
     const error = await visibleError(page);
     if (error) throw new Error(`Connection error: ${error}`);
 
     if (await visibleToastMatching(page, SENT_LABEL_RE)) return;
     if (await findInvitationModal(page)) {
-      modalClosed = false;
-    } else {
-      modalClosed = true;
+      modalClosedAt = null;
+    } else if (modalClosedAt === null) {
+      modalClosedAt = Date.now();
     }
 
-    if (modalClosed && responseSeen) return;
-    if (modalClosed && await confirmOnProfile(page, linkedinUrl)) return;
-    await page.waitForTimeout(500);
+    if (modalClosedAt !== null && responseSeen()) return;
+
+    // Give the invitation request time to finish before reloading the profile;
+    // navigating immediately when the modal closes can cancel an in-flight POST.
+    if (modalClosedAt !== null && !profileChecked && Date.now() - modalClosedAt >= 2500) {
+      profileChecked = true;
+      if (await confirmOnProfile(page, linkedinUrl)) return;
+    }
+    await page.waitForTimeout(300);
   }
 
+  const limit = await visibleWeeklyLimit(page);
+  if (limit) throw new WeeklyLimitError(limit);
   const error = await visibleError(page);
   if (error) throw new Error(`Connection error: ${error}`);
   throw new Error("LinkedIn did not confirm that the connection request was sent");
@@ -379,8 +477,9 @@ export async function sendConnectionRequest(page: Page, linkedinUrl: string): Pr
   if (!modal) {
     const error = await visibleError(page);
     if (error) throw new Error(`Connection error: ${error}`);
-    if (LIMIT_RE.test(normalizeLabel(await page.locator("body").innerText().catch(() => "")))) {
-      throw new WeeklyLimitError("Weekly connection limit reached");
+    const limit = await visibleWeeklyLimit(page);
+    if (limit || LIMIT_RE.test(normalizeLabel(await page.locator("body").innerText().catch(() => "")))) {
+      throw new WeeklyLimitError(limit || "Weekly connection limit reached");
     }
     throw new Error("LinkedIn did not open the connection invitation modal");
   }
@@ -413,7 +512,7 @@ export async function sendConnectionRequest(page: Page, linkedinUrl: string): Pr
         request.method() === "POST" &&
         response.status() >= 200 &&
         response.status() < 300 &&
-        /linkedin\.com\/voyager\/api\/(?:relationships|invitations|connections)/i.test(response.url())
+        /linkedin\.com\/voyager\/api\/.*(?:relationship|invitation|connection)/i.test(response.url())
       ) {
         responseSeen = true;
       }
@@ -424,13 +523,12 @@ export async function sendConnectionRequest(page: Page, linkedinUrl: string): Pr
   page.on("response", responseHandler);
 
   try {
-    await sendButton.click({ force: true, timeout: 10000 });
-  } catch (error) {
-    throw new Error(`Could not click LinkedIn's send-without-note button: ${error instanceof Error ? error.message : String(error)}`);
-  }
-
-  try {
-    await confirmConnectionRequest(page, linkedinUrl, responseSeen);
+    try {
+      await sendButton.click({ force: true, timeout: 10000 });
+    } catch (error) {
+      throw new Error(`Could not click LinkedIn's send-without-note button: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    await confirmConnectionRequest(page, linkedinUrl, () => responseSeen);
   } finally {
     page.off("response", responseHandler);
   }
