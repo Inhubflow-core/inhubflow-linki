@@ -623,7 +623,75 @@ function runMigrations(db: Database.Database) {
     db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_run_profiles_unique ON run_profiles(run_id, target_id);");
   } catch { /* ignore */ }
 
+  cleanExistingMessyTargetsMigration(db);
   encryptLegacySecretsMigration(db);
+}
+
+// Cleanup migration for previously inserted targets that had concatenated DOM card strings
+function cleanExistingMessyTargetsMigration(db: Database.Database) {
+  try {
+    const dirtyTargets = db.prepare(
+      "SELECT id, full_name, title, location, company FROM targets WHERE full_name LIKE '%•%' OR full_name LIKE '%Mensagem%' OR full_name LIKE '%Conectar%' OR length(full_name) > 45"
+    ).all() as Array<{ id: string; full_name: string; title: string | null; location: string | null; company: string | null }>;
+
+    if (dirtyTargets.length === 0) return;
+
+    const update = db.prepare(`
+      UPDATE targets SET
+        full_name = ?,
+        first_name = ?,
+        last_name = ?,
+        title = COALESCE(?, title),
+        location = COALESCE(?, location),
+        company = COALESCE(?, company)
+      WHERE id = ?
+    `);
+
+    for (const t of dirtyTargets) {
+      let raw = t.full_name;
+      let title = t.title;
+      let location = t.location;
+      let company = t.company;
+
+      if (raw.includes("•")) {
+        const parts = raw.split(/\s*•\s*/);
+        raw = parts[0].trim();
+        if (parts.length > 1 && !title) {
+          const rest = parts.slice(1).join(" ").replace(/^\d+(?:º|st|nd|rd)?(?:\s+e|\s+y)?\s*/i, "").trim();
+          const actionMatch = rest.match(/(?:Mensagem|Conectar|Seguir|Message|Connect|Follow|Atual:|Current:|Anterior:)/i);
+          title = actionMatch && actionMatch.index ? rest.slice(0, actionMatch.index).trim() : rest;
+        }
+      }
+
+      // De-duplicate repeated names
+      const words = raw.split(/\s+/);
+      if (words.length >= 2 && words.length % 2 === 0) {
+        const half = words.length / 2;
+        if (words.slice(0, half).join(" ").toLowerCase() === words.slice(half).join(" ").toLowerCase()) {
+          raw = words.slice(0, half).join(" ");
+        }
+      } else if (words.length >= 4) {
+        for (let h = Math.floor(words.length / 2); h >= 2; h--) {
+          if (words.slice(0, h).join(" ").toLowerCase() === words.slice(h, h * 2).join(" ").toLowerCase()) {
+            raw = words.slice(0, h).join(" ");
+            break;
+          }
+        }
+      }
+
+      const nameTokens = raw.split(/\s+/);
+      const firstName = nameTokens[0] || null;
+      const lastName = nameTokens.slice(1).join(" ") || null;
+
+      if (title) {
+        title = title.replace(/^\+\s*/, "").replace(/\s*(?:Mensagem|Conectar|Seguir).*$/i, "").trim();
+        const compMatch = title.match(/(?:at|en|@|\|)\s+([^,|•\n]+)/i);
+        if (compMatch && !company) company = compMatch[1].trim();
+      }
+
+      update.run(raw, firstName, lastName, title, location, company, t.id);
+    }
+  } catch { /* ignore */ }
 }
 
 // One-time (per-row) migration: encrypt any plaintext accounts.cookies_json,

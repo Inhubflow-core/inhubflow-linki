@@ -427,13 +427,130 @@ function normalizeProfileUrl(raw: string): string | null {
 /**
  * Parses full name into first and last name components.
  */
-function parseName(fullName: string | null): { firstName: string | null; lastName: string | null } {
+export function parseName(fullName: string | null): { firstName: string | null; lastName: string | null } {
   if (!fullName) return { firstName: null, lastName: null };
   const parts = fullName.trim().split(/\s+/);
   if (parts.length === 1) return { firstName: parts[0], lastName: null };
   return {
     firstName: parts[0],
     lastName: parts.slice(1).join(" "),
+  };
+}
+
+/**
+ * Universal cleaner and de-duplicator for LinkedIn card strings.
+ * Dissects composite strings (e.g. "Jose Felix Hurtado Cruz Jose Felix Hurtado Cruz • 3º e +Ceo & Cofundador...")
+ * into pure FullName, FirstName, LastName, Title/Headline, Company, and Location.
+ */
+export function cleanProfileCardText(
+  rawNameInput: string | null,
+  rawHeadlineInput?: string | null,
+  rawLocationInput?: string | null
+): {
+  fullName: string;
+  firstName: string | null;
+  lastName: string | null;
+  title: string | null;
+  location: string | null;
+  company: string | null;
+} {
+  let rawName = (rawNameInput || "").trim();
+  let title = (rawHeadlineInput || "").trim() || null;
+  let location = (rawLocationInput || "").trim() || null;
+  let company: string | null = null;
+
+  if (!rawName) {
+    return {
+      fullName: "Prospecto de LinkedIn",
+      firstName: null,
+      lastName: null,
+      title,
+      location,
+      company,
+    };
+  }
+
+  // 1. If rawName contains LinkedIn degree separator " • " or degree badges
+  if (rawName.includes("•")) {
+    const parts = rawName.split(/\s*•\s*/);
+    rawName = parts[0].trim();
+
+    if (parts.length > 1 && (!title || !location)) {
+      const rest = parts.slice(1).join(" ");
+      const cleanRest = rest.replace(/^\d+(?:º|st|nd|rd|th)?(?:\s+e\s+|\s+y\s+|\s+and\s+|\s+)?/i, "").trim();
+
+      const actionMatch = cleanRest.match(/(?:Mensagem|Conectar|Seguir|Message|Connect|Follow|Enviar mensagem|Acesse meu site|Atual:|Current:|Anterior:)/i);
+      let candidateTitle = cleanRest;
+      if (actionMatch && actionMatch.index !== undefined) {
+        candidateTitle = cleanRest.slice(0, actionMatch.index).trim();
+      }
+
+      candidateTitle = candidateTitle.replace(/^\+\s*/, "").trim();
+      if (!title && candidateTitle) {
+        title = candidateTitle;
+      }
+    }
+  }
+
+  // 2. Remove common trailing garbage & pronouns
+  rawName = rawName
+    .replace(/\s*\|\s*LinkedIn.*$/i, "")
+    .replace(/\s*-\s*LinkedIn.*$/i, "")
+    .replace(/\s*[-–—]\s*(?:CEO|Director|Gerente|Founder|Presidente|COO|CFO|CTO|Manager|Head).*$/i, "")
+    .replace(/\s*\(\s*(?:él|ella|he\/him|she\/her|they\/them|ella\/she)\s*\)/i, "")
+    .replace(/\s*(?:,?\s*(?:Ph\.?D\.?|MSc|MBA|PMP®?|CPA|MD|Eng|Ing|Dr|Dra))\b.*$/i, "")
+    .trim();
+
+  // 3. Detect and fix duplicated repeated names
+  const words = rawName.split(/\s+/);
+  if (words.length >= 2 && words.length % 2 === 0) {
+    const half = words.length / 2;
+    const firstHalf = words.slice(0, half).join(" ");
+    const secondHalf = words.slice(half).join(" ");
+    if (firstHalf.toLowerCase() === secondHalf.toLowerCase()) {
+      rawName = firstHalf;
+    }
+  } else if (words.length >= 4) {
+    for (let h = Math.floor(words.length / 2); h >= 2; h--) {
+      const first = words.slice(0, h).join(" ");
+      const second = words.slice(h, h * 2).join(" ");
+      if (first.toLowerCase() === second.toLowerCase()) {
+        rawName = first;
+        break;
+      }
+    }
+  }
+
+  if (rawName.includes("\n")) {
+    rawName = rawName.split("\n").map((s) => s.trim()).filter(Boolean)[0] || rawName;
+  }
+
+  // 4. Clean title / headline
+  if (title) {
+    title = title
+      .replace(/^\+\s*/, "")
+      .replace(/\s*\|\s*LinkedIn.*$/i, "")
+      .replace(/\s*(?:Mensagem|Conectar|Seguir|Message|Connect|Follow).*$/i, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const compMatch = title.match(/(?:at|en|@|\|)\s+([^,|•\n]+)/i);
+    if (compMatch) {
+      company = compMatch[1].trim();
+    }
+  }
+
+  const nameTokens = rawName.split(/\s+/);
+  const firstName = nameTokens[0] || null;
+  const lastName = nameTokens.slice(1).join(" ") || null;
+
+  return {
+    fullName: rawName || "Prospecto de LinkedIn",
+    firstName,
+    lastName,
+    title: title || null,
+    location: location || null,
+    company: company || null,
   };
 }
 
@@ -925,20 +1042,14 @@ export async function searchLinkedInProfiles(
 
           seenUrls.add(cleanUrl);
 
-          let cleanName = item.rawName
-            ? item.rawName.replace(/\s*•\s*(1st|2nd|3rd\+?|1\.º|2\.º|3\.º).*$/i, "").trim()
-            : null;
-
-          if (
-            cleanName &&
-            (cleanName.toLowerCase().includes("linkedin member") ||
-              cleanName.toLowerCase().includes("usuario de linkedin") ||
-              cleanName.toLowerCase().includes("usuário do linkedin"))
-          ) {
-            cleanName = "Miembro de LinkedIn";
-          }
-
-          const { firstName, lastName } = parseName(cleanName);
+          const {
+            fullName: cleanName,
+            firstName,
+            lastName,
+            title: cleanTitle,
+            location: cleanLocation,
+            company: autoComp,
+          } = cleanProfileCardText(item.rawName, item.rawHeadline, item.rawLocation);
 
           let degree: number | null = null;
           if (item.rawDegree) {
@@ -947,7 +1058,7 @@ export async function searchLinkedInProfiles(
             else if (/3rd|3\.º/i.test(item.rawDegree)) degree = 3;
           }
 
-          const detectedCompany = filters.company?.trim() || extractCompanyFromHeadline(item.rawHeadline);
+          const finalCompany = filters.company?.trim() || autoComp || extractCompanyFromHeadline(cleanTitle);
 
           let finalImage: string | null = null;
           if (item.rawImage && item.rawImage.startsWith("http") && item.rawImage.includes("licdn.com")) {
@@ -959,9 +1070,9 @@ export async function searchLinkedInProfiles(
             fullName: cleanName || "Prospecto de LinkedIn",
             firstName,
             lastName,
-            title: item.rawHeadline,
-            company: detectedCompany,
-            location: item.rawLocation,
+            title: cleanTitle,
+            company: finalCompany,
+            location: cleanLocation || filters.location || null,
             profileImageUrl: finalImage,
             degree,
             summary: item.rawSummary,
