@@ -1420,3 +1420,54 @@ export function startRun(runId: string): void {
   db.prepare("UPDATE runs SET status = 'running', started_at = COALESCE(started_at, datetime('now')) WHERE id = ?").run(runId);
   console.log(`[runner] Run ${runId} marked running — global loop will pick it up`);
 }
+
+export async function forceRunStep(
+  runId: string,
+  targetId?: string
+): Promise<{ success: boolean; message: string }> {
+  const db = getDb();
+
+  // Widen active hours for this run's account to 24/7 so it executes immediately
+  const run = db.prepare("SELECT account_id, email_account_id FROM runs WHERE id = ?").get(runId) as
+    | { account_id: string; email_account_id: string | null }
+    | undefined;
+  if (run) {
+    db.prepare(
+      "UPDATE accounts SET active_hours_start = 0, active_hours_end = 24, working_days = '1,2,3,4,5,6,7' WHERE id = ?"
+    ).run(run.account_id);
+    if (run.email_account_id) {
+      db.prepare(
+        "UPDATE email_accounts SET active_hours_start = 0, active_hours_end = 24, working_days = '1,2,3,4,5,6,7' WHERE id = ?"
+      ).run(run.email_account_id);
+    }
+  }
+
+  if (targetId) {
+    db.prepare(`
+      UPDATE run_profile_tracks SET
+        state = 'in_progress',
+        next_step_at = datetime('now'),
+        error_message = NULL
+      WHERE run_profile_id IN (
+        SELECT id FROM run_profiles WHERE run_id = ? AND target_id = ?
+      ) AND state NOT IN ('completed')
+    `).run(runId, targetId);
+  } else {
+    db.prepare(`
+      UPDATE run_profile_tracks SET
+        state = 'in_progress',
+        next_step_at = datetime('now'),
+        error_message = NULL
+      WHERE run_profile_id IN (
+        SELECT id FROM run_profiles WHERE run_id = ?
+      ) AND state NOT IN ('completed')
+    `).run(runId);
+  }
+
+  db.prepare("UPDATE runs SET status = 'running', started_at = COALESCE(started_at, datetime('now')) WHERE id = ?").run(runId);
+
+  // Trigger tick immediately
+  tick(db).catch((err) => console.error("[runner] Force step tick error:", err));
+
+  return { success: true, message: "Paso forzado a ejecución inmediata" };
+}

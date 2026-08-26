@@ -32,6 +32,7 @@ import {
   RiArrowDownSLine,
   RiRefreshLine,
   RiErrorWarningLine,
+  RiFlashlightLine,
 } from "react-icons/ri";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -2811,6 +2812,24 @@ export default function WorkflowDetailPage({
     }
   }
 
+  async function forceStep(runId: string, targetId?: string) {
+    const res = await fetch(`/api/runs/${runId}/force-step`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(targetId ? { target_id: targetId } : { all: true }),
+    });
+    if (res.ok) {
+      toast.success(targetId ? "⚡ Disparando acción ahora..." : "⚡ Disparando acción para todos ahora...");
+      setTimeout(() => {
+        refreshStats();
+        refreshProspects();
+      }, 1000);
+    } else {
+      const err = await res.json();
+      toast.error(err.error ?? "Error al forzar acción");
+    }
+  }
+
   // Group target_ids by run_id, then fire one request per run
   async function bulkAction(action: "retry" | "remove" | "unenroll", targetIds: string[]) {
     const grouped: Record<string, string[]> = {};
@@ -2948,8 +2967,15 @@ export default function WorkflowDetailPage({
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {isRunning && (
+          {isRunning && activeRun && (
             <>
+              <button
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition-colors"
+                onClick={() => forceStep(activeRun.id)}
+                title="Forzar y ejecutar el siguiente paso para todos los prospectos ahora mismo sin esperar"
+              >
+                <RiFlashlightLine size={14} className="text-amber-500" /> Run all now
+              </button>
               <button
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-warning/15 text-warning border border-warning/25 hover:bg-warning/25 transition-colors"
                 onClick={pauseRun}
@@ -3307,7 +3333,16 @@ export default function WorkflowDetailPage({
                           {formatNextAction(p.next_step_at, p.state)}
                         </td>
                         <td onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center gap-0.5">
+                          <div className="flex items-center gap-1">
+                            {isActive && p.state !== "completed" && (
+                              <button
+                                title="Ejecutar este paso ahora mismo para este prospecto (sin esperar al horario programado)"
+                                onClick={() => forceStep(p.run_id, p.target_id)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25 border border-amber-500/30 transition-all shrink-0"
+                              >
+                                <RiFlashlightLine size={11} className="text-amber-500" /> Run now
+                              </button>
+                            )}
                             {p.state === "failed" && (
                               <button
                                 title="Retry"
