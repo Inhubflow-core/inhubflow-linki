@@ -29,7 +29,7 @@ const LEARNING_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLBf6xNJOms
 
 const mainNav = [
   { href: "/", labelKey: "nav.dashboard", icon: RiLayoutGridLine, color: "#465fff", tour: "nav-dashboard" },
-  { href: "/lead-finder", labelKey: "nav.leadFinder", icon: RiUserSearchLine, color: "#e11d48", tour: "nav-lead-finder" },
+  { href: "/lead-finder", labelKey: "nav.leadFinder", icon: RiUserSearchLine, color: "#465fff", tour: "nav-lead-finder" },
   { href: "/lists", labelKey: "nav.lists", icon: RiFileList3Line, color: "#12b76a", tour: "nav-lists" },
   { href: "/contacts", labelKey: "nav.contacts", icon: RiContactsLine, color: "#0ba5ec", tour: "nav-contacts" },
   { href: "/companies", labelKey: "nav.companies", icon: RiBuildingLine, color: "#7a5af8", tour: "nav-companies" },

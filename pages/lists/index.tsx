@@ -143,9 +143,9 @@ export default function ListsPage({ initialLists }: { initialLists: List[] }) {
         <div className="flex items-center gap-2.5">
           <Link
             href="/lead-finder"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-rose-500 hover:bg-rose-600 text-white shadow-sm transition-all"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-500 hover:bg-brand-600 text-white shadow-sm transition-all"
           >
-            <RiUserSearchLine size={15} /> 🎯 Captar Leads
+            <RiUserSearchLine size={15} /> Captar Leads
           </Link>
           <button data-tour="lists-new" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors" onClick={() => setShowModal(true)}>
             <RiAddLine size={15} /> New List

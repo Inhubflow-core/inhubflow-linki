@@ -306,7 +306,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
   return (
     <>
       <Head>
-        <title>🎯 Lead Finder — Captador de Prospectos de LinkedIn | InHubFlow</title>
+        <title>Lead Finder — Captador de Prospectos de LinkedIn | InHubFlow</title>
         <meta
           name="description"
           content="Busca y extrae prospectos de LinkedIn directamente por Cargo, Ciudad y País y crea listas automáticas sin Sales Navigator."
@@ -315,10 +315,10 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
 
       <div className="space-y-6 pb-12">
         {/* Top Header Banner */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-rose-500/10 via-brand-500/10 to-indigo-500/10 dark:from-rose-950/30 dark:via-brand-950/30 dark:to-indigo-950/30 border border-rose-500/20 dark:border-rose-500/10 p-5 md:p-6 rounded-2xl">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 border border-brand-500/20 dark:border-brand-500/10 p-5 md:p-6 rounded-2xl">
           <div className="space-y-1">
             <div className="flex items-center gap-2.5">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500 text-white shadow-xs">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500 text-white shadow-xs">
                 <RiSparklingLine size={13} /> NATIVO
               </span>
               <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
@@ -371,7 +371,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
           <div className="lg:col-span-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 md:p-6 shadow-theme-xs space-y-5">
             <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
               <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                <RiSearchLine className="text-rose-500" /> Criterios de Prospección
+                <RiSearchLine className="text-brand-500" /> Criterios de Prospección
               </h2>
               <span className="text-xs text-gray-400 dark:text-gray-500">Paso 1 de 2</span>
             </div>
@@ -387,7 +387,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     value={selectedAccountId}
                     onChange={(e) => setSelectedAccountId(e.target.value)}
                     disabled={isSearching}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm font-medium text-gray-900 transition-all focus:border-rose-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-rose-500"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm font-medium text-gray-900 transition-all focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                   >
                     {accounts.length === 0 && <option value="">No hay cuentas registradas</option>}
                     {accounts.map((acc) => (
@@ -404,7 +404,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                         <RiShieldCheckLine size={14} /> Sesión activa y segura con Playwright Stealth
                       </span>
                     ) : (
-                      <span className="text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                      <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
                         <RiAlertLine size={14} /> Requiere iniciar sesión en Ajustes
                       </span>
                     )}
@@ -415,7 +415,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
               {/* Title / Cargo */}
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                  👔 Cargo / Título Profesional <span className="text-rose-500">*</span>
+                  👔 Cargo / Título Profesional <span className="text-brand-500">*</span>
                 </label>
                 <div className="relative">
                   <RiBriefcaseLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
@@ -425,7 +425,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     onChange={(e) => setTitle(e.target.value)}
                     disabled={isSearching}
                     placeholder="ej: CEO, Director de Marketing, Dentista, Abogado..."
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-rose-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-rose-500"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                   />
                 </div>
                 {/* Suggestions */}
@@ -436,7 +436,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                       type="button"
                       onClick={() => setTitle(st)}
                       disabled={isSearching}
-                      className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-gray-100 text-gray-600 hover:bg-rose-50 hover:text-rose-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 transition-colors"
+                      className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400 transition-colors"
                     >
                       +{st}
                     </button>
@@ -447,7 +447,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
               {/* Location */}
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                  🏙️ Ubicación (Ciudad, País) <span className="text-rose-500">*</span>
+                  🏙️ Ubicación (Ciudad, País) <span className="text-brand-500">*</span>
                 </label>
                 <div className="relative">
                   <RiMapPinLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
@@ -457,7 +457,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     onChange={(e) => setLocation(e.target.value)}
                     disabled={isSearching}
                     placeholder="ej: Madrid, España | São Paulo, Brasil | Bogotá..."
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-rose-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-rose-500"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                   />
                 </div>
                 {/* Suggestions */}
@@ -468,7 +468,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                       type="button"
                       onClick={() => setLocation(sl)}
                       disabled={isSearching}
-                      className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-gray-100 text-gray-600 hover:bg-rose-50 hover:text-rose-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 transition-colors"
+                      className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400 transition-colors"
                     >
                       +{sl}
                     </button>
@@ -489,7 +489,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     onChange={(e) => setCompany(e.target.value)}
                     disabled={isSearching}
                     placeholder="ej: Salud, SaaS, Inmobiliaria, Google..."
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-rose-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-rose-500"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                   />
                 </div>
               </div>
@@ -508,7 +508,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                       disabled={isSearching}
                       className={`py-2 rounded-xl text-xs font-semibold border transition-all ${
                         limit === val
-                          ? "bg-rose-500 border-rose-500 text-white shadow-xs"
+                          ? "bg-brand-500 border-brand-500 text-white shadow-xs"
                           : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-750"
                       }`}
                     >
@@ -534,7 +534,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     }}
                     disabled={isSearching}
                     placeholder="ej: CEOs Madrid - Agosto 2026"
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-rose-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-rose-500"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                   />
                 </div>
               </div>
@@ -545,7 +545,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                   <button
                     type="submit"
                     disabled={!hasAuthAccount}
-                    className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 shadow-md shadow-rose-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform active:scale-[0.99]"
+                    className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 shadow-md shadow-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform active:scale-[0.99]"
                   >
                     <RiFlashlightLine size={18} /> Buscar Perfiles y Crear Lista
                   </button>
@@ -554,7 +554,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     <button
                       type="button"
                       disabled
-                      className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold text-white bg-rose-600 opacity-90 cursor-wait shadow-sm"
+                      className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold text-white bg-brand-600 opacity-90 cursor-wait shadow-sm"
                     >
                       <RiRefreshLine className="animate-spin" size={18} /> Captando Leads ({leads.length}/{limit})...
                     </button>
@@ -578,10 +578,10 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
               <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 md:p-6 shadow-theme-xs space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-rose-500/10 text-rose-500">
+                    <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500/10 text-brand-500">
                       {isSearching ? (
                         <>
-                          <span className="absolute inline-flex h-full w-full animate-ping rounded-xl bg-rose-400 opacity-30"></span>
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-xl bg-brand-400 opacity-30"></span>
                           <RiRadarLine size={22} className="animate-pulse" />
                         </>
                       ) : (
@@ -599,7 +599,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                   </div>
 
                   <div className="text-right">
-                    <span className="text-xs font-bold text-rose-600 dark:text-rose-400">
+                    <span className="text-xs font-bold text-brand-600 dark:text-brand-400">
                       {leads.length} / {limit} leads
                     </span>
                     <p className="text-[11px] text-gray-400">
@@ -612,7 +612,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                 <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
                   <div
                     className={`h-2 rounded-full transition-all duration-500 ${
-                      completedResult ? "bg-emerald-500" : "bg-gradient-to-r from-rose-500 to-brand-500"
+                      completedResult ? "bg-emerald-500" : "bg-gradient-to-r from-brand-500 to-indigo-500"
                     }`}
                     style={{ width: `${progressPercent}%` }}
                   />
@@ -662,7 +662,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-theme-xs overflow-hidden">
               <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800">
                 <div className="flex items-center gap-2">
-                  <RiUserSearchLine className="text-rose-500" size={18} />
+                  <RiUserSearchLine className="text-brand-500" size={18} />
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                     Resultados Captados ({leads.length})
                   </h3>
@@ -677,7 +677,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
 
               {leads.length === 0 ? (
                 <div className="p-12 text-center space-y-3">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-500 dark:bg-rose-950/30">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-500 dark:bg-brand-950/30">
                     <RiUserSearchLine size={28} />
                   </div>
                   <div className="space-y-1">
@@ -686,7 +686,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     </h4>
                     <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mx-auto">
                       Ingresa el cargo y la ubicación que te interesan en el formulario y haz clic en{" "}
-                      <span className="font-semibold text-rose-600 dark:text-rose-400">
+                      <span className="font-semibold text-brand-600 dark:text-brand-400">
                         &quot;Buscar Perfiles y Crear Lista&quot;
                       </span>
                       .
@@ -762,7 +762,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                           target="_blank"
                           rel="noreferrer"
                           title="Ver perfil en LinkedIn"
-                          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-rose-600 dark:hover:bg-gray-800 dark:hover:text-rose-400 transition-colors"
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-brand-600 dark:hover:bg-gray-800 dark:hover:text-brand-400 transition-colors"
                         >
                           <RiExternalLinkLine size={16} />
                         </a>
