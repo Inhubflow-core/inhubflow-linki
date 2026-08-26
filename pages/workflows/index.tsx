@@ -28,6 +28,7 @@ import {
   RiArchiveLine,
   RiInboxUnarchiveLine,
   RiArrowDownSLine,
+  RiUserLine,
 } from "react-icons/ri";
 
 interface WorkflowCard {
@@ -43,6 +44,9 @@ interface WorkflowCard {
   connections_accepted: number;
   active_run_id: string | null;
   active_status: string | null;
+  account_name: string | null;
+  account_email: string | null;
+  list_name: string | null;
   created_at: string;
   step_types: string;
 }
@@ -94,6 +98,9 @@ export const getServerSideProps: GetServerSideProps = async () => {
   // Prospects/runs subquery — separate from steps to avoid GROUP_CONCAT multiplication
   const prospectRows = db.prepare(
     `SELECT r.workflow_id,
+       MAX(a.name) as account_name,
+       MAX(a.email) as account_email,
+       MAX(l.name) as list_name,
        COUNT(DISTINCT rp.id) as total_prospects,
        COUNT(DISTINCT CASE WHEN NOT EXISTS (
          SELECT 1 FROM run_profile_tracks rt
@@ -107,11 +114,16 @@ export const getServerSideProps: GetServerSideProps = async () => {
        MAX(CASE WHEN r.status = 'running' THEN r.id ELSE NULL END) as active_run_id,
        MAX(CASE WHEN r.status IN ('running','paused') THEN r.status ELSE NULL END) as active_status
      FROM runs r
+     LEFT JOIN accounts a ON a.id = r.account_id
+     LEFT JOIN lists l ON l.id = r.list_id
      LEFT JOIN run_profiles rp ON rp.run_id = r.id
      LEFT JOIN targets t ON t.id = rp.target_id
      GROUP BY r.workflow_id`
   ).all() as {
     workflow_id: string;
+    account_name: string | null;
+    account_email: string | null;
+    list_name: string | null;
     total_prospects: number;
     completed_prospects: number;
     connections_sent: number;
@@ -120,13 +132,13 @@ export const getServerSideProps: GetServerSideProps = async () => {
     active_status: string | null;
   }[];
 
-  const prospectMap = Object.fromEntries(prospectRows.map(r => [r.workflow_id, r]));
+  const prospectMap = Object.fromEntries(prospectRows.map((r) => [r.workflow_id, r]));
 
   const workflows = db.prepare(
     "SELECT id, name, description, is_archived, created_at FROM workflows ORDER BY created_at DESC"
   ).all() as { id: string; name: string; description: string | null; is_archived: number; created_at: string }[];
 
-  const merged: WorkflowCard[] = workflows.map(w => ({
+  const merged: WorkflowCard[] = workflows.map((w) => ({
     ...w,
     is_archived: w.is_archived ?? 0,
     step_count: stepMap[w.id]?.step_count ?? 0,
@@ -138,6 +150,9 @@ export const getServerSideProps: GetServerSideProps = async () => {
     connections_accepted: prospectMap[w.id]?.connections_accepted ?? 0,
     active_run_id: prospectMap[w.id]?.active_run_id ?? null,
     active_status: prospectMap[w.id]?.active_status ?? null,
+    account_name: prospectMap[w.id]?.account_name ?? null,
+    account_email: prospectMap[w.id]?.account_email ?? null,
+    list_name: prospectMap[w.id]?.list_name ?? null,
   }));
 
   return { props: { initialWorkflows: merged } };
@@ -289,7 +304,7 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
                     </div>
                     {/* Step sequence */}
                     {actionSteps.length > 0 && (
-                      <div className="flex items-center gap-1 flex-wrap">
+                      <div className="flex items-center gap-1 flex-wrap mb-1.5">
                         {actionSteps.map((type, i) => {
                           const StepIcon = STEP_ICON[type] ?? RiEyeLine;
                           return (
@@ -305,7 +320,25 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
                       </div>
                     )}
                     {actionSteps.length === 0 && (
-                      <p className="text-xs text-base-content/30">No steps configured</p>
+                      <p className="text-xs text-base-content/30 mb-1.5">No steps configured</p>
+                    )}
+
+                    {/* Assigned Account & Target List */}
+                    {w.account_name && (
+                      <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-brand-50 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300 border border-brand-200/50 dark:border-brand-800/50"
+                          title={w.account_email || undefined}
+                        >
+                          <RiUserLine size={12} className="shrink-0 text-brand-500" />
+                          {w.account_name}
+                        </span>
+                        {w.list_name && (
+                          <span className="text-[11px] text-base-content/45 truncate max-w-[180px]" title={w.list_name}>
+                            • {w.list_name}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
