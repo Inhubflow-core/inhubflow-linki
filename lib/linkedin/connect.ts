@@ -13,15 +13,13 @@ export async function sendConnectionRequest(page: Page, linkedinUrl: string): Pr
   await page.goto(linkedinUrl, { waitUntil: "domcontentloaded", timeout: 35000 });
   await page.waitForTimeout(3000 + Math.random() * 1500);
 
-  // Check degree and pending state from page text
+  // Check degree from page text
   const mainText = await page.locator("main").innerText().catch(() => "");
-
-  // Check degree: 1st vs 2nd / 3rd
   const isExplicit2ndOr3rd = /\b[23][ºªndrdth°\.]/i.test(mainText) || /•\s*[23]º/i.test(mainText);
   const isExplicit1st = (/\b1[ºªster°\.]/i.test(mainText) || /•\s*1º/i.test(mainText)) && !isExplicit2ndOr3rd;
   if (isExplicit1st) throw new AlreadyConnectedError("Already connected (1st degree)");
 
-  // Check if invitation is already pending (strictly check actual button/badge, never loose page text)
+  // Check if invitation is already pending (strictly check actual button/badge)
   const pendingBtn = page.locator(`
     main button.artdeco-button:has-text("Pendente"):visible,
     main button.artdeco-button:has-text("Pending"):visible,
@@ -55,13 +53,11 @@ export async function sendConnectionRequest(page: Page, linkedinUrl: string): Pr
   `).first();
 
   if ((await directConnect.count()) > 0) {
-    const tagName = await directConnect.evaluate((el) => el.tagName.toLowerCase()).catch(() => "");
     const href = await directConnect.getAttribute("href").catch(() => null);
-
-    if (tagName === "a" && href && href.includes("custom-invite")) {
+    if (href && href.includes("custom-invite")) {
       const inviteUrl = href.startsWith("http") ? href : `https://www.linkedin.com${href}`;
       await page.goto(inviteUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
-      await page.waitForTimeout(1200);
+      await page.waitForTimeout(1500);
       clickedConnect = true;
     } else {
       await directConnect.click({ force: true });
@@ -108,13 +104,24 @@ export async function sendConnectionRequest(page: Page, linkedinUrl: string): Pr
         [role="menuitem"]:has-text("Se connecter"):visible,
         [role="menuitem"]:has-text("Vernetzen"):visible,
         div.artdeco-dropdown__item:has-text("Conectar"):visible,
-        div.artdeco-dropdown__item:has-text("Connect"):visible
+        div.artdeco-dropdown__item:has-text("Connect"):visible,
+        a[href*="custom-invite"]:visible
       `).first();
 
       if ((await connectOption.count()) > 0) {
-        await connectOption.click({ force: true });
-        await page.waitForTimeout(1200);
-        clickedConnect = true;
+        const href = (await connectOption.getAttribute("href").catch(() => null)) ||
+          (await connectOption.locator("a").getAttribute("href").catch(() => null));
+
+        if (href && href.includes("custom-invite")) {
+          const inviteUrl = href.startsWith("http") ? href : `https://www.linkedin.com${href}`;
+          await page.goto(inviteUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+          await page.waitForTimeout(1500);
+          clickedConnect = true;
+        } else {
+          await connectOption.click({ force: true });
+          await page.waitForTimeout(1200);
+          clickedConnect = true;
+        }
       }
     }
   }
@@ -122,13 +129,15 @@ export async function sendConnectionRequest(page: Page, linkedinUrl: string): Pr
   // ── Strategy 3: Full in-page evaluate fallback ──
   if (!clickedConnect) {
     const evaluated = await page.evaluate(() => {
-      const buttons = Array.from(document.querySelectorAll("main button"));
+      const buttons = Array.from(document.querySelectorAll("main button, main a"));
       for (const btn of buttons) {
         const txt = (btn.textContent || "").trim();
         const aria = btn.getAttribute("aria-label") || "";
+        const href = btn.getAttribute("href") || "";
         if (
           txt.match(/^(Conectar|Connect|Se connecter|Vernetzen)$/i) ||
-          aria.match(/(conectar|connect|convidar|invitar)/i)
+          aria.match(/(conectar|connect|convidar|invitar)/i) ||
+          href.includes("custom-invite")
         ) {
           (btn as HTMLElement).click();
           return "clicked_direct";
@@ -156,11 +165,20 @@ export async function sendConnectionRequest(page: Page, linkedinUrl: string): Pr
         [role="menuitem"]:has-text("Conectar"):visible,
         [role="menuitem"]:has-text("Connect"):visible,
         div.artdeco-dropdown__item:has-text("Conectar"):visible,
-        div.artdeco-dropdown__item:has-text("Connect"):visible
+        div.artdeco-dropdown__item:has-text("Connect"):visible,
+        a[href*="custom-invite"]:visible
       `).first();
       if ((await connectOption.count()) > 0) {
-        await connectOption.click({ force: true });
-        await page.waitForTimeout(1200);
+        const href = (await connectOption.getAttribute("href").catch(() => null)) ||
+          (await connectOption.locator("a").getAttribute("href").catch(() => null));
+        if (href && href.includes("custom-invite")) {
+          const inviteUrl = href.startsWith("http") ? href : `https://www.linkedin.com${href}`;
+          await page.goto(inviteUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+          await page.waitForTimeout(1500);
+        } else {
+          await connectOption.click({ force: true });
+          await page.waitForTimeout(1200);
+        }
         clickedConnect = true;
       }
     } else if (evaluated === "clicked_direct") {
@@ -173,29 +191,41 @@ export async function sendConnectionRequest(page: Page, linkedinUrl: string): Pr
     throw new Error("No Connect button or More menu found on profile");
   }
 
-  // Step 3: Handle invitation modal (Send without note / Enviar sem nota / Enviar agora)
-  const sendBtn = page.locator(`
-    div[role="dialog"] button:has-text("Enviar agora"):visible,
-    div[role="dialog"] button:has-text("Enviar sem nota"):visible,
-    div[role="dialog"] button:has-text("Send now"):visible,
-    div[role="dialog"] button:has-text("Send without a note"):visible,
-    div[role="dialog"] button:has-text("Enviar"):visible,
-    div[role="dialog"] button:has-text("Send"):visible,
-    button[aria-label*="Enviar sem"]:visible,
-    button[aria-label*="Send without"]:visible,
-    button[aria-label*="Enviar agora"]:visible,
-    button[aria-label*="Send now"]:visible,
-    button[aria-label*="Enviar convite"]:visible,
-    button[aria-label*="Send invitation"]:not([aria-label*="note"]):not([aria-label*="nota"]):visible
-  `).first();
+  // ── Step 3: Handle invitation modal (Send without note / Enviar sem nota / Enviar agora) ──
+  // Wait up to 6 seconds for dialog modal to appear
+  const modal = page.locator('div[role="dialog"], .artdeco-modal, div[data-test-modal]').first();
+  const modalVisible = await modal.waitFor({ state: "visible", timeout: 6000 }).then(() => true).catch(() => false);
 
-  try {
+  if (modalVisible) {
+    // Step 4: Check if email prompt appeared inside modal ("Para conectar, digite o e-mail")
+    const emailPrompt = modal.locator('input[type="email"]:visible, input#email:visible');
+    if ((await emailPrompt.count()) > 0) {
+      const closeBtn = modal.locator('button[aria-label*="Dismiss"]:visible, button[aria-label*="Fechar"]:visible, button[aria-label*="Cerrar"]:visible').first();
+      if ((await closeBtn.count()) > 0) await closeBtn.click().catch(() => {});
+      throw new Error("LinkedIn requires email address to connect with this target");
+    }
+
+    const sendBtn = modal.locator(`
+      button:has-text("Enviar sem nota"):visible,
+      button:has-text("Enviar agora"):visible,
+      button:has-text("Send without a note"):visible,
+      button:has-text("Send now"):visible,
+      button:has-text("Enviar"):visible,
+      button:has-text("Send"):visible,
+      button[aria-label*="Enviar sem nota"]:visible,
+      button[aria-label*="Send without a note"]:visible,
+      button[aria-label*="Enviar agora"]:visible,
+      button[aria-label*="Send now"]:visible,
+      button.artdeco-button--primary:visible
+    `).first();
+
     if ((await sendBtn.count()) > 0) {
       await sendBtn.click({ force: true });
       await page.waitForTimeout(2000);
     } else {
+      // DOM fallback for modal send button
       await page.evaluate(() => {
-        const dialog = document.querySelector('div[role="dialog"], .artdeco-modal');
+        const dialog = document.querySelector('div[role="dialog"], .artdeco-modal, div[data-test-modal]');
         if (dialog) {
           const btns = Array.from(dialog.querySelectorAll("button"));
           for (const btn of btns) {
@@ -212,23 +242,15 @@ export async function sendConnectionRequest(page: Page, linkedinUrl: string): Pr
               aria.includes("without")
             ) {
               (btn as HTMLElement).click();
-              break;
+              return;
             }
           }
+          const primary = dialog.querySelector("button.artdeco-button--primary") as HTMLElement;
+          if (primary) primary.click();
         }
       });
       await page.waitForTimeout(2000);
     }
-  } catch (err) {
-    console.warn("[connect] Warning while clicking send modal button:", err);
-  }
-
-  // Step 4: Check if email prompt appeared ("Para conectar, digite o e-mail")
-  const emailPrompt = page.locator('input[type="email"]:visible, input#email:visible');
-  if ((await emailPrompt.count()) > 0) {
-    const closeBtn = page.locator('button[aria-label*="Dismiss"]:visible, button[aria-label*="Fechar"]:visible, button[aria-label*="Cerrar"]:visible').first();
-    if ((await closeBtn.count()) > 0) await closeBtn.click().catch(() => {});
-    throw new Error("LinkedIn requires email address to connect with this target");
   }
 
   // Step 5: Check for weekly limit popup
