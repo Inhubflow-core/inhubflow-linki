@@ -5,7 +5,7 @@ Updated: 2026-08-27
 ## Current checkpoint
 
 - Phase: **1A — Additive schema and disabled module contracts**
-- Status: **complete locally; pending push**
+- Status: **complete and pushed to `origin/main`**
 - Stable upstream base before Inbox work: `2b33d90`
 - Inbox baseline commit: `81e8256` (`feat(inbox): add unified slot attribution and filters`)
 - Phase 0 documentation commit: `7e3d413` (`docs(sdr): add phased implementation and continuity plan`)
@@ -53,6 +53,7 @@ Updated: 2026-08-27
 - [x] Fresh-start and restart integration test performed against an isolated temporary database.
 - [x] Runtime test with `SDR_AGENT_MODE=auto` confirmed `effectiveMode=off` and `outboundEnabled=false`.
 - [x] No Gemini/Calendar SDK installed and no runner/inbox/workflow behavior changed.
+- [x] Push Phase 1A commits `334fa0d` and `0322273` to `origin/main` after explicit approval.
 
 ## Known environment constraints
 
@@ -74,10 +75,9 @@ fresh/restart isolated DB schema                 PASS (13 tables, no FK violatio
 
 ## Next exact action
 
-1. Push commit `334fa0d` to `origin/main` after explicit user approval.
-2. Confirm the deployed baseline is known and production remains stable.
-3. Begin Phase 1B only: repository helpers and lease/retry primitives, still with no Gemini calls or outbound actions.
-4. Update this file and commit before starting Phase 1B.
+1. Confirm the deployed baseline is known and production remains stable.
+2. Begin Phase 1B only: repository helpers and lease/retry primitives, still with no Gemini calls or outbound actions.
+3. Update this file and commit before starting Phase 1B.
 
 ## Resume instruction
 
