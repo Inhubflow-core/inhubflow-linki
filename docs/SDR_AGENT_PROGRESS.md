@@ -4,13 +4,15 @@ Updated: 2026-08-27
 
 ## Current checkpoint
 
-- Phase: **1A — Additive schema and disabled module contracts**
-- Status: **complete and pushed to `origin/main`**
+- Phase: **1B — Repository, capture, and lease/retry primitives**
+- Status: **complete locally; pending commit/push**
 - Stable upstream base before Inbox work: `2b33d90`
 - Inbox baseline commit: `81e8256` (`feat(inbox): add unified slot attribution and filters`)
 - Phase 0 documentation commit: `7e3d413` (`docs(sdr): add phased implementation and continuity plan`)
 - Published Phase 0 checkpoint: `72020c6`
 - Phase 1A implementation commit: `334fa0d` (`feat(sdr): add isolated phase one foundation`)
+- Published Phase 1A checkpoint: `d89e10f`
+- Phase 1B implementation commit: **pending (current changes)**
 - SDR implementation started: **foundation only**
 - Gemini calls enabled: **no**
 - LinkedIn SDR sends enabled: **no**
@@ -55,6 +57,18 @@ Updated: 2026-08-27
 - [x] No Gemini/Calendar SDK installed and no runner/inbox/workflow behavior changed.
 - [x] Push Phase 1A commits `334fa0d` and `0322273` to `origin/main` after explicit approval.
 
+## Phase 1B deliverables
+
+- [x] Transactional inbound repository validates channel ownership and JSON-safe metadata.
+- [x] Inbound thread identity is scoped to the originating LinkedIn/email account.
+- [x] External message ids and classification jobs are idempotent.
+- [x] Duplicate sync events return the original message/job without overwriting data.
+- [x] Queue helpers cover enqueue, due ordering, lease ownership, renewal, completion, cancellation, retry, and expired-lease recovery.
+- [x] Retry attempts are bounded and terminal failures are persisted.
+- [x] Repository and queue helpers remain inside `lib/sdr-agent/**`; no core runner bridge was enabled.
+- [x] Automated fixtures verify duplicates, wrong lease tokens, backoff, terminal failure, restart recovery, and invalid channel ownership.
+- [x] Gemini/Calendar remain absent and all outbound behavior remains disabled.
+
 ## Known environment constraints
 
 - Local `linki.db` currently has no LinkedIn accounts/replies for four-slot end-to-end testing.
@@ -65,7 +79,7 @@ Updated: 2026-08-27
 ## Verification record
 
 ```text
-npm run test:sdr-foundation                       PASS
+npm run test:sdr-foundation                       PASS (Phase 1B queue/repository fixtures)
 npx tsc --noEmit                                  PASS
 npx eslint lib/sdr-agent pages/api/sdr/status.ts  PASS
 npm run build                                     PASS with expected missing-ee warning
@@ -75,9 +89,10 @@ fresh/restart isolated DB schema                 PASS (13 tables, no FK violatio
 
 ## Next exact action
 
-1. Confirm the deployed baseline is known and production remains stable.
-2. Begin Phase 1B only: repository helpers and lease/retry primitives, still with no Gemini calls or outbound actions.
-3. Update this file and commit before starting Phase 1B.
+1. Commit the verified Phase 1B repository/queue foundation as one atomic commit.
+2. Push it to `origin/main` only after explicit user approval.
+3. Begin Phase 2 only after that commit is deployed/known: read-only LinkedIn inbox capture through a channel adapter; no AI or outbound messages.
+4. Update this file and commit before starting Phase 2.
 
 ## Resume instruction
 
