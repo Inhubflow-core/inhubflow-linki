@@ -5,7 +5,7 @@ Updated: 2026-08-27
 ## Current checkpoint
 
 - Phase: **2A — Read-only LinkedIn inbox adapter contract**
-- Status: **complete locally; pending commit/push**
+- Status: **complete and pushed to `origin/main`**
 - Stable upstream base before Inbox work: `2b33d90`
 - Inbox baseline commit: `81e8256` (`feat(inbox): add unified slot attribution and filters`)
 - Phase 0 documentation commit: `7e3d413` (`docs(sdr): add phased implementation and continuity plan`)
