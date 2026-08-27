@@ -1,0 +1,20 @@
+{
+  "fixture_status": "synthetic-provider-neutral",
+  "observations": [
+    {
+      "externalThreadId": "thread-synthetic-invalid",
+      "externalMessageId": "message-synthetic-invalid",
+      "direction": "outbound",
+      "body": "Synthetic outbound record",
+      "receivedAt": "2026-08-27T12:00:00Z",
+      "senderMessagingUrn": "urn:li:fsd_profile:synthetic-person-1"
+    },
+    {
+      "externalThreadId": "thread-synthetic-no-identity",
+      "externalMessageId": "message-synthetic-no-identity",
+      "direction": "inbound",
+      "body": "No identity evidence",
+      "receivedAt": "2026-08-27T12:00:00Z"
+    }
+  ]
+}

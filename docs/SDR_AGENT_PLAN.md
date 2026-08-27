@@ -136,14 +136,29 @@ Objetivo: no mezclar Inbox y SDR.
 
 ## Fase 2 — Ingesta LinkedIn read-only por slot
 
-- Observar una sesión autorizada y documentar el contrato real de conversaciones/mensajes; no adivinar endpoints internos.
-- Crear adaptador `lib/linkedin/inbox-sync.ts` que capture thread id, message id, participantes, timestamps y texto por `accountId`.
-- Normalizar y deduplicar mensajes en `conversation_threads/messages`.
-- Vincular target por `messaging_urn`/vanity y rechazar coincidencias ambiguas.
-- Integrar sync con el runner usando intervalos/jitter y una cuenta controlada.
-- Mostrar hilo read-only, slot y estado del agente en Inbox.
+### Fase 2A — Contrato y captura explícita, sin red
 
-**Checkpoint 2:** mensajes inbound reales aparecen una sola vez y en el slot correcto; todavía no hay IA ni envío.
+- Crear el adapter aislado `lib/linkedin/inbox-sync.ts` con un contrato provider-neutral de observaciones; no adivinar endpoints, operaciones GraphQL, payloads ni paginación.
+- Normalizar thread id, message id, participantes, timestamps y texto con el contrato SDR existente.
+- Resolver targets sólo por `messaging_urn` `urn:li:fsd_profile:*` o URL canónica `/in/<vanity>` dentro del `accountId` explícito; rechazar ambigüedad, conflicto y ownership de otro slot. Nunca sustituir `linkedin_member_urn`.
+- Capturar mediante el repositorio SDR transaccional existente, con deduplicación; no cambiar campos legacy, crear targets ni ejecutar el bridge no-op.
+- Probar fixtures provider-neutral, idempotencia, aislamiento de slots y ciclo de sesión con fuente inyectada. La captura de esta subfase es manual/expresa y no se conecta al runner, scheduler, UI, Gemini ni envíos.
+- Documentar la puerta de descubrimiento en `docs/LINKEDIN_INBOX_CONTRACT.md`, inicialmente `UNVERIFIED`.
+
+### Fase 2B — Fuente basada en contrato observado
+
+- Observar una sesión autorizada y controlada de LinkedIn en modo sólo lectura; registrar el contrato real y un fixture sanitizado antes de implementar el parser/source de red.
+- Implementar el source sólo contra las rutas y campos evidenciados: thread id, message id, participantes, dirección, timestamps, texto y paginación.
+- Validar sesión expirada/auth wall, límites, errores, paginación y deduplicación contra el fixture observado.
+- Ejecutar una prueba controlada de captura por slot y actualizar el documento a `VERIFIED` sólo tras revisión de redacción y seguridad.
+
+### Fases posteriores — Operación
+
+- Integrar un sync periódico con el runner usando intervalos/jitter sólo después del checkpoint 2B y una cuenta controlada.
+- Mostrar hilos read-only, slot y estado del agente en Inbox sólo después de validar el contrato y la captura operacional.
+- Mantener Gemini, clasificación, handoff y cualquier envío en los checkpoints posteriores; una captura `classify` en cola no implica que la IA esté activa.
+
+**Checkpoint 2:** mensajes inbound reales aparecen una sola vez y en el slot correcto en una prueba controlada; todavía no hay IA ni envío.
 
 ## Fase 3 — Gemini clasifica y redacta en shadow mode
 

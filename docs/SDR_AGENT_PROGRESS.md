@@ -4,7 +4,7 @@ Updated: 2026-08-27
 
 ## Current checkpoint
 
-- Phase: **1B — Repository, capture, and lease/retry primitives**
+- Phase: **2A — Read-only LinkedIn inbox adapter contract**
 - Status: **complete locally; pending commit/push**
 - Stable upstream base before Inbox work: `2b33d90`
 - Inbox baseline commit: `81e8256` (`feat(inbox): add unified slot attribution and filters`)
@@ -12,8 +12,11 @@ Updated: 2026-08-27
 - Published Phase 0 checkpoint: `72020c6`
 - Phase 1A implementation commit: `334fa0d` (`feat(sdr): add isolated phase one foundation`)
 - Published Phase 1A checkpoint: `d89e10f`
-- Phase 1B implementation commit: **pending (current changes)**
-- SDR implementation started: **foundation only**
+- Phase 1B implementation commit: `1095e5d` (`feat(sdr): add inbound repository and durable job queue`)
+- Published Phase 1B checkpoint: `1095e5d`
+- SDR implementation started: **foundation plus read-only adapter contract**
+- Phase 2A implementation commit: **pending (current changes)**
+- Live LinkedIn contract: **UNVERIFIED** (`docs/LINKEDIN_INBOX_CONTRACT.md`)
 - Gemini calls enabled: **no**
 - LinkedIn SDR sends enabled: **no**
 
@@ -69,19 +72,31 @@ Updated: 2026-08-27
 - [x] Automated fixtures verify duplicates, wrong lease tokens, backoff, terminal failure, restart recovery, and invalid channel ownership.
 - [x] Gemini/Calendar remain absent and all outbound behavior remains disabled.
 
+## Phase 2A deliverables
+
+- [x] Provider-neutral `LinkedInInboxObservation` and injected observation-source contract.
+- [x] Deterministic normalization of identifiers, body, ISO timestamps, and bounded event IDs.
+- [x] Fail-closed target matching by explicit slot ownership, `messaging_urn`, and canonical profile vanity.
+- [x] Outbound/system/unknown records and ambiguous or cross-slot identities are skipped without SDR writes.
+- [x] Transactional capture reuses `captureSdrInboundMessage`; no legacy target/inbox fields are mutated.
+- [x] Explicit session wrapper closes pages in `finally`, saves only after a valid observation, and marks auth walls for reauthentication.
+- [x] Synthetic provider-neutral fixtures and dependency-free tests cover idempotency, isolation, normalization, and session safety.
+- [x] Live contract gate documented as `UNVERIFIED`; no endpoint or parser was guessed.
+
 ## Known environment constraints
 
 - Local `linki.db` currently has no LinkedIn accounts/replies for four-slot end-to-end testing.
 - `ee/` is not present, so the build logs an expected `@/ee` module warning and premium reply sync is inactive.
 - Claude development credit and Gemini runtime billing are separate.
 - Gemini API/Vertex credentials and Google Calendar OAuth credentials are not configured yet.
+- Phase 2B is blocked on an authorized controlled LinkedIn session and sanitized wire-contract observation.
 
 ## Verification record
 
 ```text
-npm run test:sdr-foundation                       PASS (Phase 1B queue/repository fixtures)
+npm run test:sdr-foundation                       PASS (Phase 1B + Phase 2A fixtures)
 npx tsc --noEmit                                  PASS
-npx eslint lib/sdr-agent pages/api/sdr/status.ts  PASS
+npx eslint lib/linkedin/inbox-sync.ts scripts/test-sdr-foundation.cjs PASS
 npm run build                                     PASS with expected missing-ee warning
 fresh/restart isolated DB schema                 PASS (13 tables, no FK violations)
 /api/sdr/status with auto mode                   PASS (effective off, outbound false)
@@ -89,10 +104,10 @@ fresh/restart isolated DB schema                 PASS (13 tables, no FK violatio
 
 ## Next exact action
 
-1. Commit the verified Phase 1B repository/queue foundation as one atomic commit.
-2. Push it to `origin/main` only after explicit user approval.
-3. Begin Phase 2 only after that commit is deployed/known: read-only LinkedIn inbox capture through a channel adapter; no AI or outbound messages.
-4. Update this file and commit before starting Phase 2.
+1. Run the full production build and inspect imports/diff for no runner/premium/outbound wiring.
+2. Commit the verified Phase 2A adapter, fixtures, and documentation as one atomic commit.
+3. Push it to `origin/main` only after explicit user approval.
+4. For Phase 2B, use an authorized controlled account to observe and document the LinkedIn inbox wire contract before implementing any network source.
 
 ## Resume instruction
 

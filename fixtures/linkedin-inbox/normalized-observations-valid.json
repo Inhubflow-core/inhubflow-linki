@@ -1,0 +1,17 @@
+{
+  "fixture_status": "synthetic-provider-neutral",
+  "observations": [
+    {
+      "externalThreadId": "thread-test-1",
+      "externalMessageId": "message-test-1",
+      "direction": "inbound",
+      "body": "  First line\r\nSecond line  ",
+      "receivedAt": "2026-08-27T12:00:00-04:00",
+      "senderMessagingUrn": "urn:li:fsd_profile:person-a",
+      "senderProfileUrl": "https://www.linkedin.com/in/person-a/?trk=synthetic#section",
+      "senderExternalId": "sender-a",
+      "senderName": "Synthetic Sender",
+      "rawKind": "message"
+    }
+  ]
+}
