@@ -8,6 +8,7 @@ Updated: 2026-08-26
 - Status: **complete locally; pending push to origin**
 - Stable upstream base before Inbox work: `2b33d90`
 - Inbox baseline commit: `81e8256` (`feat(inbox): add unified slot attribution and filters`)
+- Phase 0 documentation commit: `7e3d413` (`docs(sdr): add phased implementation and continuity plan`)
 - SDR implementation started: **no**
 - Gemini calls enabled: **no**
 - LinkedIn SDR sends enabled: **no**
@@ -55,7 +56,7 @@ Inbox SQL read-only validation                         PASS
 
 ## Next exact action
 
-1. Push commits `81e8256` and the forthcoming Phase 0 documentation commit to `origin/main` after the user authorizes the outward-facing push.
+1. Push all verified local commits ahead of `origin/main` after the user authorizes the outward-facing push.
 2. Confirm remote is clean and deployed baseline is known.
 3. Begin Phase 1A only: additive SDR schema and disabled/no-op module contracts. Do not install Gemini or create outbound behavior yet.
 4. Update this file and commit before starting Phase 1B.
