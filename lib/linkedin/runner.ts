@@ -211,6 +211,40 @@ function nowIso() { return new Date().toISOString(); }
 function addHours(h: number) { return new Date(Date.now() + h * 3600_000).toISOString(); }
 function hoursSince(isoStr: string) { return (Date.now() - new Date(isoStr).getTime()) / 3600_000; }
 
+function linkedinReplySnapshot(
+  db: ReturnType<typeof getDb>,
+  accountId: string
+): Map<string, string | null> {
+  const rows = db.prepare(`
+    SELECT DISTINCT t.id, t.last_replied_at
+    FROM targets t
+    JOIN run_profiles rp ON rp.target_id = t.id
+    JOIN runs r ON r.id = rp.run_id
+    WHERE r.account_id = ?
+  `).all(accountId) as Array<{ id: string; last_replied_at: string | null }>;
+  return new Map(rows.map((row) => [row.id, row.last_replied_at]));
+}
+
+function attributeChangedLinkedinReplies(
+  db: ReturnType<typeof getDb>,
+  accountId: string,
+  before: Map<string, string | null>
+): number {
+  const rows = db.prepare(`
+    SELECT DISTINCT t.id, t.last_replied_at
+    FROM targets t
+    JOIN run_profiles rp ON rp.target_id = t.id
+    JOIN runs r ON r.id = rp.run_id
+    WHERE r.account_id = ? AND t.last_replied_at IS NOT NULL
+  `).all(accountId) as Array<{ id: string; last_replied_at: string }>;
+  const update = db.prepare("UPDATE targets SET last_replied_account_id = ? WHERE id = ?");
+  const changed = rows.filter((row) => before.get(row.id) !== row.last_replied_at);
+  db.transaction((replies: typeof changed) => {
+    for (const reply of replies) update.run(accountId, reply.id);
+  })(changed);
+  return changed.length;
+}
+
 // ─── TrackRun verb layer ─────────────────────────────────────────────────────
 // These are the only functions that write to run_profile_tracks rows.
 
@@ -1007,8 +1041,17 @@ async function tick(db: ReturnType<typeof getDb>): Promise<void> {
     if (premium?.replies?.shouldSyncInbox(accountId)) {
       try {
         console.log(`[runner] Starting LinkedIn inbox sync for account ${accountId}`);
-        const replies = await premium.replies.syncAccountInbox(accountId);
-        console.log(`[runner] LinkedIn inbox sync complete — ${replies} new repl${replies === 1 ? "y" : "ies"}`);
+        const beforeReplies = linkedinReplySnapshot(db, accountId);
+        let replies = 0;
+        let attributed = 0;
+        try {
+          replies = await premium.replies.syncAccountInbox(accountId);
+        } finally {
+          // Attribute partial updates too if the premium sync throws after
+          // stamping one or more targets.
+          attributed = attributeChangedLinkedinReplies(db, accountId, beforeReplies);
+        }
+        console.log(`[runner] LinkedIn inbox sync complete — ${replies} new repl${replies === 1 ? "y" : "ies"}, ${attributed} attributed to slot`);
         if (replies > 0) {
           for (const r of activeRuns.filter(x => x.account_id === accountId)) {
             log(db, r.run_id, null, "info", `LinkedIn inbox sync: ${replies} new repl${replies === 1 ? "y" : "ies"} detected`);

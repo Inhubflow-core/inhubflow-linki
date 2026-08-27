@@ -16,6 +16,11 @@ export interface InboxReply {
   run_id: string | null;
   workflow_id: string | null;
   workflow_name: string | null;
+  // LinkedIn slot context
+  linkedin_account_id: string | null;
+  linkedin_account_name: string | null;
+  linkedin_account_email: string | null;
+  linkedin_account_inferred: number;
   // email account context
   email_account_id: string | null;
   email_account_name: string | null;
@@ -32,6 +37,8 @@ export interface InboxReply {
   manually_edited: number;
 }
 
+const VALID_CHANNELS = new Set(["email", "linkedin"]);
+
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
     res.setHeader("Allow", ["GET"]);
@@ -39,17 +46,78 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   const db = getDb();
-  const channel = req.query.channel as string | undefined; // "email" | "linkedin" | undefined
+  const rawChannel = Array.isArray(req.query.channel) ? req.query.channel[0] : req.query.channel;
+  const channel = rawChannel && VALID_CHANNELS.has(rawChannel) ? rawChannel : undefined;
+  const rawAccountId = Array.isArray(req.query.accountId) ? req.query.accountId[0] : req.query.accountId;
+  const accountId = rawAccountId?.trim() || undefined;
 
-  // A target shows in the inbox if it has a reply stamp OR a captured email_replies row.
-  // OOO-followup replies intentionally leave email_replied_at NULL, so we must include
-  // the email_replies source to keep scheduled follow-ups visible.
+  if (rawChannel && !channel) {
+    return res.status(400).json({ error: "Invalid channel filter" });
+  }
+  if (accountId) {
+    const account = db.prepare("SELECT 1 FROM accounts WHERE id = ?").get(accountId);
+    if (!account) return res.status(400).json({ error: "Invalid LinkedIn account filter" });
+  }
+
+  // OOO-followup replies intentionally leave email_replied_at NULL, so the captured
+  // email_replies row must also qualify a contact for the inbox.
   let channelFilter =
     "AND (t.email_replied_at IS NOT NULL OR t.last_replied_at IS NOT NULL OR er.id IS NOT NULL)";
   if (channel === "email") channelFilter = "AND (t.email_replied_at IS NOT NULL OR er.id IS NOT NULL)";
   if (channel === "linkedin") channelFilter = "AND t.last_replied_at IS NOT NULL";
 
+  const params: string[] = [];
+  let accountFilter = "";
+  if (accountId) {
+    accountFilter = `
+      AND (
+        (t.last_replied_at IS NOT NULL
+          AND COALESCE(t.last_replied_account_id, context_run.account_id, lc.account_id) = ?)
+        OR
+        ((t.email_replied_at IS NOT NULL OR er.id IS NOT NULL)
+          AND COALESCE(context_run.account_id, lc.account_id) = ?)
+      )`;
+    params.push(accountId, accountId);
+  }
+
+  // Both reply and run context are ranked before joining. This guarantees one row
+  // per target and avoids SQLite choosing arbitrary non-aggregated values from a
+  // GROUP BY when the same target belongs to multiple campaigns.
   const rows = db.prepare(`
+    WITH ranked_email_replies AS (
+      SELECT
+        er0.*,
+        ROW_NUMBER() OVER (
+          PARTITION BY er0.target_id
+          ORDER BY datetime(er0.received_at) DESC, datetime(er0.created_at) DESC, er0.id DESC
+        ) AS row_num
+      FROM email_replies er0
+    ),
+    latest_email_reply AS (
+      SELECT * FROM ranked_email_replies WHERE row_num = 1
+    ),
+    ranked_run_context AS (
+      SELECT
+        rp.target_id,
+        rp.run_id,
+        rp.email_account_id,
+        r0.account_id,
+        r0.workflow_id,
+        ROW_NUMBER() OVER (
+          PARTITION BY rp.target_id
+          ORDER BY
+            CASE r0.status WHEN 'running' THEN 0 WHEN 'paused' THEN 1 WHEN 'completed' THEN 2 ELSE 3 END,
+            datetime(COALESCE(r0.started_at, r0.created_at)) DESC,
+            datetime(rp.created_at) DESC,
+            rp.id DESC
+        ) AS row_num
+      FROM run_profiles rp
+      JOIN runs r0 ON r0.id = rp.run_id
+      WHERE r0.status IN ('running', 'paused', 'completed')
+    ),
+    latest_context AS (
+      SELECT * FROM ranked_run_context WHERE row_num = 1
+    )
     SELECT
       t.id,
       t.full_name,
@@ -69,9 +137,16 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         COALESCE(t.last_replied_at, ''),
         COALESCE(er.received_at, '')
       ) AS replied_at,
-      r.id AS run_id,
-      r.workflow_id,
+      context_run.id AS run_id,
+      context_run.workflow_id,
       w.name AS workflow_name,
+      linkedin_account.id AS linkedin_account_id,
+      linkedin_account.name AS linkedin_account_name,
+      linkedin_account.email AS linkedin_account_email,
+      CASE
+        WHEN t.last_replied_account_id IS NULL AND linkedin_account.id IS NOT NULL THEN 1
+        ELSE 0
+      END AS linkedin_account_inferred,
       ea.id AS email_account_id,
       ea.name AS email_account_name,
       ea.from_email AS email_account_from,
@@ -84,21 +159,21 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       er.dispatch_result_json,
       COALESCE(er.manually_edited, 0) AS manually_edited
     FROM targets t
-    LEFT JOIN run_profiles rp ON rp.target_id = t.id
-    LEFT JOIN runs r ON r.id = rp.run_id AND r.status IN ('running', 'paused', 'completed')
-    LEFT JOIN workflows w ON w.id = r.workflow_id
-    LEFT JOIN email_accounts ea ON ea.id = rp.email_account_id
-    LEFT JOIN (
-      SELECT er1.* FROM email_replies er1
-      WHERE er1.received_at = (
-        SELECT MAX(er2.received_at) FROM email_replies er2 WHERE er2.target_id = er1.target_id
-      )
-    ) er ON er.target_id = t.id
+    LEFT JOIN latest_email_reply er ON er.target_id = t.id
+    LEFT JOIN latest_context lc ON lc.target_id = t.id
+    LEFT JOIN run_profiles reply_rp
+      ON reply_rp.target_id = t.id AND reply_rp.run_id = er.run_id
+    LEFT JOIN runs context_run ON context_run.id = COALESCE(er.run_id, lc.run_id)
+    LEFT JOIN workflows w ON w.id = context_run.workflow_id
+    LEFT JOIN email_accounts ea
+      ON ea.id = COALESCE(reply_rp.email_account_id, context_run.email_account_id, lc.email_account_id)
+    LEFT JOIN accounts linkedin_account
+      ON linkedin_account.id = COALESCE(t.last_replied_account_id, context_run.account_id, lc.account_id)
     WHERE 1=1
-    ${channelFilter}
-    GROUP BY t.id
+      ${channelFilter}
+      ${accountFilter}
     ORDER BY replied_at DESC
-  `).all() as Array<InboxReply & { classification_json: string | null }>;
+  `).all(...params) as Array<InboxReply & { classification_json: string | null }>;
 
   const replies: InboxReply[] = rows.map((row) => {
     let reply_kind: string | null = null;

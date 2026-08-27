@@ -1,85 +1,132 @@
 import Head from "next/head";
 import Link from "next/link";
-import { useState, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  RiMailLine,
-  RiLinkedinBoxLine,
-  RiSearchLine,
-  RiInboxLine,
-  RiExternalLinkLine,
-  RiSendPlaneLine,
   RiCloseLine,
+  RiExternalLinkLine,
+  RiInboxLine,
+  RiLinkedinBoxLine,
   RiLoader4Line,
+  RiMailLine,
+  RiSearchLine,
+  RiSendPlaneLine,
 } from "react-icons/ri";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
+import type { Locale, TranslationParams } from "@/lib/i18n/types";
 import type { InboxReply } from "./api/inbox/index";
 import type { EmailMessage } from "./api/inbox/thread";
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d`;
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+type Translate = (key: string, params?: TranslationParams) => string;
+
+type ChannelFilter = "all" | "email" | "linkedin";
+
+interface LinkedInAccountOption {
+  id: string;
+  name: string;
+  email: string;
+  is_authenticated: number;
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString("en-US", {
-    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+const DATE_LOCALES: Record<Locale, string> = {
+  en: "en-US",
+  es: "es-ES",
+  "pt-BR": "pt-BR",
+};
+
+const CHANNELS: ChannelFilter[] = ["all", "email", "linkedin"];
+
+const VERDICT_KEYS = [
+  "all",
+  "ooo_followup",
+  "substitute",
+  "call_task",
+  "human_reply",
+  "not_interested",
+  "pending",
+  "failed",
+  "none",
+] as const;
+
+const VERDICT_CLASSES: Record<string, string> = {
+  ooo_followup: "bg-warning/15 text-warning",
+  substitute: "bg-secondary/15 text-secondary",
+  call_task: "bg-success/15 text-success",
+  human_reply: "bg-info/15 text-info",
+  not_interested: "bg-error/15 text-error",
+  cancelled: "bg-base-300/60 text-base-content/50",
+  pending: "bg-base-300/60 text-base-content/50",
+  failed: "bg-error/15 text-error",
+  none: "bg-base-300/40 text-base-content/30",
+};
+
+function timeAgo(iso: string, locale: Locale, t: Translate): string {
+  const diff = Math.max(0, Date.now() - new Date(iso).getTime());
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return t("inbox.time.justNow");
+  if (mins < 60) return t("inbox.time.minutes", { count: mins });
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return t("inbox.time.hours", { count: hours });
+  const days = Math.floor(hours / 24);
+  if (days < 7) return t("inbox.time.days", { count: days });
+  return new Date(iso).toLocaleDateString(DATE_LOCALES[locale], { month: "short", day: "numeric" });
+}
+
+function formatDate(iso: string, locale: Locale): string {
+  return new Date(iso).toLocaleString(DATE_LOCALES[locale], {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
-const CHANNEL_TABS = [
-  { key: "all", label: "All" },
-  { key: "email", label: "Email" },
-  { key: "linkedin", label: "LinkedIn" },
-] as const;
-
-type ChannelFilter = typeof CHANNEL_TABS[number]["key"];
-
-// ── Classifier verdict badges ───────────────────────────────────────────────
-
-const VERDICT_BADGES: Record<string, { label: string; cls: string }> = {
-  ooo_followup: { label: "OOO follow-up", cls: "bg-warning/15 text-warning" },
-  substitute: { label: "Substitute", cls: "bg-secondary/15 text-secondary" },
-  call_task: { label: "Call task", cls: "bg-success/15 text-success" },
-  human_reply: { label: "Human reply", cls: "bg-info/15 text-info" },
-  not_interested: { label: "Not interested", cls: "bg-error/15 text-error" },
-  cancelled: { label: "Cancelled", cls: "bg-base-300/60 text-base-content/50" },
-};
-
-function verdictBadge(reply: InboxReply): { label: string; cls: string } {
-  if (reply.classification_error) return { label: "Failed", cls: "bg-error/15 text-error" };
-  if (reply.reply_id && !reply.classified_at) return { label: "Pending", cls: "bg-base-300/60 text-base-content/50" };
-  if (reply.reply_kind && VERDICT_BADGES[reply.reply_kind]) return VERDICT_BADGES[reply.reply_kind];
-  return { label: "—", cls: "bg-base-300/40 text-base-content/30" };
-}
-
-// Stable key for filtering — matches the categories the badge renders.
 function verdictKey(reply: InboxReply): string {
   if (reply.classification_error) return "failed";
   if (reply.reply_id && !reply.classified_at) return "pending";
-  if (reply.reply_kind && VERDICT_BADGES[reply.reply_kind]) return reply.reply_kind;
+  if (reply.reply_kind && VERDICT_CLASSES[reply.reply_kind]) return reply.reply_kind;
   return "none";
 }
 
-const VERDICT_FILTERS: Array<{ key: string; label: string }> = [
-  { key: "all", label: "All verdicts" },
-  { key: "ooo_followup", label: "OOO follow-up" },
-  { key: "substitute", label: "Substitute" },
-  { key: "call_task", label: "Call task" },
-  { key: "human_reply", label: "Human reply" },
-  { key: "not_interested", label: "Not interested" },
-  { key: "pending", label: "Pending" },
-  { key: "failed", label: "Failed" },
-  { key: "none", label: "Unclassified" },
-];
+function verdictBadge(reply: InboxReply, t: Translate): { label: string; cls: string } {
+  const key = verdictKey(reply);
+  return {
+    label: t(`inbox.verdicts.${key}`),
+    cls: VERDICT_CLASSES[key] ?? VERDICT_CLASSES.none,
+  };
+}
 
-// ── Reply Modal ───────────────────────────────────────────────────────────────
+function OriginBadges({ reply, t }: { reply: InboxReply; t: Translate }) {
+  const hasLinkedIn = reply.channel === "linkedin" || reply.channel === "both";
+  const hasEmail = reply.channel === "email" || reply.channel === "both";
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      {hasLinkedIn && (
+        <span
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary max-w-48"
+          title={reply.linkedin_account_inferred ? t("inbox.originInferred") : reply.linkedin_account_email ?? undefined}
+        >
+          <RiLinkedinBoxLine size={11} className="shrink-0" />
+          <span className="truncate">
+            {reply.linkedin_account_name ?? reply.linkedin_account_email ?? t("inbox.unattributed")}
+          </span>
+        </span>
+      )}
+      {hasEmail && (
+        <span
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-info/10 text-info max-w-48"
+          title={reply.email_account_from ?? undefined}
+        >
+          <RiMailLine size={11} className="shrink-0" />
+          <span className="truncate">
+            {reply.email_account_name ?? reply.email_account_from ?? t("inbox.unattributed")}
+          </span>
+        </span>
+      )}
+    </div>
+  );
+}
 
 interface ReplyModalProps {
   reply: InboxReply;
@@ -89,15 +136,19 @@ interface ReplyModalProps {
 }
 
 function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProps) {
+  const { t, locale } = useTranslation();
+  const hasEmailReply = reply.channel === "email" || reply.channel === "both";
+  const hasLinkedInReply = reply.channel === "linkedin" || reply.channel === "both";
+  const canReplyByEmail = hasEmailReply && !!reply.email && !!reply.email_account_id;
   const [messages, setMessages] = useState<EmailMessage[]>([]);
-  const [loadingThread, setLoadingThread] = useState(true);
+  const [loadingThread, setLoadingThread] = useState(canReplyByEmail);
   const [replyText, setReplyText] = useState("");
   const [replySubject, setReplySubject] = useState("");
   const [sending, setSending] = useState(false);
   const [acting, setActing] = useState<"reclassify" | "cancel" | null>(null);
   const threadEndRef = useRef<HTMLDivElement>(null);
 
-  const verdict = verdictBadge(reply);
+  const verdict = verdictBadge(reply, t);
   const dispatch = (() => {
     if (!reply.dispatch_result_json) return null;
     try { return JSON.parse(reply.dispatch_result_json) as Record<string, unknown>; } catch { return null; }
@@ -108,14 +159,14 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
     if (!reply.reply_id) return;
     setActing("reclassify");
     try {
-      const r = await fetch(`/api/inbox/${reply.reply_id}/reclassify`, { method: "POST" });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error ?? "Reclassify failed");
-      toast.success("Reclassified");
+      const response = await fetch(`/api/inbox/${reply.reply_id}/reclassify`, { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? t("inbox.errors.reclassify"));
+      toast.success(t("inbox.toasts.reclassified"));
       onActionDone();
       onClose();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Reclassify failed");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("inbox.errors.reclassify"));
     } finally {
       setActing(null);
     }
@@ -125,39 +176,48 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
     if (!reply.reply_id) return;
     setActing("cancel");
     try {
-      const r = await fetch(`/api/inbox/${reply.reply_id}/cancel-followup`, { method: "POST" });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error ?? "Cancel failed");
-      toast.success("Follow-up cancelled");
+      const response = await fetch(`/api/inbox/${reply.reply_id}/cancel-followup`, { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? t("inbox.errors.cancelFollowup"));
+      toast.success(t("inbox.toasts.followupCancelled"));
       onActionDone();
       onClose();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Cancel failed");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("inbox.errors.cancelFollowup"));
     } finally {
       setActing(null);
     }
   }
 
   useEffect(() => {
-    if (!reply.email_account_id || !reply.email) {
+    if (!canReplyByEmail || !reply.email_account_id || !reply.email) {
       setLoadingThread(false);
       return;
     }
+
+    let cancelled = false;
     setLoadingThread(true);
     const params = new URLSearchParams({ targetId: reply.id, emailAccountId: reply.email_account_id });
     fetch(`/api/inbox/thread?${params}`)
-      .then((r) => r.json())
-      .then((d) => {
-        setMessages(d.messages ?? []);
-        // Pre-fill reply subject from last message
-        const last = (d.messages ?? []).at(-1) as EmailMessage | undefined;
-        if (last) {
-          setReplySubject(last.subject.startsWith("Re:") ? last.subject : `Re: ${last.subject}`);
-        }
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error ?? t("inbox.errors.loadThread"));
+        return data;
       })
-      .catch(() => toast.error("Failed to load thread"))
-      .finally(() => setLoadingThread(false));
-  }, [reply.id, reply.email_account_id, reply.email]);
+      .then((data) => {
+        if (cancelled) return;
+        const loadedMessages = (data.messages ?? []) as EmailMessage[];
+        setMessages(loadedMessages);
+        const last = loadedMessages.at(-1);
+        if (last) setReplySubject(last.subject.startsWith("Re:") ? last.subject : `Re: ${last.subject}`);
+      })
+      .catch((error) => {
+        if (!cancelled) toast.error(error instanceof Error ? error.message : t("inbox.errors.loadThread"));
+      })
+      .finally(() => { if (!cancelled) setLoadingThread(false); });
+
+    return () => { cancelled = true; };
+  }, [canReplyByEmail, reply.id, reply.email_account_id, reply.email, t]);
 
   useEffect(() => {
     threadEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -167,7 +227,7 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
     if (!replyText.trim() || !reply.email || !reply.email_account_id) return;
     setSending(true);
     try {
-      const r = await fetch("/api/inbox/reply", {
+      const response = await fetch("/api/inbox/reply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -177,48 +237,39 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
           body: replyText,
         }),
       });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error ?? "Send failed");
-      toast.success("Reply sent");
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? t("inbox.errors.send"));
+      toast.success(t("inbox.toasts.replySent"));
       setReplyText("");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to send");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("inbox.errors.send"));
     } finally {
       setSending(false);
     }
   }
 
-  const canReply = !!reply.email && !!reply.email_account_id;
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-
-      {/* Modal */}
       <div className="relative z-10 w-full max-w-2xl max-h-[85vh] flex flex-col bg-base-100 border border-base-300/50 rounded-xl shadow-2xl mx-4">
-        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-base-300/50">
-          <div>
-            <div className="font-semibold text-base-content">
-              {reply.full_name ?? reply.email ?? "Unknown"}
+          <div className="min-w-0">
+            <div className="font-semibold text-base-content truncate">
+              {reply.full_name ?? reply.email ?? t("inbox.unknown")}
             </div>
-            <div className="text-xs text-base-content/40 mt-0.5">
-              {reply.email && <span>{reply.email}</span>}
-              {reply.email_account_from && (
-                <span className="ml-2 text-base-content/30">via {reply.email_account_from}</span>
-              )}
+            <div className="mt-1 flex items-center gap-2 flex-wrap">
+              <OriginBadges reply={reply} t={t} />
             </div>
           </div>
           <button
             onClick={onClose}
+            aria-label={t("inbox.close")}
             className="text-base-content/40 hover:text-base-content transition-colors p-1"
           >
             <RiCloseLine size={18} />
           </button>
         </div>
 
-        {/* Classifier verdict + dispatch trail */}
         {reply.reply_id && (
           <div className="px-5 py-3.5 border-b border-base-300/50 bg-base-200/40 space-y-2.5">
             <div className="flex items-center gap-2 flex-wrap">
@@ -227,23 +278,30 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
               </span>
               {reply.manually_edited === 1 && (
                 <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-base-300/60 text-base-content/50">
-                  edited
+                  {t("inbox.edited")}
                 </span>
               )}
-              {reply.reply_summary && (
-                <span className="text-xs text-base-content/60">{reply.reply_summary}</span>
-              )}
+              {reply.reply_summary && <span className="text-xs text-base-content/60">{reply.reply_summary}</span>}
             </div>
 
             {reply.classification_error && (
-              <div className="text-xs text-error/80">Classifier error: {reply.classification_error}</div>
+              <div className="text-xs text-error/80">
+                {t("inbox.classifierError", { error: reply.classification_error })}
+              </div>
             )}
 
             {dispatch && (
               <div className="text-xs text-base-content/45 space-y-0.5">
-                {scheduledFor && <div>Follow-up scheduled for {formatDate(scheduledFor)}</div>}
-                {dispatch.substitute_target_id ? <div>Substitute enrolled</div> : null}
-                {dispatch.todo_id ? <div>Call task created{dispatch.phone_number ? ` · ${dispatch.phone_number}` : ""}</div> : null}
+                {scheduledFor && (
+                  <div>{t("inbox.followupScheduled", { date: formatDate(scheduledFor, locale) })}</div>
+                )}
+                {dispatch.substitute_target_id ? <div>{t("inbox.substituteEnrolled")}</div> : null}
+                {dispatch.todo_id ? (
+                  <div>
+                    {t("inbox.callTaskCreated")}
+                    {dispatch.phone_number ? ` · ${dispatch.phone_number}` : ""}
+                  </div>
+                ) : null}
               </div>
             )}
 
@@ -255,7 +313,7 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-base-300/50 text-base-content/70 hover:bg-base-300 disabled:opacity-40 transition-colors"
                 >
                   {acting === "reclassify" ? <RiLoader4Line size={12} className="animate-spin" /> : null}
-                  Reclassify
+                  {t("inbox.reclassify")}
                 </button>
               )}
               {scheduledFor && (
@@ -265,75 +323,89 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-error/10 text-error hover:bg-error/20 disabled:opacity-40 transition-colors"
                 >
                   {acting === "cancel" ? <RiLoader4Line size={12} className="animate-spin" /> : null}
-                  Cancel follow-up
+                  {t("inbox.cancelFollowup")}
                 </button>
               )}
             </div>
           </div>
         )}
 
-        {/* Thread */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
-          {loadingThread ? (
-            <div className="flex items-center justify-center gap-2 text-base-content/30 py-10">
-              <RiLoader4Line size={18} className="animate-spin" />
-              <span className="text-sm">Loading thread…</span>
-            </div>
-          ) : messages.length === 0 ? (
-            <div className="text-center text-base-content/30 text-sm py-10">
-              {canReply ? "No messages found in thread" : "No email account linked to this reply"}
-            </div>
-          ) : (
-            messages.map((msg, i) => {
-              const isFromContact = msg.from.toLowerCase().includes((reply.email ?? "").toLowerCase());
-              return (
-                <div
-                  key={i}
-                  className={`rounded-lg p-3.5 ${
-                    isFromContact
-                      ? "bg-base-200 border border-base-300/40"
-                      : "bg-primary/8 border border-primary/20"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium text-base-content/60">{msg.from}</span>
-                    <span className="text-xs text-base-content/30">{formatDate(msg.date)}</span>
-                  </div>
-                  <p className="text-sm text-base-content whitespace-pre-wrap leading-relaxed">
-                    {msg.text || "(no text content)"}
-                  </p>
-                </div>
-              );
-            })
-          )}
-          <div ref={threadEndRef} />
-        </div>
+        {hasLinkedInReply && reply.linkedin_url && (
+          <div className="px-5 py-3 border-b border-base-300/50 bg-primary/5 flex items-center justify-between gap-3">
+            <div className="text-xs text-base-content/55">{t("inbox.linkedinReplyDetected")}</div>
+            <a
+              href={reply.linkedin_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors shrink-0"
+            >
+              <RiExternalLinkLine size={12} /> {t("inbox.openInLinkedin")}
+            </a>
+          </div>
+        )}
 
-        {/* Reply composer */}
-        {canReply && (
+        {hasEmailReply && (
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
+            {loadingThread ? (
+              <div className="flex items-center justify-center gap-2 text-base-content/30 py-10">
+                <RiLoader4Line size={18} className="animate-spin" />
+                <span className="text-sm">{t("inbox.loadingThread")}</span>
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="text-center text-base-content/30 text-sm py-10">
+                {canReplyByEmail ? t("inbox.noMessages") : t("inbox.noEmailAccount")}
+              </div>
+            ) : (
+              messages.map((message, index) => {
+                const isFromContact = message.from.toLowerCase().includes((reply.email ?? "").toLowerCase());
+                return (
+                  <div
+                    key={`${message.uid}-${index}`}
+                    className={`rounded-lg p-3.5 ${
+                      isFromContact
+                        ? "bg-base-200 border border-base-300/40"
+                        : "bg-primary/8 border border-primary/20"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-base-content/60">{message.from}</span>
+                      <span className="text-xs text-base-content/30">{formatDate(message.date, locale)}</span>
+                    </div>
+                    <p className="text-sm text-base-content whitespace-pre-wrap leading-relaxed">
+                      {message.text || t("inbox.noTextContent")}
+                    </p>
+                  </div>
+                );
+              })
+            )}
+            <div ref={threadEndRef} />
+          </div>
+        )}
+
+        {canReplyByEmail && (
           <div className="border-t border-base-300/50 px-5 py-4 space-y-2.5">
             <input
               type="text"
               value={replySubject}
-              onChange={(e) => setReplySubject(e.target.value)}
-              placeholder="Subject"
+              onChange={(event) => setReplySubject(event.target.value)}
+              placeholder={t("inbox.subject")}
               className="w-full bg-base-200 border border-base-300/50 rounded-lg px-3 py-1.5 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:border-primary/40"
             />
             <textarea
               value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              placeholder={`Reply to ${reply.full_name ?? reply.email}…`}
+              onChange={(event) => setReplyText(event.target.value)}
+              placeholder={t("inbox.replyTo", { name: reply.full_name ?? reply.email ?? t("inbox.unknown") })}
               rows={4}
               className="w-full bg-base-200 border border-base-300/50 rounded-lg px-3 py-2 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:border-primary/40 resize-none"
             />
             <div className="flex justify-end">
               <button
                 onClick={handleSend}
-                disabled={!replyText.trim() || sending}
+                disabled={!replyText.trim() || !replySubject.trim() || sending}
                 className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 {sending ? <RiLoader4Line size={14} className="animate-spin" /> : <RiSendPlaneLine size={14} />}
-                {sending ? "Sending…" : "Send"}
+                {sending ? t("inbox.sending") : t("inbox.send")}
               </button>
             </div>
           </div>
@@ -343,39 +415,83 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
   );
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
-
 export default function InboxPage() {
+  const { t, locale } = useTranslation();
   const [replies, setReplies] = useState<InboxReply[]>([]);
+  const [accounts, setAccounts] = useState<LinkedInAccountOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [channel, setChannel] = useState<ChannelFilter>("all");
+  const [accountId, setAccountId] = useState("");
   const [verdict, setVerdict] = useState<string>("all");
   const [selectedReply, setSelectedReply] = useState<InboxReply | null>(null);
   const [reclassifyingAll, setReclassifyingAll] = useState(false);
   const [backfilling, setBackfilling] = useState(false);
-  // Open-core: AI reply classification + backfill are premium (ee/). Replies are still
-  // shown; only the AI action controls are gated behind an upgrade.
-  const [hasPremium, setHasPremium] = useState(true);
+  const [hasPremium, setHasPremium] = useState(false);
+
   useEffect(() => {
-    fetch("/api/premium-status").then((r) => r.ok ? r.json() : null)
-      .then((d) => { if (d) setHasPremium(!!d.hasPremium); }).catch(() => {});
+    fetch("/api/premium-status")
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => { if (data) setHasPremium(!!data.hasPremium); })
+      .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/accounts")
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error ?? t("inbox.errors.loadAccounts"));
+        return data;
+      })
+      .then((data) => { if (!cancelled) setAccounts(Array.isArray(data) ? data : []); })
+      .catch((error) => {
+        if (!cancelled) toast.error(error instanceof Error ? error.message : t("inbox.errors.loadAccounts"));
+      });
+    return () => { cancelled = true; };
+  }, [t]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (channel !== "all") params.set("channel", channel);
+    if (accountId) params.set("accountId", accountId);
+
+    try {
+      const response = await fetch(`/api/inbox?${params}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? t("inbox.errors.loadReplies"));
+      setReplies(data.replies ?? []);
+    } catch (error) {
+      setReplies([]);
+      toast.error(error instanceof Error ? error.message : t("inbox.errors.loadReplies"));
+    } finally {
+      setLoading(false);
+    }
+  }, [accountId, channel, t]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   async function handleBackfill() {
     setBackfilling(true);
     try {
-      const r = await fetch("/api/inbox/backfill", { method: "POST" });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error ?? "Backfill failed");
+      const response = await fetch("/api/inbox/backfill", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? t("inbox.errors.backfill"));
       toast.success(
-        d.to_process === 0
-          ? "Nothing to backfill"
-          : `Backfilled ${d.classified}/${d.captured} captured${d.failed ? ` (${d.failed} failed)` : ""}`,
+        data.to_process === 0
+          ? t("inbox.toasts.nothingToBackfill")
+          : t("inbox.toasts.backfilled", {
+              classified: data.classified,
+              captured: data.captured,
+              failed: data.failed ? ` (${data.failed} ${t("inbox.verdicts.failed").toLowerCase()})` : "",
+            })
       );
-      load();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Backfill failed");
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("inbox.errors.backfill"));
     } finally {
       setBackfilling(false);
     }
@@ -384,53 +500,46 @@ export default function InboxPage() {
   async function handleReclassifyAll() {
     setReclassifyingAll(true);
     try {
-      const r = await fetch("/api/inbox/reclassify-all", { method: "POST" });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error ?? "Reclassify failed");
+      const response = await fetch("/api/inbox/reclassify-all", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? t("inbox.errors.reclassify"));
       toast.success(
-        d.total === 0
-          ? "Nothing to reclassify"
-          : `Reclassified ${d.classified}/${d.total}${d.failed ? ` (${d.failed} failed)` : ""}`,
+        data.total === 0
+          ? t("inbox.toasts.nothingToReclassify")
+          : t("inbox.toasts.reclassifiedCount", {
+              classified: data.classified,
+              total: data.total,
+              failed: data.failed ? ` (${data.failed} ${t("inbox.verdicts.failed").toLowerCase()})` : "",
+            })
       );
-      load();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Reclassify failed");
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("inbox.errors.reclassify"));
     } finally {
       setReclassifyingAll(false);
     }
   }
 
-  function load() {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (channel !== "all") params.set("channel", channel);
-    fetch(`/api/inbox?${params}`)
-      .then((r) => r.json())
-      .then((d) => setReplies(d.replies ?? []))
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channel]);
-
-  const filtered = replies.filter((r) => {
-    if (verdict !== "all" && verdictKey(r) !== verdict) return false;
+  const filtered = replies.filter((reply) => {
+    if (verdict !== "all" && verdictKey(reply) !== verdict) return false;
     if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      (r.full_name ?? "").toLowerCase().includes(q) ||
-      (r.email ?? "").toLowerCase().includes(q) ||
-      (r.company ?? "").toLowerCase().includes(q) ||
-      (r.workflow_name ?? "").toLowerCase().includes(q)
-    );
+    const query = search.toLowerCase();
+    return [
+      reply.full_name,
+      reply.email,
+      reply.company,
+      reply.workflow_name,
+      reply.linkedin_account_name,
+      reply.linkedin_account_email,
+      reply.email_account_name,
+      reply.email_account_from,
+    ].some((value) => (value ?? "").toLowerCase().includes(query));
   });
 
   return (
     <>
       <Head>
-        <title>Inbox — Dashboard B2B</title>
+        <title>{t("inbox.pageTitle")}</title>
         <meta name="robots" content="noindex, nofollow" />
       </Head>
 
@@ -443,18 +552,17 @@ export default function InboxPage() {
         />
       )}
 
-      {/* Header */}
       <div className="flex items-center gap-3 mb-5">
         <div className="flex-1">
           <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-semibold">Inbox</h1>
+            <h1 className="text-xl font-semibold">{t("inbox.title")}</h1>
             {!loading && filtered.length > 0 && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-success/15 text-success">
-                {filtered.length} repl{filtered.length !== 1 ? "ies" : "y"}
+                {t(filtered.length === 1 ? "inbox.replyCount" : "inbox.replyCountPlural", { count: filtered.length })}
               </span>
             )}
           </div>
-          <p className="text-base-content/40 text-sm mt-0.5">Contacts who replied to your outreach</p>
+          <p className="text-base-content/40 text-sm mt-0.5">{t("inbox.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           {hasPremium ? (
@@ -462,34 +570,37 @@ export default function InboxPage() {
               <button
                 onClick={handleBackfill}
                 disabled={backfilling}
-                title="Fetch + classify historic replies that predate the classifier (no dispatch)"
+                title={t("inbox.backfillTitle")}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-base-200 border border-base-300/50 text-base-content/70 hover:bg-base-300/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 {backfilling ? <RiLoader4Line size={13} className="animate-spin" /> : null}
-                {backfilling ? "Backfilling…" : "Backfill"}
+                {backfilling ? t("inbox.backfilling") : t("inbox.backfill")}
               </button>
               <button
                 onClick={handleReclassifyAll}
                 disabled={reclassifyingAll}
-                title="Re-run the classifier on unclassified or failed replies (no dispatch)"
+                title={t("inbox.reclassifyAllTitle")}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-base-200 border border-base-300/50 text-base-content/70 hover:bg-base-300/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 {reclassifyingAll ? <RiLoader4Line size={13} className="animate-spin" /> : null}
-                {reclassifyingAll ? "Reclassifying…" : "Reclassify all"}
+                {reclassifyingAll ? t("inbox.reclassifying") : t("inbox.reclassifyAll")}
               </button>
             </>
           ) : (
-            <a href="https://opsily.com?utm_source=linki&utm_medium=app&utm_campaign=reply-ai" target="_blank" rel="noopener noreferrer"
-              title="AI reply classification + auto-followup is a premium feature"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-colors">
-              Auto-classify replies · Upgrade →
+            <a
+              href="https://opsily.com?utm_source=linki&utm_medium=app&utm_campaign=reply-ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              title={t("inbox.upgradeTitle")}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-colors"
+            >
+              {t("inbox.upgrade")}
             </a>
           )}
         </div>
       </div>
 
-      {/* Toolbar */}
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
         <div className="relative">
           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-base-content/30 pointer-events-none">
             <RiSearchLine size={13} />
@@ -497,26 +608,40 @@ export default function InboxPage() {
           <input
             type="text"
             className="w-56 bg-base-200 border border-base-300/50 rounded-lg pl-8 pr-3 py-1.5 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:border-primary/40"
-            placeholder="Name, email, company…"
+            placeholder={t("inbox.searchPlaceholder")}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(event) => setSearch(event.target.value)}
           />
         </div>
+
+        <select
+          aria-label={t("inbox.slotFilter")}
+          value={accountId}
+          onChange={(event) => setAccountId(event.target.value)}
+          className="h-8 min-w-48 bg-base-200 border border-base-300/50 rounded-lg px-2.5 text-xs font-medium text-base-content/70 focus:outline-none focus:border-primary/40 cursor-pointer"
+        >
+          <option value="">{t("inbox.allSlots")}</option>
+          {accounts.map((account) => (
+            <option key={account.id} value={account.id}>
+              {account.name} · {account.email}{account.is_authenticated ? "" : ` · ${t("inbox.disconnected")}`}
+            </option>
+          ))}
+        </select>
 
         <div className="w-px h-4 bg-base-300/60" />
 
         <div className="flex items-center gap-1">
-          {CHANNEL_TABS.map((tab) => (
+          {CHANNELS.map((item) => (
             <button
-              key={tab.key}
-              onClick={() => setChannel(tab.key)}
+              key={item}
+              onClick={() => setChannel(item)}
               className={`h-7 px-3 rounded-lg text-xs font-medium transition-colors ${
-                channel === tab.key
+                channel === item
                   ? "bg-primary/15 text-primary border border-primary/30"
                   : "text-base-content/50 hover:text-base-content hover:bg-base-300/50"
               }`}
             >
-              {tab.label}
+              {t(`inbox.channels.${item}`)}
             </button>
           ))}
         </div>
@@ -524,94 +649,87 @@ export default function InboxPage() {
         <div className="w-px h-4 bg-base-300/60" />
 
         <select
+          aria-label={t("inbox.verdictFilter")}
           value={verdict}
-          onChange={(e) => setVerdict(e.target.value)}
+          onChange={(event) => setVerdict(event.target.value)}
           className="h-7 bg-base-200 border border-base-300/50 rounded-lg px-2.5 text-xs font-medium text-base-content/70 focus:outline-none focus:border-primary/40 cursor-pointer"
         >
-          {VERDICT_FILTERS.map((v) => (
-            <option key={v.key} value={v.key}>{v.label}</option>
+          {VERDICT_KEYS.map((key) => (
+            <option key={key} value={key}>{t(`inbox.verdictFilters.${key}`)}</option>
           ))}
         </select>
       </div>
 
-      {/* Body */}
       {loading ? (
         <div className="flex flex-col items-center justify-center gap-3 text-base-content/30 py-24">
           <span className="loading loading-spinner loading-md" />
-          <span className="text-sm">Loading replies…</span>
+          <span className="text-sm">{t("inbox.loadingReplies")}</span>
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 text-base-content/30 py-24">
           <RiInboxLine size={36} className="opacity-30" />
           <div className="text-center">
             <p className="text-sm font-medium">
-              {search ? "No replies match your search" : "No replies yet"}
+              {search ? t("inbox.noSearchMatches") : t("inbox.noReplies")}
             </p>
-            <p className="text-xs mt-1 text-base-content/25">
-              {!search && "Replies are detected automatically by the runner"}
-            </p>
+            {!search && <p className="text-xs mt-1 text-base-content/25">{t("inbox.detectedAutomatically")}</p>}
           </div>
         </div>
       ) : (
-        <div className="rounded-lg border border-base-300/50 overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="rounded-lg border border-base-300/50 overflow-x-auto">
+          <table className="w-full text-sm min-w-[900px]">
             <thead>
               <tr className="border-b border-base-300/50 bg-base-200/60">
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-base-content/40">Contact</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-base-content/40">Channel</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-base-content/40">Verdict</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-base-content/40">From</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-base-content/40">Campaign</th>
-                <th className="text-right px-4 py-2.5 text-xs font-medium text-base-content/40">Replied</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-base-content/40">{t("inbox.columns.contact")}</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-base-content/40">{t("inbox.columns.channel")}</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-base-content/40">{t("inbox.columns.verdict")}</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-base-content/40">{t("inbox.columns.origin")}</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-base-content/40">{t("inbox.columns.campaign")}</th>
+                <th className="text-right px-4 py-2.5 text-xs font-medium text-base-content/40">{t("inbox.columns.replied")}</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r) => (
+              {filtered.map((reply) => (
                 <tr
-                  key={r.id}
+                  key={reply.id}
                   className="border-b border-base-300/30 hover:bg-base-200/40 transition-colors cursor-pointer"
-                  onClick={() => setSelectedReply(r)}
+                  onClick={() => setSelectedReply(reply)}
                 >
-                  {/* Contact */}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
                       <div>
                         <div className="flex items-center gap-1.5">
                           <span className="font-medium text-base-content">
-                            {r.full_name ?? r.email ?? r.linkedin_url ?? "Unknown"}
+                            {reply.full_name ?? reply.email ?? reply.linkedin_url ?? t("inbox.unknown")}
                           </span>
-                          {r.linkedin_url && (
+                          {reply.linkedin_url && (
                             <a
-                              href={r.linkedin_url}
+                              href={reply.linkedin_url}
                               target="_blank"
                               rel="noopener noreferrer"
+                              aria-label={t("inbox.openInLinkedin")}
                               className="text-base-content/25 hover:text-primary transition-colors"
-                              onClick={(e) => e.stopPropagation()}
+                              onClick={(event) => event.stopPropagation()}
                             >
                               <RiExternalLinkLine size={12} />
                             </a>
                           )}
                         </div>
                         <div className="text-xs text-base-content/40 mt-0.5">
-                          {r.company ? (
-                            <span>{r.company}</span>
-                          ) : r.email ? (
-                            <span>{r.email}</span>
-                          ) : null}
+                          {reply.company ?? reply.email ?? ""}
                         </div>
                       </div>
                     </div>
                   </td>
 
-                  {/* Channel */}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
-                      {(r.channel === "email" || r.channel === "both") && (
+                      {(reply.channel === "email" || reply.channel === "both") && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-info/15 text-info">
-                          <RiMailLine size={11} /> Email
+                          <RiMailLine size={11} /> {t("inbox.channels.email")}
                         </span>
                       )}
-                      {(r.channel === "linkedin" || r.channel === "both") && (
+                      {(reply.channel === "linkedin" || reply.channel === "both") && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-primary/15 text-primary">
                           <RiLinkedinBoxLine size={11} /> LinkedIn
                         </span>
@@ -619,18 +737,17 @@ export default function InboxPage() {
                     </div>
                   </td>
 
-                  {/* Verdict */}
                   <td className="px-4 py-3">
                     {(() => {
-                      const v = verdictBadge(r);
+                      const badge = verdictBadge(reply, t);
                       return (
                         <div className="flex items-center gap-1.5">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${v.cls}`}>
-                            {v.label}
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${badge.cls}`}>
+                            {badge.label}
                           </span>
-                          {r.reply_summary && (
-                            <span className="text-xs text-base-content/35 truncate max-w-[16rem]" title={r.reply_summary}>
-                              {r.reply_summary}
+                          {reply.reply_summary && (
+                            <span className="text-xs text-base-content/35 truncate max-w-[16rem]" title={reply.reply_summary}>
+                              {reply.reply_summary}
                             </span>
                           )}
                         </div>
@@ -638,35 +755,24 @@ export default function InboxPage() {
                     })()}
                   </td>
 
-                  {/* From (email account) */}
-                  <td className="px-4 py-3">
-                    {r.email_account_from ? (
-                      <span className="text-xs text-base-content/50">
-                        {r.email_account_name ?? r.email_account_from}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-base-content/25">—</span>
-                    )}
-                  </td>
+                  <td className="px-4 py-3"><OriginBadges reply={reply} t={t} /></td>
 
-                  {/* Campaign */}
                   <td className="px-4 py-3">
-                    {r.workflow_id ? (
+                    {reply.workflow_id ? (
                       <Link
-                        href={`/workflows/${r.workflow_id}`}
+                        href={`/workflows/${reply.workflow_id}`}
                         className="text-xs text-base-content/60 hover:text-base-content transition-colors"
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(event) => event.stopPropagation()}
                       >
-                        {r.workflow_name ?? r.workflow_id}
+                        {reply.workflow_name ?? reply.workflow_id}
                       </Link>
                     ) : (
                       <span className="text-xs text-base-content/25">—</span>
                     )}
                   </td>
 
-                  {/* Replied */}
                   <td className="px-4 py-3 text-right">
-                    <span className="text-xs text-base-content/40">{timeAgo(r.replied_at)}</span>
+                    <span className="text-xs text-base-content/40">{timeAgo(reply.replied_at, locale, t)}</span>
                   </td>
                 </tr>
               ))}

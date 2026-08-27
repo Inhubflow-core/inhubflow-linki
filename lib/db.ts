@@ -224,6 +224,10 @@ function runMigrations(db: Database.Database) {
     "ALTER TABLE targets ADD COLUMN connected_at TEXT",
     "ALTER TABLE targets ADD COLUMN message_sent_at TEXT",
     "ALTER TABLE targets ADD COLUMN last_replied_at TEXT",
+    // LinkedIn slot that observed the latest reply. The runner stamps this after
+    // each per-account inbox sync so the unified inbox can filter safely.
+    "ALTER TABLE targets ADD COLUMN last_replied_account_id TEXT REFERENCES accounts(id)",
+    "CREATE INDEX IF NOT EXISTS idx_targets_last_replied_account_id ON targets(last_replied_account_id)",
     "ALTER TABLE targets ADD COLUMN linkedin_member_urn TEXT",
     "ALTER TABLE targets ADD COLUMN sales_nav_url TEXT",
     "ALTER TABLE lists ADD COLUMN sales_nav_url TEXT",
@@ -763,6 +767,7 @@ function initDb(db: Database.Database) {
       connected_at TEXT,
       message_sent_at TEXT,
       last_replied_at TEXT,
+      last_replied_account_id TEXT REFERENCES accounts(id),
       linkedin_member_urn TEXT,
       enriched_at TEXT,
       created_at TEXT DEFAULT (datetime('now'))
