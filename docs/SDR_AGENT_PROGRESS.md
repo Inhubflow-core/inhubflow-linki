@@ -5,12 +5,12 @@ Updated: 2026-08-27
 ## Current checkpoint
 
 - Phase: **1A — Additive schema and disabled module contracts**
-- Status: **complete locally; pending commit/push**
+- Status: **complete locally; pending push**
 - Stable upstream base before Inbox work: `2b33d90`
 - Inbox baseline commit: `81e8256` (`feat(inbox): add unified slot attribution and filters`)
 - Phase 0 documentation commit: `7e3d413` (`docs(sdr): add phased implementation and continuity plan`)
 - Published Phase 0 checkpoint: `72020c6`
-- Phase 1A implementation commit: **pending (current changes)**
+- Phase 1A implementation commit: `334fa0d` (`feat(sdr): add isolated phase one foundation`)
 - SDR implementation started: **foundation only**
 - Gemini calls enabled: **no**
 - LinkedIn SDR sends enabled: **no**
@@ -74,13 +74,13 @@ fresh/restart isolated DB schema                 PASS (13 tables, no FK violatio
 
 ## Next exact action
 
-1. Commit the verified Phase 1A foundation as one atomic commit.
-2. Push it to `origin/main` only after explicit user approval.
-3. Begin Phase 1B only after that commit is deployed/known: repository helpers and lease/retry primitives, still with no Gemini calls or outbound actions.
+1. Push commit `334fa0d` to `origin/main` after explicit user approval.
+2. Confirm the deployed baseline is known and production remains stable.
+3. Begin Phase 1B only: repository helpers and lease/retry primitives, still with no Gemini calls or outbound actions.
 4. Update this file and commit before starting Phase 1B.
 
 ## Resume instruction
 
 Use this prompt in a new session:
 
-> Continue the SDR plan in `docs/SDR_AGENT_PLAN.md` from the checkpoint in `docs/SDR_AGENT_PROGRESS.md`. First verify git status, current SHA, and recorded tests. Do not repeat completed phases and do not enable outbound AI behavior.
+> Continue the SDR plan in `docs/SDR_AGENT_PLAN.md` from the checkpoint in `docs/SDR_AGENT_PROGRESS.md`. First verify the current SHA, working tree, and recorded tests. Do not repeat completed phases and do not enable outbound AI behavior.
