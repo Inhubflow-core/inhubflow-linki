@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { scheduleUpdateCheck } from "@/lib/update-check";
 import { encryptSecret, isEncrypted } from "@/lib/crypto";
 import { autoSeedInstance } from "@/lib/auto-seed";
+import { applySdrSchema } from "@/lib/sdr-agent/schema";
 
 const DB_PATH = process.env.LINKI_DB_PATH || path.join(process.cwd(), "linki.db");
 
@@ -629,6 +630,10 @@ function runMigrations(db: Database.Database) {
 
   cleanExistingMessyTargetsMigration(db);
   encryptLegacySecretsMigration(db);
+
+  // Optional SDR module: additive tables only. Applying the schema does not
+  // initialize a provider, start a worker, or alter existing core behavior.
+  applySdrSchema(db);
 }
 
 // Cleanup migration for previously inserted targets that had concatenated DOM card strings

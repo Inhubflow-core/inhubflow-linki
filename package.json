@@ -9,6 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:sdr-foundation": "node scripts/test-sdr-foundation.cjs",
     "mirror:ee": "node scripts/mirror-ee.js"
   },
   "dependencies": {

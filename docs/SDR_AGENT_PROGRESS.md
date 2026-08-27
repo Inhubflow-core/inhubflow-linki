@@ -1,15 +1,17 @@
 # SDR Agent — Progress
 
-Updated: 2026-08-26
+Updated: 2026-08-27
 
 ## Current checkpoint
 
-- Phase: **0 — Freeze current baseline**
-- Status: **complete and pushed to `origin/main`**
+- Phase: **1A — Additive schema and disabled module contracts**
+- Status: **complete locally; pending commit/push**
 - Stable upstream base before Inbox work: `2b33d90`
 - Inbox baseline commit: `81e8256` (`feat(inbox): add unified slot attribution and filters`)
 - Phase 0 documentation commit: `7e3d413` (`docs(sdr): add phased implementation and continuity plan`)
-- SDR implementation started: **no**
+- Published Phase 0 checkpoint: `72020c6`
+- Phase 1A implementation commit: **pending (current changes)**
+- SDR implementation started: **foundation only**
 - Gemini calls enabled: **no**
 - LinkedIn SDR sends enabled: **no**
 
@@ -37,6 +39,21 @@ Updated: 2026-08-26
 - [x] Initial runbook created.
 - [x] Push Phase 0 commits to `origin/main` after explicit approval.
 
+## Phase 1A deliverables
+
+- [x] Isolated `lib/sdr-agent/**` module boundary documented.
+- [x] Stable contracts for status, inbound events, and worker ticks.
+- [x] Channel-specific inbound validation for LinkedIn/email ownership.
+- [x] Fail-closed bridge: `off` stays disabled and requested `shadow/approval/auto` remains unavailable.
+- [x] No-op bridge performs no persistence, model calls, tool execution, or outbound sends.
+- [x] Additive module-owned schema with 13 tables and 29 idempotent statements.
+- [x] Atomic `applySdrSchema` integration through one core import/call in `lib/db.ts`.
+- [x] Authenticated `GET /api/sdr/status` route with no secrets/prompts in its response.
+- [x] Dependency-free foundation test script added (`npm run test:sdr-foundation`).
+- [x] Fresh-start and restart integration test performed against an isolated temporary database.
+- [x] Runtime test with `SDR_AGENT_MODE=auto` confirmed `effectiveMode=off` and `outboundEnabled=false`.
+- [x] No Gemini/Calendar SDK installed and no runner/inbox/workflow behavior changed.
+
 ## Known environment constraints
 
 - Local `linki.db` currently has no LinkedIn accounts/replies for four-slot end-to-end testing.
@@ -47,18 +64,20 @@ Updated: 2026-08-26
 ## Verification record
 
 ```text
-npx tsc --noEmit                                      PASS
-npx eslint pages/inbox.tsx pages/api/inbox/index.ts   PASS
-npm run build                                          PASS with expected missing-ee warning
-locale JSON parse/key parity                           PASS (88 Inbox keys)
-Inbox SQL read-only validation                         PASS
+npm run test:sdr-foundation                       PASS
+npx tsc --noEmit                                  PASS
+npx eslint lib/sdr-agent pages/api/sdr/status.ts  PASS
+npm run build                                     PASS with expected missing-ee warning
+fresh/restart isolated DB schema                 PASS (13 tables, no FK violations)
+/api/sdr/status with auto mode                   PASS (effective off, outbound false)
 ```
 
 ## Next exact action
 
-1. Confirm production deploys the verified baseline through commit `99934c5` or newer.
-2. Begin Phase 1A only: additive SDR schema and disabled/no-op module contracts. Do not install Gemini or create outbound behavior yet.
-3. Update this file and commit before starting Phase 1B.
+1. Commit the verified Phase 1A foundation as one atomic commit.
+2. Push it to `origin/main` only after explicit user approval.
+3. Begin Phase 1B only after that commit is deployed/known: repository helpers and lease/retry primitives, still with no Gemini calls or outbound actions.
+4. Update this file and commit before starting Phase 1B.
 
 ## Resume instruction
 
