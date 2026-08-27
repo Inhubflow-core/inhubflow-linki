@@ -5,7 +5,7 @@ Updated: 2026-08-26
 ## Current checkpoint
 
 - Phase: **0 — Freeze current baseline**
-- Status: **complete locally; pending push to origin**
+- Status: **complete and pushed to `origin/main`**
 - Stable upstream base before Inbox work: `2b33d90`
 - Inbox baseline commit: `81e8256` (`feat(inbox): add unified slot attribution and filters`)
 - Phase 0 documentation commit: `7e3d413` (`docs(sdr): add phased implementation and continuity plan`)
@@ -35,7 +35,7 @@ Updated: 2026-08-26
 - [x] SDR plan versioned at `docs/SDR_AGENT_PLAN.md`.
 - [x] Continuation log created.
 - [x] Initial runbook created.
-- [ ] Push local commits to `origin/main` after explicit approval.
+- [x] Push Phase 0 commits to `origin/main` after explicit approval.
 
 ## Known environment constraints
 
@@ -56,10 +56,9 @@ Inbox SQL read-only validation                         PASS
 
 ## Next exact action
 
-1. Push all verified local commits ahead of `origin/main` after the user authorizes the outward-facing push.
-2. Confirm remote is clean and deployed baseline is known.
-3. Begin Phase 1A only: additive SDR schema and disabled/no-op module contracts. Do not install Gemini or create outbound behavior yet.
-4. Update this file and commit before starting Phase 1B.
+1. Confirm production deploys the verified baseline through commit `99934c5` or newer.
+2. Begin Phase 1A only: additive SDR schema and disabled/no-op module contracts. Do not install Gemini or create outbound behavior yet.
+3. Update this file and commit before starting Phase 1B.
 
 ## Resume instruction
 
