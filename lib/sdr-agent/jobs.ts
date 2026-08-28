@@ -200,6 +200,38 @@ export function leaseNextSdrJob(db: Database.Database, options: LeaseOptions): L
   })();
 }
 
+/**
+ * Leases a specific job by id if it is in queued state.
+ */
+export function leaseSdrJob(db: Database.Database, jobId: string, options: LeaseOptions): LeasedSdrJob | null {
+  assertNonEmpty(jobId, "id");
+  assertNonEmpty(options.workerId, "workerId");
+  const leaseMs = options.leaseMs ?? DEFAULT_LEASE_MS;
+  const now = options.now ?? new Date();
+  const nowSql = toSqliteDate(now);
+  const expiresAt = new Date(now.getTime() + leaseMs);
+  const expiresSql = toSqliteDate(expiresAt);
+  const leaseToken = `${options.workerId}:${randomUUID()}`;
+
+  const claimed = db.prepare(`
+    UPDATE sdr_jobs
+    SET
+      state = 'leased',
+      attempts = attempts + 1,
+      lease_token = ?,
+      lease_expires_at = ?,
+      updated_at = ?
+    WHERE id = ? AND state = 'queued'
+  `).run(leaseToken, expiresSql, nowSql, jobId);
+
+  if (claimed.changes !== 1) return null;
+  const job = readJob(db, jobId);
+  if (job?.state === "leased" && job.lease_token === leaseToken && job.lease_expires_at) {
+    return job as LeasedSdrJob;
+  }
+  return null;
+}
+
 /** Extends a lease only when the caller still owns it. */
 export function renewSdrJobLease(
   db: Database.Database,

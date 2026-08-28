@@ -20,6 +20,7 @@ import {
   RiPlayCircleLine,
   RiGlobalLine,
   RiUserSearchLine,
+  RiRobotLine,
 } from "react-icons/ri";
 import { pathToTourPage, replayPageTour } from "@/lib/tour";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
@@ -35,6 +36,7 @@ const mainNav = [
   { href: "/companies", labelKey: "nav.companies", icon: RiBuildingLine, color: "#7a5af8", tour: "nav-companies" },
   { href: "/workflows", labelKey: "nav.campaigns", icon: RiFlowChart, color: "#f79009", tour: "nav-workflows" },
   { href: "/inbox", labelKey: "nav.inbox", icon: RiInboxLine, color: "#0086c9", tour: "nav-inbox" },
+  { href: "/sdr", labelKey: "nav.sdrAgent", icon: RiRobotLine, color: "#8b5cf6", tour: "nav-sdr" },
   { href: "/email-health", labelKey: "nav.emailHealth", icon: RiMailCheckLine, color: "#fb6514", tour: "nav-email-health" },
 ];
 

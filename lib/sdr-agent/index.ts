@@ -1,6 +1,8 @@
 export * from "./contracts";
 export * from "./jobs";
 export * from "./repository";
+export * from "./gemini";
+export * from "./pipeline";
 export { createDisabledSdrBridge, type DisabledSdrBridgeOptions } from "./noop";
 
 import { createDisabledSdrBridge } from "./noop";

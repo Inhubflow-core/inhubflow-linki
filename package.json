@@ -10,9 +10,11 @@
     "start": "next start",
     "lint": "eslint",
     "test:sdr-foundation": "node scripts/test-sdr-foundation.cjs",
+    "test:sdr-shadow": "node scripts/test-sdr-shadow.cjs",
     "mirror:ee": "node scripts/mirror-ee.js"
   },
   "dependencies": {
+    "@google/genai": "^2.19.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/mailparser": "^3.4.6",

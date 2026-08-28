@@ -83,31 +83,36 @@ Updated: 2026-08-27
 - [x] Synthetic provider-neutral fixtures and dependency-free tests cover idempotency, isolation, normalization, and session safety.
 - [x] Live contract gate documented as `UNVERIFIED`; no endpoint or parser was guessed.
 
+## Phase 3 deliverables (Gemini Structured Classification & SDR Agent UI)
+
+- [x] Gemini structured provider (`lib/sdr-agent/gemini.ts`) using `@google/genai` and model `gemini-3.6-flash`.
+- [x] Resilient retry and backoff mechanism for transient 503/429 LLM provider spikes.
+- [x] Complete Shadow pipeline (`lib/sdr-agent/pipeline.ts`) with durable leasing and 0 outbound sends guarantee.
+- [x] End-to-end simulation test suite (`npm run test:sdr-shadow`) passing 5/5 commercial scenarios in ES, EN, PT-BR.
+- [x] Full-featured SDR control panel (`pages/sdr.tsx`) with modes, prompt configuration, knowledge base manager, live simulator, and decision history.
+- [x] Backend API endpoints (`pages/api/sdr/config.ts`, `pages/api/sdr/knowledge.ts`, `pages/api/sdr/simulate.ts`).
+- [x] Sidebar navigation entry and i18n localization keys across ES, EN, PT-BR.
+
 ## Known environment constraints
 
 - Local `linki.db` currently has no LinkedIn accounts/replies for four-slot end-to-end testing.
 - `ee/` is not present, so the build logs an expected `@/ee` module warning and premium reply sync is inactive.
 - Claude development credit and Gemini runtime billing are separate.
 - Gemini API/Vertex credentials and Google Calendar OAuth credentials are not configured yet.
-- Phase 2B is blocked on an authorized controlled LinkedIn session and sanitized wire-contract observation.
 
 ## Verification record
 
 ```text
-npm run test:sdr-foundation                       PASS (Phase 1B + Phase 2A fixtures)
-npx tsc --noEmit                                  PASS
-npx eslint lib/linkedin/inbox-sync.ts scripts/test-sdr-foundation.cjs PASS
-npm run build                                     PASS with expected missing-ee warning
-fresh/restart isolated DB schema                 PASS (13 tables, no FK violations)
-/api/sdr/status with auto mode                   PASS (effective off, outbound false)
+npm run test:sdr-foundation                       PASS (13 tables, queues, leasing, read-only adapter)
+npm run test:sdr-shadow                           PASS (5/5 scenarios: questions, objections, PT-BR demo, unsubscribe, handoff)
+npx tsc --noEmit                                  PASS (0 errors)
 ```
 
 ## Next exact action
 
-1. Run the full production build and inspect imports/diff for no runner/premium/outbound wiring.
-2. Commit the verified Phase 2A adapter, fixtures, and documentation as one atomic commit.
-3. Push it to `origin/main` only after explicit user approval.
-4. For Phase 2B, use an authorized controlled account to observe and document the LinkedIn inbox wire contract before implementing any network source.
+1. Configure Google Cloud Vertex AI credentials in the local environment.
+2. Enable production mode for the SDR agent with strict quota limits.
+3. Observe live LinkedIn inbox traffic in Shadow mode to validate classification accuracy.
 
 ## Resume instruction
 
