@@ -4,7 +4,7 @@ import { getSessionPage, saveSessionState, getSessionContext } from "@/lib/linke
 import { visitProfile } from "@/lib/linkedin/visit";
 import { sendConnectionRequest, WeeklyLimitError, AlreadyConnectedError, PendingInviteError } from "@/lib/linkedin/connect";
 import { sendMessage, NotConnectedError } from "@/lib/linkedin/message";
-import { shouldSyncAccepted, syncAcceptedConnections } from "@/lib/linkedin/sync-accepted";
+import { shouldSyncAccepted, syncAcceptedConnectionsDetailed, type AcceptedSyncResult } from "@/lib/linkedin/sync-accepted";
 import { sendEmail } from "@/lib/email/sender";
 import { shouldSyncEmailInbox, syncEmailInbox } from "@/lib/email/inbox";
 import { enrichProfile } from "@/lib/linkedin/enrich";
@@ -26,6 +26,31 @@ const inmailCreditsExhaustedOn: Record<string, string> = {};
 function todayLocalDate(): string { return new Date().toISOString().slice(0, 10); }
 function inmailCreditsExhaustedToday(accountId: string): boolean {
   return inmailCreditsExhaustedOn[accountId] === todayLocalDate();
+}
+
+// One accepted-connection reconciliation at a time per account. Message-step
+// preflight can otherwise make every due lead open its own 60-second scan.
+const ACCEPTED_PREFLIGHT_COOLDOWN_MS = 5 * 60 * 1000;
+const acceptedSyncByAccount = new Map<string, { startedAt: number; promise: Promise<AcceptedSyncResult> }>();
+function reconcileAcceptedConnections(accountId: string): Promise<AcceptedSyncResult> {
+  const now = Date.now();
+  const cached = acceptedSyncByAccount.get(accountId);
+  if (cached && now - cached.startedAt < ACCEPTED_PREFLIGHT_COOLDOWN_MS) return cached.promise;
+
+  const promise = syncAcceptedConnectionsDetailed(accountId).catch((): AcceptedSyncResult => ({
+    success: false,
+    partial: true,
+    stamped: 0,
+    unmarked: 0,
+    pages: 0,
+    connectionsRead: 0,
+    pendingTargets: 0,
+    matchedTargets: 0,
+    declaredTotal: null,
+    reason: "invalid_response",
+  }));
+  acceptedSyncByAccount.set(accountId, { startedAt: now, promise });
+  return promise;
 }
 
 // Initial wait before first acceptance check (6h)
@@ -393,7 +418,7 @@ async function ensureSalesNavEnriched(db: ReturnType<typeof getDb>, target: Targ
   }
 }
 
-async function ensureApolloEnriched(db: ReturnType<typeof getDb>, target: Target, runId: string): Promise<void> {
+async function ensureApolloEnriched(db: ReturnType<typeof getDb>, target: Target): Promise<void> {
   const fresh = db.prepare("SELECT apollo_enriched_at, email, linkedin_url, sales_nav_url FROM targets WHERE id = ?").get(target.id) as { apollo_enriched_at: string | null; email: string | null; linkedin_url: string | null; sales_nav_url: string | null } | undefined;
   if (!fresh || fresh.apollo_enriched_at || fresh.email) return;
   const apolloUrl = fresh.linkedin_url?.includes("/in/") ? fresh.linkedin_url : fresh.sales_nav_url;
@@ -552,7 +577,7 @@ async function executeStep(
     } else if (step.step_type === "connect") {
       if (!enforceSchedule(db, tr, runId, target.id, name, accountLimits)) return;
 
-      const freshTarget = db.prepare("SELECT * FROM targets WHERE id = ?").get(target.id) as Target;
+      let freshTarget = db.prepare("SELECT * FROM targets WHERE id = ?").get(target.id) as Target;
       if (freshTarget.degree === 1) {
         if (!freshTarget.connected_at) db.prepare("UPDATE targets SET connected_at = ? WHERE id = ?").run(nowIso(), target.id);
         log(db, runId, target.id, "info", `${name} already connected — skipping connect step`);
@@ -561,14 +586,28 @@ async function executeStep(
       }
 
       if (freshTarget.connection_requested_at) {
-        const hoursSinceRequest = hoursSince(freshTarget.connection_requested_at);
+        const syncResult = await reconcileAcceptedConnections(accountId);
+        freshTarget = db.prepare("SELECT * FROM targets WHERE id = ?").get(target.id) as Target;
+        if (freshTarget.degree === 1) {
+          log(db, runId, target.id, "info", `${name} accepted connection confirmed via connections API (${syncResult.matchedTargets} match${syncResult.matchedTargets === 1 ? "" : "es"}) — advancing`);
+          trAdvance(db, tr, steps);
+          return;
+        }
+
+        const requestedAt = freshTarget.connection_requested_at;
+        if (!requestedAt) {
+          log(db, runId, target.id, "warn", `${name} lost its connection-request timestamp during reconciliation — rescheduling safely`);
+          trWait(db, tr, CONNECTION_RECHECK_HOURS);
+          return;
+        }
+        const hoursSinceRequest = hoursSince(requestedAt);
         if (hoursSinceRequest / 24 > CONNECTION_MAX_WAIT_DAYS) {
           log(db, runId, target.id, "warn", `${name} did not accept after ${CONNECTION_MAX_WAIT_DAYS} days — skipping`);
           trSkip(db, tr, `Did not accept connection after ${CONNECTION_MAX_WAIT_DAYS} days`);
           return;
         }
-        // Acceptance is detected by the daily sync-accepted job (scrolls invitation manager).
-        // Runner just re-checks degree from DB — no per-profile page visits needed.
+        // Acceptance is reconciled from LinkedIn's authoritative connections API.
+        // The next runner tick will re-check the persisted degree.
         log(db, runId, target.id, "info", `${name} not yet accepted — rechecking in ${CONNECTION_RECHECK_HOURS}h`);
         trWait(db, tr, CONNECTION_RECHECK_HOURS);
         return;
@@ -590,7 +629,18 @@ async function executeStep(
 
       let freshTarget = db.prepare("SELECT * FROM targets WHERE id = ?").get(target.id) as Target;
       if (freshTarget.degree !== 1) {
-        // Perform a live verification check by visiting the profile
+        // The scheduled account sync may have run before this acceptance. Force a
+        // bounded, account-scoped reconciliation before falling back to the UI.
+        const syncResult = await reconcileAcceptedConnections(accountId);
+        freshTarget = db.prepare("SELECT * FROM targets WHERE id = ?").get(target.id) as Target;
+        if (freshTarget.degree === 1) {
+          log(db, runId, target.id, "info", `${name} confirmed as 1st-degree via connections API (${syncResult.matchedTargets} match${syncResult.matchedTargets === 1 ? "" : "es"}) — proceeding with message`);
+        }
+      }
+
+      if (freshTarget.degree !== 1) {
+        // Perform a live verification check by visiting the profile. This is the
+        // final read-only check immediately before send and writes no action.
         const messageLinkedinUrl = await getLinkedinUrl(db, target, accountId);
         const page = await getSessionPage(accountId);
         try {
@@ -599,10 +649,13 @@ async function executeStep(
             db.prepare("UPDATE targets SET degree = 1, connected_at = COALESCE(connected_at, ?), messaging_urn = COALESCE(messaging_urn, ?) WHERE id = ?")
               .run(nowIso(), check.messagingUrn, target.id);
             freshTarget = db.prepare("SELECT * FROM targets WHERE id = ?").get(target.id) as Target;
-            log(db, runId, target.id, "info", `${name} verified as 1st-degree connection live — proceeding with message`);
+            log(db, runId, target.id, "info", `${name} verified as 1st-degree via live profile (${check.evidence.reason}) — proceeding with message`);
+          } else {
+            log(db, runId, target.id, "info", `${name} live connection check negative (${check.evidence.reason}; message=${check.evidence.hasMessageAction}, connect=${check.evidence.hasConnectAction}, pending=${check.evidence.hasPendingAction})`);
           }
         } catch (err) {
-          console.warn(`[runner] Live connection check failed for ${name}:`, err);
+          console.warn(`[runner] Live connection check failed for ${name}:`, err instanceof Error ? err.message : err);
+          log(db, runId, target.id, "warn", `${name} live connection check failed — ${err instanceof Error ? err.message : String(err)}`);
         } finally {
           await page.close();
         }
@@ -615,7 +668,7 @@ async function executeStep(
           trSkip(db, tr, "Never accepted connection");
           return;
         }
-        log(db, runId, target.id, "info", `${name} not yet connected — rescheduling message in ${CONNECTION_RECHECK_HOURS}h`);
+        log(db, runId, target.id, "info", `${name} not yet connected after API and live checks — rescheduling message in ${CONNECTION_RECHECK_HOURS}h`);
         trWait(db, tr, CONNECTION_RECHECK_HOURS);
         return;
       }
@@ -814,7 +867,7 @@ async function executeStep(
       log(db, runId, target.id, "info", `InMail sent to ${name}`);
 
     } else if (step.step_type === "email") {
-      await ensureApolloEnriched(db, target, runId);
+      await ensureApolloEnriched(db, target);
 
       if (!emailAccountId || !emailAccountLimits) {
         log(db, runId, target.id, "warn", `Email step skipped — no email account configured on this run`);
@@ -988,6 +1041,13 @@ async function executeStep(
 // ─── global loop ─────────────────────────────────────────────────────────────
 
 const g = global as typeof global & { __linkiGlobalRunnerStarted?: boolean };
+let tickQueueTail: Promise<void> = Promise.resolve();
+
+function enqueueTick(db: ReturnType<typeof getDb>): Promise<void> {
+  const next = tickQueueTail.then(() => tick(db), () => tick(db));
+  tickQueueTail = next.catch(() => { /* caller records the failure */ });
+  return next;
+}
 
 export function ensureGlobalRunnerStarted(): void {
   if (g.__linkiGlobalRunnerStarted) return;
@@ -1001,7 +1061,7 @@ async function globalLoop(): Promise<void> {
 
   while (true) {
     try {
-      await tick(db);
+      await enqueueTick(db);
     } catch (err) {
       console.error("[runner] Tick error:", err instanceof Error ? err.message : err);
     }
@@ -1035,16 +1095,20 @@ async function tick(db: ReturnType<typeof getDb>): Promise<void> {
     seenAccounts.add(run.account_id);
   }
 
-  // Daily sync: stamp accepted connections from invitation manager (once per 23h per account)
+  // Periodic authoritative reconciliation (up to once per 8h per account).
   for (const accountId of seenAccounts) {
     if (shouldSyncAccepted(accountId)) {
       try {
         console.log(`[runner] Starting accepted-connections sync for account ${accountId}`);
-        const stamped = await syncAcceptedConnections(accountId);
+        const syncResult = await reconcileAcceptedConnections(accountId);
+        const stamped = syncResult.stamped;
         if (stamped > 0) {
           for (const r of activeRuns.filter(x => x.account_id === accountId)) {
             log(db, r.run_id, null, "info", `Accepted-connections sync: ${stamped} contact${stamped === 1 ? "" : "s"} marked as connected`);
           }
+        }
+        if (!syncResult.success) {
+          console.warn(`[runner] Accepted-connections sync incomplete for ${accountId} (${syncResult.reason ?? "unknown"}) — ${syncResult.matchedTargets} target match(es)`);
         }
         console.log(`[runner] Accepted-connections sync complete — ${stamped} stamped`);
       } catch (e) {
@@ -1528,8 +1592,9 @@ export async function forceRunStep(
 
   db.prepare("UPDATE runs SET status = 'running', started_at = COALESCE(started_at, datetime('now')) WHERE id = ?").run(runId);
 
-  // Trigger tick immediately
-  tick(db).catch((err) => console.error("[runner] Force step tick error:", err));
+  // Trigger a serialized tick immediately; repeated Run now requests wait their
+  // turn instead of entering the runner concurrently for the same track.
+  enqueueTick(db).catch((err) => console.error("[runner] Force step tick error:", err));
 
   return { success: true, message: "Paso forzado a ejecución inmediata" };
 }

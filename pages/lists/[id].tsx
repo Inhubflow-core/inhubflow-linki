@@ -407,7 +407,7 @@ export default function ListDetailPage({
     setSyncing(false);
     const data = await res.json();
     if (!res.ok) { toast.error(data.error ?? "Sync failed"); return; }
-    toast.success(`Synced ${data.updated} leads`);
+    toast.success(`Verified ${data.updated} newly accepted lead${data.updated === 1 ? "" : "s"} across ${data.connectionsRead} LinkedIn connection${data.connectionsRead === 1 ? "" : "s"}`);
     setShowSync(false);
     const listRes = await fetch(`/api/lists/${initialList.id}`);
     const listData = await listRes.json();
@@ -457,11 +457,9 @@ export default function ListDetailPage({
               ? `${filteredTargets.length} / ${targets.length}`
               : `${targets.length}`} leads
           </span>
-          {initialList.sales_nav_url && (
-            <button className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors" onClick={() => setShowSync(true)}>
-              <RiRefreshLine size={15} /> Sync Status
-            </button>
-          )}
+          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors" onClick={() => setShowSync(true)}>
+            <RiRefreshLine size={15} /> Sync Status
+          </button>
           {apolloConfigured && (
             <button
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors disabled:opacity-40"
@@ -1008,7 +1006,7 @@ export default function ListDetailPage({
           <div className="modal-box bg-base-200 border border-base-300/50 max-w-sm">
             <h3 className="font-semibold text-base mb-1">Sync Connection Status</h3>
             <p className="text-base-content/50 text-xs mb-4">
-              Re-fetches the Sales Navigator list to check who accepted your connection requests.
+              Checks LinkedIn&apos;s authoritative connections list and updates requests that are confirmed as accepted.
             </p>
             <form onSubmit={runSync} className="flex flex-col gap-3">
               <div>
