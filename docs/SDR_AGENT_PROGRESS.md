@@ -108,11 +108,18 @@ npm run test:sdr-shadow                           PASS (5/5 scenarios: questions
 npx tsc --noEmit                                  PASS (0 errors)
 ```
 
+## Review follow-up — 2026-08-28
+
+La revisión posterior a la integración de Gemini determinó que la implementación actual es una fundación de Shadow Mode y un playground, no todavía un Agente SDR operativo. El bridge sigue desactivado, no existe un worker conectado y varias configuraciones visibles aún no se aplican al runtime.
+
+El diagnóstico, los riesgos y el orden recomendado para terminarlo quedaron registrados en [`docs/SDR_AGENT_REVIEW_BACKLOG.md`](./SDR_AGENT_REVIEW_BACKLOG.md).
+
 ## Next exact action
 
-1. Configure Google Cloud Vertex AI credentials in the local environment.
-2. Enable production mode for the SDR agent with strict quota limits.
-3. Observe live LinkedIn inbox traffic in Shadow mode to validate classification accuracy.
+1. Retomar desde `docs/SDR_AGENT_REVIEW_BACKLOG.md`.
+2. Mantener el bridge fail-closed y no habilitar envíos ni modo `auto`.
+3. Implementar primero el bridge/worker de Shadow Mode y conectar configuración, políticas y conocimiento al pipeline.
+4. Ejecutar las verificaciones registradas antes de avanzar a approval o producción.
 
 ## Resume instruction
 
