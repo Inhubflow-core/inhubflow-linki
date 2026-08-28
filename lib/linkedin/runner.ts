@@ -588,7 +588,26 @@ async function executeStep(
       await ensureSalesNavEnriched(db, target, accountId);
       if (!enforceSchedule(db, tr, runId, target.id, name, accountLimits)) return;
 
-      const freshTarget = db.prepare("SELECT * FROM targets WHERE id = ?").get(target.id) as Target;
+      let freshTarget = db.prepare("SELECT * FROM targets WHERE id = ?").get(target.id) as Target;
+      if (freshTarget.degree !== 1) {
+        // Perform a live verification check by visiting the profile
+        const messageLinkedinUrl = await getLinkedinUrl(db, target, accountId);
+        const page = await getSessionPage(accountId);
+        try {
+          const check = await visitProfile(page, messageLinkedinUrl);
+          if (check.isFirstDegree) {
+            db.prepare("UPDATE targets SET degree = 1, connected_at = COALESCE(connected_at, ?), messaging_urn = COALESCE(messaging_urn, ?) WHERE id = ?")
+              .run(nowIso(), check.messagingUrn, target.id);
+            freshTarget = db.prepare("SELECT * FROM targets WHERE id = ?").get(target.id) as Target;
+            log(db, runId, target.id, "info", `${name} verified as 1st-degree connection live — proceeding with message`);
+          }
+        } catch (err) {
+          console.warn(`[runner] Live connection check failed for ${name}:`, err);
+        } finally {
+          await page.close();
+        }
+      }
+
       if (freshTarget.degree !== 1) {
         const requested = freshTarget.connection_requested_at;
         if (requested && hoursSince(requested) / 24 > CONNECTION_MAX_WAIT_DAYS) {

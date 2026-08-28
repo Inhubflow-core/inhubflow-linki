@@ -81,12 +81,12 @@ export async function syncAcceptedConnections(accountId: string): Promise<number
       return 0;
     }
     const declaredTotal = await page.evaluate(() => {
-      const m = document.body.innerText.match(/([\d.,]+)\s+connections?/i);
+      const m = document.body.innerText.match(/([\d.,]+)\s+(?:connections?|conex[õo]es?|contactos?|conexiones?)/i);
       return m ? parseInt(m[1].replace(/[.,]/g, ""), 10) : null;
     });
 
     const findByVanity = db.prepare(
-      `SELECT id, full_name, connected_at, degree FROM targets
+      `SELECT id, full_name, linkedin_url, connected_at, degree FROM targets
        WHERE linkedin_url LIKE ? AND connection_requested_at IS NOT NULL`
     );
     const stampAccepted = db.prepare(
@@ -108,7 +108,7 @@ export async function syncAcceptedConnections(accountId: string): Promise<number
 
       for (const c of conns) {
         uniquePulled++;
-        if (c.vanity) seenVanities.add(c.vanity);
+        if (c.vanity) seenVanities.add(c.vanity.toLowerCase());
         if (newestSeen === null || c.createdAt > newestSeen) newestSeen = c.createdAt;
 
         // Incremental early-exit (list is newest-first).
@@ -118,13 +118,18 @@ export async function syncAcceptedConnections(accountId: string): Promise<number
         }
         if (!c.vanity) continue;
 
-        for (const m of findByVanity.all(`%/in/${c.vanity}/%`) as Array<{
-          id: string; full_name: string | null; connected_at: string | null; degree: number | null;
-        }>) {
-          if (m.degree === 1 && m.connected_at) continue; // already correct
-          stampAccepted.run(msToSqlite(c.createdAt), m.id);
-          console.log(`[sync-accepted] Accepted: ${m.full_name ?? c.vanity}`);
-          stamped++;
+        const targetMatches = findByVanity.all(`%/in/${c.vanity}%`) as Array<{
+          id: string; full_name: string | null; linkedin_url: string; connected_at: string | null; degree: number | null;
+        }>;
+
+        for (const m of targetMatches) {
+          const urlVanity = m.linkedin_url.match(/\/in\/([^/?#]+)/)?.[1]?.toLowerCase();
+          if (urlVanity === c.vanity.toLowerCase()) {
+            if (m.degree === 1 && m.connected_at) continue; // already correct
+            stampAccepted.run(msToSqlite(c.createdAt), m.id);
+            console.log(`[sync-accepted] Accepted: ${m.full_name ?? c.vanity}`);
+            stamped++;
+          }
         }
       }
 
