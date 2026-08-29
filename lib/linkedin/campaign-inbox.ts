@@ -331,8 +331,9 @@ export async function syncLinkedInCampaignInbox(
   const page = options.pageFactory ? await options.pageFactory(accountId) : await getSessionPage(accountId);
   let wall = false;
   try {
-    if (!page.url().includes("linkedin.com")) {
-      await page.goto("https://www.linkedin.com/feed/", { waitUntil: "domcontentloaded", timeout: 30000 });
+    if (!page.url().includes("linkedin.com/messaging")) {
+      await page.goto("https://www.linkedin.com/messaging/", { waitUntil: "domcontentloaded", timeout: 35000 });
+      await page.waitForTimeout(2000);
     }
     const currentUrl = page.url();
     if (/\/login|\/authwall|\/checkpoint|\/uas\//i.test(currentUrl)) {
