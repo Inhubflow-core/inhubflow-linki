@@ -10,8 +10,10 @@ import {
   RiLoader4Line,
   RiMailLine,
   RiPulseLine,
+  RiRobotLine,
   RiSearchLine,
   RiSendPlaneLine,
+  RiSparklingLine,
 } from "react-icons/ri";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import type { Locale, TranslationParams } from "@/lib/i18n/types";
@@ -267,6 +269,81 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
     threadEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, linkedinMessages]);
 
+  const [suggesting, setSuggesting] = useState(false);
+
+  async function handleSuggestReply() {
+    setSuggesting(true);
+    try {
+      const lastMsg = reply.linkedin_reply_body || (linkedinMessages.at(-1)?.body) || (messages.at(-1)?.text) || "";
+      const history = hasLinkedInReply
+        ? linkedinMessages.map((m) => ({ direction: m.direction, body: m.body }))
+        : messages.map((m) => ({ direction: m.from.includes(reply.email || "") ? "inbound" : "outbound", body: m.text }));
+
+      const response = await fetch("/api/inbox/suggest-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetId: reply.id,
+          lastMessage: lastMsg,
+          history,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo generar la sugerencia.");
+      if (data.suggestedReply) {
+        setReplyText(data.suggestedReply);
+        toast.success("✨ Sugerencia de SDR IA generada.");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error al generar sugerencia.");
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
+  async function handleSendLinkedIn() {
+    if (!replyText.trim()) return;
+    const accountId = reply.linkedin_account_id;
+    if (!accountId) {
+      toast.error("No se encontró la cuenta de LinkedIn asociada.");
+      return;
+    }
+    setSending(true);
+    try {
+      const response = await fetch("/api/inbox/reply-linkedin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetId: reply.id,
+          accountId,
+          messageText: replyText,
+          threadId: reply.linkedin_thread_id,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Error al enviar mensaje a LinkedIn");
+
+      toast.success("Mensaje enviado a LinkedIn con éxito.");
+      const newMsg: LinkedInThreadMessage = {
+        externalThreadId: reply.linkedin_thread_id || `thread-${reply.id}`,
+        externalMessageId: data.messageId || `outbound-${Date.now()}`,
+        direction: "outbound",
+        senderName: reply.linkedin_account_name || "Me",
+        senderExternalId: null,
+        metadataJson: "{}",
+        body: replyText.trim(),
+        sentAt: data.sentAt || new Date().toISOString(),
+      };
+      setLinkedinMessages((prev) => [...prev, newMsg]);
+      setReplyText("");
+      onActionDone();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error al enviar mensaje a LinkedIn");
+    } finally {
+      setSending(false);
+    }
+  }
+
   async function handleSend() {
     if (!replyText.trim() || !reply.email || !reply.email_account_id) return;
     setSending(true);
@@ -285,6 +362,7 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
       if (!response.ok) throw new Error(data.error ?? t("inbox.errors.send"));
       toast.success(t("inbox.toasts.replySent"));
       setReplyText("");
+      onActionDone();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("inbox.errors.send"));
     } finally {
@@ -476,31 +554,58 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
         )}
         </div>
 
-        {canReplyByEmail && (
-          <div className="border-t border-base-300/50 px-5 py-4 space-y-2.5">
-            <input
-              type="text"
-              value={replySubject}
-              onChange={(event) => setReplySubject(event.target.value)}
-              placeholder={t("inbox.subject")}
-              className="w-full bg-base-200 border border-base-300/50 rounded-lg px-3 py-1.5 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:border-primary/40"
-            />
+        {(hasLinkedInReply || canReplyByEmail) && (
+          <div className="border-t border-base-300/50 px-5 py-4 space-y-2.5 bg-base-100">
+            {canReplyByEmail && !hasLinkedInReply && (
+              <input
+                type="text"
+                value={replySubject}
+                onChange={(event) => setReplySubject(event.target.value)}
+                placeholder={t("inbox.subject")}
+                className="w-full bg-base-200 border border-base-300/50 rounded-lg px-3 py-1.5 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:border-primary/40"
+              />
+            )}
             <textarea
               value={replyText}
               onChange={(event) => setReplyText(event.target.value)}
-              placeholder={t("inbox.replyTo", { name: reply.full_name ?? reply.email ?? t("inbox.unknown") })}
-              rows={4}
+              placeholder={`Escribe una respuesta para ${reply.full_name ?? reply.email ?? "el contacto"}...`}
+              rows={3}
               className="w-full bg-base-200 border border-base-300/50 rounded-lg px-3 py-2 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:border-primary/40 resize-none"
             />
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between gap-2">
               <button
-                onClick={handleSend}
-                disabled={!replyText.trim() || !replySubject.trim() || sending}
-                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                type="button"
+                onClick={handleSuggestReply}
+                disabled={suggesting || sending}
+                title="Generar respuesta inteligente contextual con el Agente SDR IA"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-warning/10 border border-warning/30 text-warning hover:bg-warning/20 disabled:opacity-40 transition-all shadow-sm"
               >
-                {sending ? <RiLoader4Line size={14} className="animate-spin" /> : <RiSendPlaneLine size={14} />}
-                {sending ? t("inbox.sending") : t("inbox.send")}
+                {suggesting ? <RiLoader4Line size={13} className="animate-spin" /> : <RiSparklingLine size={14} />}
+                {suggesting ? "Pensando respuesta..." : "✨ Sugerir con SDR IA"}
               </button>
+
+              <div className="flex items-center gap-2">
+                {hasLinkedInReply && (
+                  <button
+                    onClick={handleSendLinkedIn}
+                    disabled={!replyText.trim() || sending}
+                    className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold bg-primary text-primary-content hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
+                  >
+                    {sending ? <RiLoader4Line size={13} className="animate-spin" /> : <RiLinkedinBoxLine size={14} />}
+                    {sending ? "Enviando a LinkedIn..." : "Enviar a LinkedIn"}
+                  </button>
+                )}
+                {canReplyByEmail && (
+                  <button
+                    onClick={handleSend}
+                    disabled={!replyText.trim() || !replySubject.trim() || sending}
+                    className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold bg-secondary text-secondary-content hover:bg-secondary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
+                  >
+                    {sending ? <RiLoader4Line size={13} className="animate-spin" /> : <RiMailLine size={14} />}
+                    {sending ? t("inbox.sending") : t("inbox.send")}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}

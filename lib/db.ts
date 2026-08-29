@@ -490,7 +490,7 @@ function runMigrations(db: Database.Database) {
       workflow_id TEXT REFERENCES workflows(id) ON DELETE SET NULL,
       external_thread_id TEXT NOT NULL,
       external_message_id TEXT NOT NULL,
-      direction TEXT NOT NULL DEFAULT 'inbound' CHECK(direction = 'inbound'),
+      direction TEXT NOT NULL DEFAULT 'inbound' CHECK(direction IN ('inbound', 'outbound')),
       sender_external_id TEXT,
       sender_name TEXT,
       body TEXT NOT NULL,
@@ -510,6 +510,41 @@ function runMigrations(db: Database.Database) {
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
   }
+
+  // Migrate linkedin_inbox_messages CHECK constraint to allow 'outbound' direction
+  try {
+    const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='linkedin_inbox_messages'").get() as { sql: string } | undefined;
+    if (tableInfo && !tableInfo.sql.includes("'outbound'")) {
+      db.exec(`
+        PRAGMA foreign_keys = OFF;
+        CREATE TABLE linkedin_inbox_messages_new (
+          id TEXT PRIMARY KEY,
+          account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+          target_id TEXT NOT NULL REFERENCES targets(id) ON DELETE CASCADE,
+          run_id TEXT REFERENCES runs(id) ON DELETE SET NULL,
+          workflow_id TEXT REFERENCES workflows(id) ON DELETE SET NULL,
+          external_thread_id TEXT NOT NULL,
+          external_message_id TEXT NOT NULL,
+          direction TEXT NOT NULL DEFAULT 'inbound' CHECK(direction IN ('inbound', 'outbound')),
+          sender_external_id TEXT,
+          sender_name TEXT,
+          body TEXT NOT NULL,
+          sent_at TEXT NOT NULL,
+          captured_at TEXT NOT NULL DEFAULT (datetime('now')),
+          identity_mode TEXT NOT NULL CHECK(identity_mode IN ('messaging_urn', 'profile_url', 'messaging_urn+profile_url')),
+          metadata_json TEXT NOT NULL DEFAULT '{}',
+          UNIQUE(account_id, external_thread_id, external_message_id)
+        );
+        INSERT INTO linkedin_inbox_messages_new SELECT * FROM linkedin_inbox_messages;
+        DROP TABLE linkedin_inbox_messages;
+        ALTER TABLE linkedin_inbox_messages_new RENAME TO linkedin_inbox_messages;
+        CREATE INDEX IF NOT EXISTS idx_linkedin_inbox_target_time ON linkedin_inbox_messages(target_id, sent_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_linkedin_inbox_account_time ON linkedin_inbox_messages(account_id, sent_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_linkedin_inbox_thread_time ON linkedin_inbox_messages(account_id, external_thread_id, sent_at ASC);
+        PRAGMA foreign_keys = ON;
+      `);
+    }
+  } catch { /* ignore */ }
 
   // Parallel tracks: assign email steps to email track, re-number step_order, backfill run_profile_tracks
   runParallelTracksMigration(db);
