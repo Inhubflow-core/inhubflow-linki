@@ -20,6 +20,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const firstName = targetName.split(" ")[0];
   const inboundText = lastMessage || "";
 
+  // Load SDR Agent config and knowledge from DB
+  let companyContext: string | undefined;
+  let customInstructions: string | undefined;
+  try {
+    const agent = db.prepare("SELECT id, active_version_id FROM sdr_agents ORDER BY created_at ASC LIMIT 1").get() as { id: string; active_version_id: string } | undefined;
+    if (agent?.active_version_id) {
+      const version = db.prepare("SELECT policy_json, config_json, system_prompt FROM sdr_agent_versions WHERE id = ?").get(agent.active_version_id) as { policy_json: string; config_json: string; system_prompt: string } | undefined;
+      if (version) {
+        const policy = JSON.parse(version.policy_json || "{}");
+        const config = JSON.parse(version.config_json || "{}");
+        companyContext = policy.company_context || version.system_prompt;
+        customInstructions = config.custom_instructions;
+      }
+    }
+    const sources = db.prepare("SELECT title, metadata_json FROM sdr_knowledge_sources WHERE status = 'approved'").all() as Array<{ title: string; metadata_json: string }>;
+    if (sources.length > 0) {
+      const knowledgeTexts = sources.map(s => {
+        try {
+          const m = JSON.parse(s.metadata_json);
+          return `### ${s.title}\n${m.content || ""}`;
+        } catch { return `### ${s.title}`; }
+      }).join("\n\n");
+      companyContext = (companyContext ? `${companyContext}\n\n=== BASE DE CONOCIMIENTO DE LA EMPRESA ===\n` : "=== BASE DE CONOCIMIENTO DE LA EMPRESA ===\n") + knowledgeTexts;
+    }
+  } catch { /* ignore */ }
+
   // 1. If GEMINI_API_KEY is available, use GeminiSdrProvider
   if (process.env.GEMINI_API_KEY) {
     try {
@@ -28,6 +54,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         senderName: targetName,
         inboundMessage: inboundText,
         conversationHistory: Array.isArray(history) ? history : [],
+        companyContext,
+        customInstructions,
       });
 
       return res.status(200).json({
@@ -37,6 +65,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         reasoning: decision.reasoning_summary,
       });
     } catch (err) {
+      console.warn("[suggest-reply] Gemini provider error:", err);
       // Fallback to contextual heuristic if Gemini API error occurs
     }
   }

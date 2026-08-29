@@ -15,12 +15,14 @@ import {
   RiLinkedinBoxLine,
   RiLoader4Line,
   RiMailLine,
+  RiNotification3Line,
   RiPulseLine,
   RiRobotLine,
   RiSearchLine,
   RiSendPlaneLine,
   RiSparklingLine,
   RiVideoLine,
+  RiVolumeUpLine,
 } from "react-icons/ri";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import type { Locale, TranslationParams } from "@/lib/i18n/types";
@@ -179,6 +181,65 @@ function dedupeLinkedInMessages(msgs: LinkedInThreadMessage[]): LinkedInThreadMe
     }
   }
   return result;
+}
+
+function playNotificationChime() {
+  try {
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+
+    // Tone 1 (D5 - 587Hz)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(587.33, ctx.currentTime);
+    gain1.gain.setValueAtTime(0.18, ctx.currentTime);
+    gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(ctx.currentTime);
+    osc1.stop(ctx.currentTime + 0.3);
+
+    // Tone 2 (A5 - 880Hz, vibrant ding)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = "sine";
+    osc2.frequency.setValueAtTime(880.0, ctx.currentTime + 0.1);
+    gain2.gain.setValueAtTime(0.22, ctx.currentTime + 0.1);
+    gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(ctx.currentTime + 0.1);
+    osc2.stop(ctx.currentTime + 0.6);
+  } catch {
+    // AudioContext blocked or not allowed yet
+  }
+}
+
+function triggerDesktopNotification(options: {
+  title: string;
+  body: string;
+  onClick?: () => void;
+}) {
+  playNotificationChime();
+  if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+    try {
+      const n = new Notification(options.title, {
+        body: options.body,
+        icon: "/favicon.ico",
+      });
+      if (options.onClick) {
+        n.onclick = () => {
+          window.focus();
+          options.onClick?.();
+          n.close();
+        };
+      }
+    } catch {
+      // Notification constructor blocked
+    }
+  }
 }
 
 function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProps) {
@@ -891,6 +952,45 @@ export default function InboxPage() {
   const [reclassifyingAll, setReclassifyingAll] = useState(false);
   const [backfilling, setBackfilling] = useState(false);
   const [hasPremium, setHasPremium] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default");
+  const seenReplyIdsRef = useRef<Set<string>>(new Set());
+  const initialLoadDoneRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      setNotificationPermission(Notification.permission);
+    }
+  }, []);
+
+  async function handleToggleNotifications() {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      toast.error("Tu navegador no soporta notificaciones de escritorio.");
+      return;
+    }
+    if (Notification.permission === "granted") {
+      playNotificationChime();
+      triggerDesktopNotification({
+        title: "🔔 Notificaciones Linki Activas",
+        body: "¡Listo! Sonará un timbre y recibirás una alerta cuando tu Agente SDR IA requiera tu ayuda.",
+        onClick: () => {},
+      });
+      toast.success("Notificaciones activas. ¡Prueba emitida con sonido!");
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    setNotificationPermission(perm);
+    if (perm === "granted") {
+      playNotificationChime();
+      triggerDesktopNotification({
+        title: "🔔 Notificaciones Linki Habilitadas",
+        body: "Te avisaremos de inmediato con sonido cuando un cliente responda o se requiera tu intervención.",
+        onClick: () => {},
+      });
+      toast.success("Notificaciones de escritorio habilitadas con éxito.");
+    } else {
+      toast.error("Permiso de notificaciones no otorgado en el navegador.");
+    }
+  }
 
   useEffect(() => {
     fetch("/api/premium-status")
@@ -924,7 +1024,17 @@ export default function InboxPage() {
       const response = await fetch(`/api/inbox?${params}`);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? t("inbox.errors.loadReplies"));
-      setReplies(data.replies ?? []);
+      const newReplies = (data.replies ?? []) as InboxReply[];
+      setReplies(newReplies);
+
+      // Seed seen keys on initial load
+      if (!initialLoadDoneRef.current) {
+        for (const rep of newReplies) {
+          const repKey = `${rep.id}:${rep.linkedin_reply_received_at || rep.last_replied_at || ""}`;
+          seenReplyIdsRef.current.add(repKey);
+        }
+        initialLoadDoneRef.current = true;
+      }
     } catch (error) {
       setReplies([]);
       toast.error(error instanceof Error ? error.message : t("inbox.errors.loadReplies"));
@@ -937,7 +1047,7 @@ export default function InboxPage() {
     void load();
   }, [load]);
 
-  // Silent live auto-refresh for inbox list every 15s
+  // Silent live auto-refresh for inbox list every 15s with Desktop Alerts and Sound
   useEffect(() => {
     const interval = setInterval(() => {
       const params = new URLSearchParams();
@@ -948,7 +1058,36 @@ export default function InboxPage() {
         .then((res) => res.json())
         .then((data) => {
           if (data.replies && Array.isArray(data.replies)) {
-            setReplies(data.replies);
+            const newReplies = data.replies as InboxReply[];
+            setReplies(newReplies);
+
+            if (initialLoadDoneRef.current) {
+              for (const rep of newReplies) {
+                const repKey = `${rep.id}:${rep.linkedin_reply_received_at || rep.last_replied_at || ""}`;
+                if (!seenReplyIdsRef.current.has(repKey)) {
+                  seenReplyIdsRef.current.add(repKey);
+
+                  const sender = rep.full_name || rep.email || "Prospecto";
+                  const snippet = rep.linkedin_reply_body || rep.reply_body || rep.reply_summary || "Nuevo mensaje recibido";
+                  const isHandoff = rep.reply_kind === "human_handoff" || rep.reply_kind === "objection" || rep.reply_kind === "pricing";
+
+                  triggerDesktopNotification({
+                    title: isHandoff ? `⚠️ InHubFlow SDR: ¡Intervención Requerida!` : `💬 Nuevo mensaje de ${sender}`,
+                    body: `${sender}: "${snippet.slice(0, 110)}"`,
+                    onClick: () => {
+                      setSelectedReply(rep);
+                    },
+                  });
+                  break;
+                }
+              }
+            } else {
+              for (const rep of newReplies) {
+                const repKey = `${rep.id}:${rep.linkedin_reply_received_at || rep.last_replied_at || ""}`;
+                seenReplyIdsRef.current.add(repKey);
+              }
+              initialLoadDoneRef.current = true;
+            }
           }
         })
         .catch(() => {});
@@ -1205,6 +1344,18 @@ export default function InboxPage() {
           <p className="text-base-content/40 text-sm mt-0.5">{t("inbox.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleToggleNotifications}
+            title={notificationPermission === "granted" ? "Notificaciones de escritorio y sonido activas (Haz clic para probar el timbre)" : "Activar notificaciones de escritorio y sonido"}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all shadow-sm ${
+              notificationPermission === "granted"
+                ? "bg-success/15 border-success/35 text-success hover:bg-success/25"
+                : "bg-base-200 border-base-300 text-base-content/70 hover:text-base-content hover:bg-base-300"
+            }`}
+          >
+            <RiNotification3Line size={14} className={notificationPermission === "granted" ? "text-success animate-pulse" : ""} />
+            {notificationPermission === "granted" ? "🔔 Alertas Activas (Probar 🔊)" : "Activar Alertas 🔔"}
+          </button>
           <button
             onClick={handleDiagnose}
             disabled={diagnosing}
