@@ -403,14 +403,14 @@ export class CampaignLinkedInMessagingSource {
     if (observations.length === 0) {
       try {
         const domThreads = await page.evaluate(() => {
-          const listItems = Array.from(document.querySelectorAll('.msg-conversation-listitem, li[class*="msg-conversation-listitem"]'));
-          return listItems.map((item) => {
-            const link = item.querySelector('a[href*="/messaging/thread/"], a[class*="msg-conversation-listitem__link"]');
+          const listItems = Array.from(document.querySelectorAll('.msg-conversation-listitem, li[class*="msg-conversation"]'));
+          const results = listItems.map((item) => {
+            const link = item.querySelector('a[href*="/messaging/thread/"], a[class*="msg-conversation-listitem__link"], a[class*="msg-conversation"]');
             const href = link?.getAttribute('href') || '';
             const threadMatch = href.match(/\/messaging\/thread\/([^/?#]+)/);
             const threadId = threadMatch ? threadMatch[1] : href;
 
-            const nameEl = item.querySelector('.msg-conversation-listitem__participant-names, [class*="participant-name"]');
+            const nameEl = item.querySelector('.msg-conversation-listitem__participant-names, [class*="participant-name"], h3');
             const name = (nameEl?.textContent || '').trim();
 
             const profileLink = item.querySelector('a[href*="/in/"]');
@@ -424,6 +424,26 @@ export class CampaignLinkedInMessagingSource {
 
             return { threadId, name, profileUrl, lastMessage, timeText };
           });
+
+          // Also check open active thread in main panel
+          const activeProfileLink = document.querySelector('.msg-thread__link-to-profile, .msg-entity-lockup__entity-title a[href*="/in/"]');
+          const activeProfileUrl = activeProfileLink ? activeProfileLink.getAttribute('href') : null;
+          const activeNameEl = document.querySelector('.msg-entity-lockup__entity-title, [class*="msg-entity-lockup"] h2, [class*="msg-entity-lockup"] a');
+          const activeName = (activeNameEl?.textContent || '').trim();
+          const activeMessageEls = Array.from(document.querySelectorAll('.msg-s-message-list__event, .msg-s-event-listitem__body'));
+          const activeLastMsgEl = activeMessageEls[activeMessageEls.length - 1];
+          const activeLastMsg = (activeLastMsgEl?.textContent || '').trim();
+          if (activeName && activeLastMsg) {
+            results.unshift({
+              threadId: window.location.pathname.match(/\/messaging\/thread\/([^/?#]+)/)?.[1] || '',
+              name: activeName,
+              profileUrl: activeProfileUrl,
+              lastMessage: activeLastMsg,
+              timeText: '',
+            });
+          }
+
+          return results;
         });
 
         this.conversationsReviewed += domThreads.length;
@@ -432,28 +452,50 @@ export class CampaignLinkedInMessagingSource {
           const match = url.match(/\/in\/([^/?#]+)/i);
           return match ? match[1].toLowerCase() : null;
         };
+        const normName = (name?: string | null) => {
+          if (!name) return "";
+          return name
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]/g, "")
+            .trim();
+        };
 
         for (const dom of domThreads) {
           if (!dom.lastMessage) continue;
           const domVanity = normVanity(dom.profileUrl);
+          const domNormName = normName(dom.name);
+
           const matchedScope = this.scopes.find((s) => {
             const scopeVanity = normVanity(s.linkedinUrl);
             if (domVanity && scopeVanity && domVanity === scopeVanity) return true;
+            const scopeNormName = normName(s.fullName);
+            if (domNormName && scopeNormName && (domNormName === scopeNormName || domNormName.includes(scopeNormName) || scopeNormName.includes(domNormName))) {
+              return true;
+            }
             return false;
           });
 
           if (matchedScope) {
             this.campaignCandidates++;
+            let cleanBody = dom.lastMessage;
+            const colonIdx = cleanBody.indexOf(":");
+            if (colonIdx > 0 && colonIdx < 35) {
+              cleanBody = cleanBody.slice(colonIdx + 1).trim();
+            }
+            if (!cleanBody) cleanBody = dom.lastMessage;
+
             observations.push({
               externalThreadId: dom.threadId || `thread-${matchedScope.targetId}`,
               externalMessageId: `msg-${matchedScope.targetId}-${Date.now()}`,
               direction: "inbound",
-              body: dom.lastMessage,
+              body: cleanBody,
               receivedAt: new Date().toISOString(),
-              senderExternalId: dom.profileUrl,
-              senderName: dom.name,
-              senderMessagingUrn: null,
-              senderProfileUrl: dom.profileUrl,
+              senderExternalId: matchedScope.messagingUrn || matchedScope.linkedinUrl || dom.name,
+              senderName: dom.name || matchedScope.fullName || "Lead",
+              senderMessagingUrn: matchedScope.messagingUrn || null,
+              senderProfileUrl: matchedScope.linkedinUrl || dom.profileUrl || null,
               providerEventId: `event-${matchedScope.targetId}`,
               rawKind: "message",
               campaignOutboundObservedAt: matchedScope.outboundAt,

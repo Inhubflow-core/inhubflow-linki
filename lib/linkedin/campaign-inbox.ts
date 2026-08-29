@@ -10,6 +10,7 @@ import type { LinkedInInboxObservation } from "./inbox-sync";
 
 export interface CampaignTargetScope {
   targetId: string;
+  fullName?: string | null;
   accountId: string;
   runId: string;
   workflowId: string | null;
@@ -96,6 +97,7 @@ export function loadCampaignTargetScopes(
   const rows = db.prepare(`
     SELECT
       t.id AS targetId,
+      t.full_name AS fullName,
       r.account_id AS accountId,
       r.id AS runId,
       r.workflow_id AS workflowId,
@@ -155,13 +157,22 @@ function normalizeUrn(value: string | null | undefined): string | null {
   return normalized || null;
 }
 
+function normalizePersonName(name?: string | null): string {
+  if (!name) return "";
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "")
+    .trim();
+}
+
 function findScope(
   observation: CampaignInboxObservation,
   scopes: readonly CampaignTargetScope[],
 ): { scope: CampaignTargetScope; identityMode: "messaging_urn" | "profile_url" | "messaging_urn+profile_url" } | { reason: CampaignInboxSkipReason } {
   const senderUrn = normalizeUrn(observation.senderMessagingUrn);
   const senderVanity = canonicalLinkedInVanity(observation.senderProfileUrl);
-  if (!senderUrn && !senderVanity) return { reason: "invalid_observation" };
 
   const urnMatches = senderUrn ? scopes.filter((scope) => normalizeUrn(scope.messagingUrn) === senderUrn) : [];
   const vanityMatches = senderVanity
@@ -185,6 +196,23 @@ function findScope(
     }
     return { scope: vanityMatches[0], identityMode: "profile_url" };
   }
+
+  // Name-based fallback matching ONLY when URN and Vanity URL are both absent (e.g. DOM extraction where LinkedIn didn't render profile link in card)
+  if (!senderUrn && !senderVanity) {
+    const obsName = normalizePersonName(observation.senderName);
+    if (obsName) {
+      const nameMatches = scopes.filter((scope) => {
+        const scopeName = normalizePersonName(scope.fullName);
+        return scopeName && (scopeName === obsName || scopeName.includes(obsName) || obsName.includes(scopeName));
+      });
+      if (nameMatches.length === 1) {
+        return { scope: nameMatches[0], identityMode: "profile_url" };
+      }
+      if (nameMatches.length > 1) return { reason: "ambiguous_target" };
+    }
+    return { reason: "invalid_observation" };
+  }
+
   return { reason: "unmatched_target" };
 }
 
