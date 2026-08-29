@@ -44,7 +44,7 @@ function createDb() {
       linkedin_inbox_synced_at TEXT, linkedin_inbox_sync_error TEXT, linkedin_inbox_contract_version TEXT);
     CREATE TABLE targets (id TEXT PRIMARY KEY, full_name TEXT, linkedin_url TEXT, messaging_urn TEXT,
       connection_requested_at TEXT, message_sent_at TEXT,
-      last_replied_at TEXT, last_replied_account_id TEXT REFERENCES accounts(id));
+      last_replied_at TEXT, last_replied_account_id TEXT REFERENCES accounts(id), sdr_autopilot INTEGER DEFAULT 0);
     CREATE TABLE workflows (id TEXT PRIMARY KEY, name TEXT);
     CREATE TABLE runs (id TEXT PRIMARY KEY, account_id TEXT REFERENCES accounts(id), workflow_id TEXT REFERENCES workflows(id), status TEXT);
     CREATE TABLE run_profiles (id TEXT PRIMARY KEY, run_id TEXT REFERENCES runs(id), target_id TEXT REFERENCES targets(id), created_at TEXT);
@@ -58,7 +58,7 @@ function createDb() {
       workflow_id TEXT REFERENCES workflows(id) ON DELETE SET NULL,
       external_thread_id TEXT NOT NULL,
       external_message_id TEXT NOT NULL,
-      direction TEXT NOT NULL DEFAULT 'inbound' CHECK(direction = 'inbound'),
+      direction TEXT NOT NULL DEFAULT 'inbound' CHECK(direction IN ('inbound', 'outbound')),
       sender_external_id TEXT,
       sender_name TEXT,
       body TEXT NOT NULL,

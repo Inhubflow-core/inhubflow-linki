@@ -370,6 +370,30 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
     }
   }
 
+  const [autopilot, setAutopilot] = useState(reply.sdr_autopilot === 1);
+  const [togglingAutopilot, setTogglingAutopilot] = useState(false);
+
+  async function handleToggleAutopilot() {
+    setTogglingAutopilot(true);
+    try {
+      const next = !autopilot;
+      const res = await fetch(`/api/inbox/${reply.id}/toggle-autopilot`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: next }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al cambiar piloto automático");
+      setAutopilot(data.sdr_autopilot === 1);
+      toast.success(data.message || (next ? "Piloto Automático activado." : "Piloto Automático desactivado."));
+      onActionDone();
+    } catch (err: any) {
+      toast.error(err.message || "Error al alternar piloto automático");
+    } finally {
+      setTogglingAutopilot(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
@@ -383,13 +407,28 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
               <OriginBadges reply={reply} t={t} />
             </div>
           </div>
-          <button
-            onClick={onClose}
-            aria-label={t("inbox.close")}
-            className="text-base-content/40 hover:text-base-content transition-colors p-1"
-          >
-            <RiCloseLine size={18} />
-          </button>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <button
+              onClick={handleToggleAutopilot}
+              disabled={togglingAutopilot}
+              title={autopilot ? "Piloto Automático activo: la IA responderá automáticamente" : "Activar Piloto Automático para que la IA responda por ti"}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all shadow-sm ${
+                autopilot
+                  ? "bg-success/15 border-success/30 text-success hover:bg-success/20"
+                  : "bg-base-200 border-base-300/50 text-base-content/60 hover:bg-base-300"
+              }`}
+            >
+              {togglingAutopilot ? <RiLoader4Line size={12} className="animate-spin" /> : <RiRobotLine size={13} />}
+              {autopilot ? "🤖 Piloto Automático: ACTIVO" : "🤖 Piloto Automático: OFF"}
+            </button>
+            <button
+              onClick={onClose}
+              aria-label={t("inbox.close")}
+              className="text-base-content/40 hover:text-base-content transition-colors p-1"
+            >
+              <RiCloseLine size={18} />
+            </button>
+          </div>
         </div>
 
         {reply.reply_id && (
@@ -502,8 +541,16 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2 gap-2">
-                      <span className="text-xs font-medium text-base-content/60">
-                        {isInbound ? (message.senderName ?? reply.full_name ?? t("inbox.unknown")) : t("inbox.linkedinOutbound")}
+                      <span className="text-xs font-medium text-base-content/60 flex items-center gap-1.5">
+                        {isInbound ? (
+                          message.senderName ?? reply.full_name ?? t("inbox.unknown")
+                        ) : message.metadataJson?.includes("autopilot") || message.metadataJson?.includes("sdr") ? (
+                          <span className="text-warning font-semibold flex items-center gap-1">
+                            <RiRobotLine size={12} /> SDR IA (Autopilot)
+                          </span>
+                        ) : (
+                          t("inbox.linkedinOutbound")
+                        )}
                       </span>
                       <span className="text-xs text-base-content/30 whitespace-nowrap">{formatDate(message.sentAt, locale)}</span>
                     </div>

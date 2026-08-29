@@ -11,6 +11,7 @@ import type { LinkedInInboxObservation } from "./inbox-sync";
 export interface CampaignTargetScope {
   targetId: string;
   fullName?: string | null;
+  sdrAutopilot?: number;
   accountId: string;
   runId: string;
   workflowId: string | null;
@@ -98,6 +99,7 @@ export function loadCampaignTargetScopes(
     SELECT
       t.id AS targetId,
       t.full_name AS fullName,
+      COALESCE(t.sdr_autopilot, 0) AS sdrAutopilot,
       r.account_id AS accountId,
       r.id AS runId,
       r.workflow_id AS workflowId,

@@ -506,6 +506,7 @@ function runMigrations(db: Database.Database) {
     "ALTER TABLE accounts ADD COLUMN linkedin_inbox_synced_at TEXT",
     "ALTER TABLE accounts ADD COLUMN linkedin_inbox_sync_error TEXT",
     "ALTER TABLE accounts ADD COLUMN linkedin_inbox_contract_version TEXT",
+    "ALTER TABLE targets ADD COLUMN sdr_autopilot INTEGER NOT NULL DEFAULT 0",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }

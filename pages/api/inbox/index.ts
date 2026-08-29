@@ -35,6 +35,8 @@ export interface InboxReply {
   dispatched_at: string | null;
   dispatch_result_json: string | null;
   manually_edited: number;
+  // SDR Autopilot state
+  sdr_autopilot: number;
   // Latest campaign-attributed LinkedIn inbound event (account-scoped).
   linkedin_thread_id: string | null;
   linkedin_message_id: string | null;
@@ -178,6 +180,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       er.dispatched_at,
       er.dispatch_result_json,
       COALESCE(er.manually_edited, 0) AS manually_edited,
+      COALESCE(t.sdr_autopilot, 0) AS sdr_autopilot,
       lie.external_thread_id AS linkedin_thread_id,
       lie.external_message_id AS linkedin_message_id,
       lie.body AS linkedin_reply_body,
