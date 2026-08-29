@@ -278,24 +278,25 @@ async function fetchJson(page: Page, url: string): Promise<JsonResponse> {
     try {
       const cookies = document.cookie.split("; ").reduce((values: Record<string, string>, cookie) => {
         const index = cookie.indexOf("=");
-        if (index > 0) values[cookie.slice(0, index)] = cookie.slice(index + 1);
+        if (index > 0) values[cookie.slice(0, index).trim()] = cookie.slice(index + 1).trim();
         return values;
       }, {});
-      const csrf = (cookies.JSESSIONID || "").replace(/\"/g, "");
+      const csrf = (cookies.JSESSIONID || cookies.jsessionid || "").replace(/\"/g, "");
+      const headers: Record<string, string> = {
+        accept: "application/vnd.linkedin.normalized+json+2.1",
+        "x-restli-protocol-version": "2.0.0",
+      };
+      if (csrf) headers["csrf-token"] = csrf;
       const response = await fetch(requestUrl, {
         method: "GET",
-        headers: {
-          accept: "application/vnd.linkedin.normalized+json+2.1",
-          "x-restli-protocol-version": "2.0.0",
-          ...(csrf ? { "csrf-token": csrf } : {}),
-        },
+        headers,
         credentials: "include",
       });
       let body: unknown = null;
       try { body = await response.json(); } catch { /* malformed body handled below */ }
       return { status: response.status, url: response.url, body };
-    } catch {
-      return { status: 0, url: requestUrl, body: null };
+    } catch (err) {
+      return { status: 0, url: requestUrl, body: { error: err instanceof Error ? err.message : String(err) } };
     }
   }, url);
 }
