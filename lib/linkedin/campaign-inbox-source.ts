@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import type { Page } from "playwright";
 import { canonicalLinkedInVanity } from "./connection-reconciliation";
 import {
@@ -486,9 +487,10 @@ export class CampaignLinkedInMessagingSource {
             }
             if (!cleanBody) cleanBody = dom.lastMessage;
 
+            const bodyHash = crypto.createHash("md5").update(cleanBody.trim()).digest("hex").slice(0, 16);
             observations.push({
               externalThreadId: dom.threadId || `thread-${matchedScope.targetId}`,
-              externalMessageId: `msg-${matchedScope.targetId}-${Date.now()}`,
+              externalMessageId: `msg-${matchedScope.targetId}-${bodyHash}`,
               direction: "inbound",
               body: cleanBody,
               receivedAt: new Date().toISOString(),

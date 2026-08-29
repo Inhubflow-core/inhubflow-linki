@@ -168,6 +168,19 @@ interface ReplyModalProps {
   hasPremium: boolean;
 }
 
+function dedupeLinkedInMessages(msgs: LinkedInThreadMessage[]): LinkedInThreadMessage[] {
+  const seen = new Set<string>();
+  const result: LinkedInThreadMessage[] = [];
+  for (const m of msgs) {
+    const key = `${m.direction}:${m.body.trim()}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(m);
+    }
+  }
+  return result;
+}
+
 function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProps) {
   const { t, locale } = useTranslation();
   const hasEmailReply = reply.channel === "email" || reply.channel === "both";
@@ -318,7 +331,7 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
             },
           ]);
         } else {
-          setLinkedinMessages(loaded);
+          setLinkedinMessages(dedupeLinkedInMessages(loaded));
         }
       })
       .catch((error) => {
@@ -344,9 +357,10 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
         .then((res) => res.json())
         .then((data) => {
           if (data.ok && Array.isArray(data.messages) && data.messages.length > 0) {
+            const deduped = dedupeLinkedInMessages(data.messages);
             setLinkedinMessages((prev) => {
-              if (data.messages.length !== prev.length || JSON.stringify(data.messages) !== JSON.stringify(prev)) {
-                return data.messages;
+              if (deduped.length !== prev.length || JSON.stringify(deduped) !== JSON.stringify(prev)) {
+                return deduped;
               }
               return prev;
             });

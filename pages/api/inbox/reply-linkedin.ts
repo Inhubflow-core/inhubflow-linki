@@ -85,10 +85,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // Upload attachment if any
         if (tempFilePath) {
-          const fileInput = page.locator("input[type='file'].msg-form__attachment-input, input[type='file'][name='file'], input[type='file']").first();
-          if (await fileInput.count() > 0) {
-            await fileInput.setInputFiles(tempFilePath);
-            await page.waitForTimeout(3000);
+          const fileInputs = page.locator("input[type='file']");
+          const count = await fileInputs.count();
+          let uploaded = false;
+          if (count > 0) {
+            const isDoc = /\.pdf|\.doc|\.docx|\.xls|\.xlsx|\.txt/i.test(tempFilePath);
+            if (isDoc) {
+              const docBtn = page.locator("button.msg-form__attachment-btn--doc, button[aria-label*='document'], button[aria-label*='archivo'], button[aria-label*='documento']").first();
+              if (await docBtn.isVisible().catch(() => false)) {
+                await docBtn.click().catch(() => {});
+                await page.waitForTimeout(1000);
+              }
+            }
+            for (let i = 0; i < count; i++) {
+              try {
+                await fileInputs.nth(i).setInputFiles(tempFilePath);
+                uploaded = true;
+                break;
+              } catch { /* continue */ }
+            }
+          }
+          if (uploaded) {
+            await page.waitForTimeout(2500);
+            const modalPrimaryBtn = page.locator(`
+              .artdeco-modal button.artdeco-button--primary,
+              .share-promoted-document-modal__primary-button,
+              div[role='dialog'] button:has-text('Done'),
+              div[role='dialog'] button:has-text('Listo'),
+              div[role='dialog'] button:has-text('Hecho'),
+              div[role='dialog'] button:has-text('Continuar'),
+              div[role='dialog'] button:has-text('Save'),
+              div[role='dialog'] button:has-text('Guardar')
+            `).first();
+
+            if (await modalPrimaryBtn.isVisible({ timeout: 4000 }).catch(() => false)) {
+              await modalPrimaryBtn.click({ delay: 100 });
+              await page.waitForTimeout(2000);
+            }
           }
         }
 
@@ -105,7 +138,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const sendBtn = page.locator("button.msg-form__send-button, button[type='submit'].msg-form__send-btn").first();
         if (await sendBtn.isVisible({ timeout: 5000 }).catch(() => false) && !(await sendBtn.isDisabled().catch(() => true))) {
           await sendBtn.click();
-          await page.waitForTimeout(2500);
+          await page.waitForTimeout(3000);
           sent = true;
         }
       } catch {
@@ -115,8 +148,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // 3. Fallback to standard LinkedIn messaging
     if (!sent) {
-      const textToSend = messageText?.trim() || (attachment ? `📎 ${attachment.name}` : "");
-      await sendMessage(page, target.full_name, textToSend, target.linkedin_url, target.messaging_urn);
+      const textToSend = messageText?.trim() || "";
+      await sendMessage(page, target.full_name, textToSend, target.linkedin_url, target.messaging_urn, tempFilePath);
     }
 
     // 4. Persist outbound message in database

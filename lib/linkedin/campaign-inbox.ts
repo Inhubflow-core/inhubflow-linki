@@ -280,6 +280,17 @@ export function captureCampaignInboxObservations(
       continue;
     }
 
+    const alreadyCaptured = db.prepare(`
+      SELECT 1 FROM linkedin_inbox_messages
+      WHERE target_id = ? AND account_id = ? AND direction = 'inbound' AND body = ?
+      LIMIT 1
+    `).get(match.scope.targetId, accountId, observation.body.trim());
+    if (alreadyCaptured) {
+      result.duplicates++;
+      result.skipped.push({ ...key, reason: "duplicate" });
+      continue;
+    }
+
     const sentAt = new Date(receivedAtMs).toISOString();
     const metadata = JSON.stringify({
       source: "campaign-inbox",

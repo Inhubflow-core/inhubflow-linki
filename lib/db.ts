@@ -547,6 +547,18 @@ function runMigrations(db: Database.Database) {
     }
   } catch { /* ignore */ }
 
+  // Deduplicate any repeated linkedin_inbox_messages rows
+  try {
+    db.exec(`
+      DELETE FROM linkedin_inbox_messages
+      WHERE id NOT IN (
+        SELECT MIN(id)
+        FROM linkedin_inbox_messages
+        GROUP BY target_id, direction, body
+      );
+    `);
+  } catch { /* ignore */ }
+
   // Parallel tracks: assign email steps to email track, re-number step_order, backfill run_profile_tracks
   runParallelTracksMigration(db);
   // Drop deprecated run_profiles columns (state, current_step, etc.) — consumers now read track-runs

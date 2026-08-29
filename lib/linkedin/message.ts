@@ -21,13 +21,14 @@ export async function sendMessage(
   fullName: string,
   text: string,
   linkedinUrl: string,
-  messagingUrn?: string | null
+  messagingUrn?: string | null,
+  attachmentPath?: string | null,
 ): Promise<SendMessageResult> {
   // 1. If messagingUrn is cached, try direct compose URL
   if (messagingUrn) {
     const opened = await openComposeByUrn(page, messagingUrn);
     if (opened) {
-      await sendFromComposeBox(page, text);
+      await sendFromComposeBox(page, text, attachmentPath);
       return { messagingUrn, isFirstDegree: true };
     }
   }
@@ -37,7 +38,7 @@ export async function sendMessage(
   if (resolved.messagingUrn) {
     const opened = await openComposeByUrn(page, resolved.messagingUrn);
     if (opened) {
-      await sendFromComposeBox(page, text);
+      await sendFromComposeBox(page, text, attachmentPath);
       return resolved;
     }
   }
@@ -46,7 +47,7 @@ export async function sendMessage(
   if (resolved.isFirstDegree) {
     const openedOnPage = await openComposeFromProfilePage(page);
     if (openedOnPage) {
-      await sendFromComposeBox(page, text);
+      await sendFromComposeBox(page, text, attachmentPath);
       return resolved;
     }
   }
@@ -56,7 +57,7 @@ export async function sendMessage(
   }
 
   // 4. Connected, but compose URN not found — fallback to name search
-  await sendMessageViaTypeahead(page, fullName, text);
+  await sendMessageViaTypeahead(page, fullName, text, attachmentPath);
   return resolved;
 }
 
@@ -104,7 +105,7 @@ async function openComposeByUrn(page: Page, messagingUrn: string): Promise<boole
   }
 }
 
-async function sendMessageViaTypeahead(page: Page, fullName: string, text: string): Promise<void> {
+async function sendMessageViaTypeahead(page: Page, fullName: string, text: string, attachmentPath?: string | null): Promise<void> {
   await page.goto("https://www.linkedin.com/messaging/thread/new/", {
     waitUntil: "domcontentloaded",
     timeout: 30000,
@@ -129,7 +130,7 @@ async function sendMessageViaTypeahead(page: Page, fullName: string, text: strin
   await firstResult.click({ delay: 100 });
   await page.waitForTimeout(800);
 
-  await sendFromComposeBox(page, text);
+  await sendFromComposeBox(page, text, attachmentPath);
 }
 
 function resultNameMatches(resultText: string, fullName: string): boolean {
@@ -140,24 +141,84 @@ function resultNameMatches(resultText: string, fullName: string): boolean {
   return normalize(resultText).includes(target);
 }
 
-async function sendFromComposeBox(page: Page, text: string): Promise<void> {
-  // Paste message into compose area
-  const msgInput = page.locator("div.msg-form__contenteditable, div[role='textbox'].msg-form__message-texteditor").first();
-  await msgInput.waitFor({ timeout: 8000 });
-  await msgInput.click();
+async function attachFileInCompose(page: Page, filePath: string): Promise<boolean> {
   try {
-    await page.evaluate((t) => navigator.clipboard.writeText(t), text);
-    await page.waitForTimeout(300);
-    await msgInput.press("Control+V");
-  } catch {
-    // Clipboard blocked in headless — fall back to keyboard typing
-    await msgInput.pressSequentially(text, { delay: 20 });
-  }
-  await page.waitForTimeout(500);
+    const isDoc = /\.pdf|\.doc|\.docx|\.xls|\.xlsx|\.txt/i.test(filePath);
+    const fileInputs = page.locator("input[type='file']");
+    const count = await fileInputs.count();
+    let uploaded = false;
 
-  // Send
-  const sendBtn = page.locator("button.msg-form__send-button:visible, button[type='submit'].msg-form__send-button:visible").first();
-  await sendBtn.waitFor({ timeout: 5000 });
+    if (count > 0) {
+      if (isDoc) {
+        const docBtn = page.locator("button.msg-form__attachment-btn--doc, button[aria-label*='document'], button[aria-label*='archivo'], button[aria-label*='documento']").first();
+        if (await docBtn.isVisible().catch(() => false)) {
+          await docBtn.click().catch(() => {});
+          await page.waitForTimeout(1000);
+        }
+      }
+
+      for (let i = 0; i < count; i++) {
+        try {
+          await fileInputs.nth(i).setInputFiles(filePath);
+          uploaded = true;
+          break;
+        } catch { /* continue */ }
+      }
+    }
+
+    if (uploaded) {
+      await page.waitForTimeout(2500);
+
+      // Confirm LinkedIn document upload modal if present
+      const modalPrimaryBtn = page.locator(`
+        .artdeco-modal button.artdeco-button--primary,
+        .share-promoted-document-modal__primary-button,
+        div[role='dialog'] button:has-text('Done'),
+        div[role='dialog'] button:has-text('Listo'),
+        div[role='dialog'] button:has-text('Hecho'),
+        div[role='dialog'] button:has-text('Continuar'),
+        div[role='dialog'] button:has-text('Save'),
+        div[role='dialog'] button:has-text('Guardar')
+      `).first();
+
+      if (await modalPrimaryBtn.isVisible({ timeout: 4000 }).catch(() => false)) {
+        await modalPrimaryBtn.click({ delay: 100 });
+        await page.waitForTimeout(2000);
+      }
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.warn("[attachFileInCompose] error attaching file:", err);
+    return false;
+  }
+}
+
+async function sendFromComposeBox(page: Page, text: string, attachmentPath?: string | null): Promise<void> {
+  // 1. If attachment present, attach it first
+  if (attachmentPath) {
+    await attachFileInCompose(page, attachmentPath);
+  }
+
+  // 2. Paste or type text message into compose area if text provided
+  if (text?.trim()) {
+    const msgInput = page.locator("div.msg-form__contenteditable, div[role='textbox'].msg-form__message-texteditor").first();
+    if (await msgInput.isVisible({ timeout: 8000 }).catch(() => false)) {
+      await msgInput.click();
+      try {
+        await page.evaluate((t) => navigator.clipboard.writeText(t), text);
+        await page.waitForTimeout(300);
+        await msgInput.press("Control+V");
+      } catch {
+        await msgInput.pressSequentially(text, { delay: 20 });
+      }
+      await page.waitForTimeout(500);
+    }
+  }
+
+  // 3. Send
+  const sendBtn = page.locator("button.msg-form__send-button:visible, button[type='submit'].msg-form__send-button:visible, button.msg-form__send-btn:visible").first();
+  await sendBtn.waitFor({ timeout: 8000 });
   await sendBtn.click({ delay: 100 });
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(3000);
 }
