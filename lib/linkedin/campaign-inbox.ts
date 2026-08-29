@@ -422,17 +422,10 @@ export interface CampaignInboxThreadMessage {
 export function getCampaignLinkedInThread(
   db: Database.Database,
   targetId: string,
-  accountId: string,
-  externalThreadId: string,
-): CampaignInboxThreadMessage[] | null {
-  const owns = db.prepare(`
-    SELECT 1
-    FROM linkedin_inbox_messages m
-    WHERE m.target_id = ? AND m.account_id = ? AND m.external_thread_id = ?
-    LIMIT 1
-  `).get(targetId, accountId, externalThreadId);
-  if (!owns) return null;
-  return db.prepare(`
+  accountId?: string,
+  externalThreadId?: string,
+): CampaignInboxThreadMessage[] {
+  let query = `
     SELECT external_thread_id AS externalThreadId,
       external_message_id AS externalMessageId,
       direction, body, sent_at AS sentAt,
@@ -440,9 +433,19 @@ export function getCampaignLinkedInThread(
       sender_name AS senderName,
       metadata_json AS metadataJson
     FROM linkedin_inbox_messages
-    WHERE target_id = ? AND account_id = ? AND external_thread_id = ?
-    ORDER BY sent_at ASC, id ASC
-  `).all(targetId, accountId, externalThreadId) as CampaignInboxThreadMessage[];
+    WHERE target_id = ?
+  `;
+  const params: unknown[] = [targetId];
+  if (accountId) {
+    query += ` AND account_id = ?`;
+    params.push(accountId);
+  }
+  if (externalThreadId) {
+    query += ` AND external_thread_id = ?`;
+    params.push(externalThreadId);
+  }
+  query += ` ORDER BY sent_at ASC, id ASC`;
+  return db.prepare(query).all(...params) as CampaignInboxThreadMessage[];
 }
 
 export interface CampaignInboxEventSummary {

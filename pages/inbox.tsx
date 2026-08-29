@@ -236,7 +236,7 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
   }, [canReplyByEmail, reply.id, reply.email_account_id, reply.email, t]);
 
   useEffect(() => {
-    if (!hasLinkedInReply || !reply.linkedin_account_id || !reply.linkedin_thread_id) {
+    if (!hasLinkedInReply && !reply.linkedin_url) {
       setLoadingLinkedInThread(false);
       setLinkedinMessages([]);
       return;
@@ -244,11 +244,10 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
 
     let cancelled = false;
     setLoadingLinkedInThread(true);
-    const params = new URLSearchParams({
-      targetId: reply.id,
-      accountId: reply.linkedin_account_id,
-      threadId: reply.linkedin_thread_id,
-    });
+    const params = new URLSearchParams({ targetId: reply.id });
+    if (reply.linkedin_account_id) params.set("accountId", reply.linkedin_account_id);
+    if (reply.linkedin_thread_id) params.set("threadId", reply.linkedin_thread_id);
+
     fetch(`/api/inbox/linkedin-thread?${params}`)
       .then(async (response) => {
         const data = await response.json();
@@ -256,7 +255,24 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
         return data as { messages?: LinkedInThreadMessage[] };
       })
       .then((data) => {
-        if (!cancelled) setLinkedinMessages(data.messages ?? []);
+        if (cancelled) return;
+        const loaded = data.messages ?? [];
+        if (loaded.length === 0 && reply.linkedin_reply_body) {
+          setLinkedinMessages([
+            {
+              externalThreadId: reply.linkedin_thread_id || `thread-${reply.id}`,
+              externalMessageId: `inbound-${reply.id}`,
+              direction: "inbound",
+              senderName: reply.full_name,
+              senderExternalId: null,
+              body: reply.linkedin_reply_body,
+              sentAt: reply.linkedin_reply_received_at || new Date().toISOString(),
+              metadataJson: "{}",
+            },
+          ]);
+        } else {
+          setLinkedinMessages(loaded);
+        }
       })
       .catch((error) => {
         if (!cancelled) toast.error(error instanceof Error ? error.message : t("inbox.errors.loadLinkedInThread"));
@@ -264,7 +280,8 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
       .finally(() => { if (!cancelled) setLoadingLinkedInThread(false); });
 
     return () => { cancelled = true; };
-  }, [hasLinkedInReply, reply.id, reply.linkedin_account_id, reply.linkedin_thread_id, t]);
+  }, [hasLinkedInReply, reply.id, reply.linkedin_account_id, reply.linkedin_thread_id, reply.linkedin_url, reply.linkedin_reply_body, reply.linkedin_reply_received_at, reply.full_name, t]);
+
   useEffect(() => {
     threadEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, linkedinMessages]);
@@ -334,7 +351,22 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
         body: replyText.trim(),
         sentAt: data.sentAt || new Date().toISOString(),
       };
-      setLinkedinMessages((prev) => [...prev, newMsg]);
+      setLinkedinMessages((prev) => {
+        if (prev.length === 0 && reply.linkedin_reply_body) {
+          const initialInbound: LinkedInThreadMessage = {
+            externalThreadId: reply.linkedin_thread_id || `thread-${reply.id}`,
+            externalMessageId: `inbound-${reply.id}`,
+            direction: "inbound",
+            senderName: reply.full_name,
+            senderExternalId: null,
+            body: reply.linkedin_reply_body,
+            sentAt: reply.linkedin_reply_received_at || new Date().toISOString(),
+            metadataJson: "{}",
+          };
+          return [initialInbound, newMsg];
+        }
+        return [...prev, newMsg];
+      });
       setReplyText("");
       onActionDone();
     } catch (error) {
@@ -559,6 +591,7 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
                 );
               })
             )}
+            <div ref={threadEndRef} />
           </div>
         )}
 
