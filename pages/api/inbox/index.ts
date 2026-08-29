@@ -68,9 +68,9 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   // email_replies row must also qualify a contact for the inbox. LinkedIn events
   // are already campaign-attributed before entering this table.
   let channelFilter =
-    "AND (t.email_replied_at IS NOT NULL OR er.id IS NOT NULL OR lie.id IS NOT NULL)";
+    "AND (t.email_replied_at IS NOT NULL OR er.id IS NOT NULL OR lie.id IS NOT NULL OR t.last_replied_at IS NOT NULL)";
   if (channel === "email") channelFilter = "AND (t.email_replied_at IS NOT NULL OR er.id IS NOT NULL)";
-  if (channel === "linkedin") channelFilter = "AND lie.id IS NOT NULL";
+  if (channel === "linkedin") channelFilter = "AND (lie.id IS NOT NULL OR t.last_replied_at IS NOT NULL)";
 
   const params: string[] = [];
   let accountFilter = "";

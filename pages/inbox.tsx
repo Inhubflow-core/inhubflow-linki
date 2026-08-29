@@ -613,6 +613,38 @@ export default function InboxPage() {
     }
   }
 
+  const [syncingLinkedIn, setSyncingLinkedIn] = useState(false);
+
+  async function handleSyncLinkedIn() {
+    const authAccounts = accounts.filter((a) => a.is_authenticated === 1);
+    if (authAccounts.length === 0) {
+      toast.error("No hay cuentas de LinkedIn autenticadas para sincronizar.");
+      return;
+    }
+
+    setSyncingLinkedIn(true);
+    let totalCaptured = 0;
+    try {
+      for (const acc of authAccounts) {
+        const res = await fetch(`/api/accounts/${acc.id}/sync-linkedin-inbox`, { method: "POST" });
+        const data = await res.json();
+        if (data.ok) {
+          totalCaptured += data.captured ?? 0;
+        }
+      }
+      toast.success(
+        totalCaptured > 0
+          ? `Sincronización completada: ${totalCaptured} nueva(s) respuesta(s) capturada(s).`
+          : "Sincronización completada. Bandeja al día."
+      );
+      await load();
+    } catch (err: any) {
+      toast.error(err.message || "Error al sincronizar LinkedIn");
+    } finally {
+      setSyncingLinkedIn(false);
+    }
+  }
+
   const filtered = replies.filter((reply) => {
     if (verdict !== "all" && verdictKey(reply) !== verdict) return false;
     if (!search) return true;
@@ -658,6 +690,15 @@ export default function InboxPage() {
           <p className="text-base-content/40 text-sm mt-0.5">{t("inbox.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleSyncLinkedIn}
+            disabled={syncingLinkedIn}
+            title="Sincronizar respuestas entrantes de LinkedIn ahora"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary/10 border border-primary/25 text-primary hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
+          >
+            {syncingLinkedIn ? <RiLoader4Line size={13} className="animate-spin" /> : <RiLinkedinBoxLine size={14} />}
+            {syncingLinkedIn ? "Sincronizando..." : "Sincronizar LinkedIn"}
+          </button>
           {hasPremium ? (
             <>
               <button

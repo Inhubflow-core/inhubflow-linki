@@ -70,13 +70,11 @@ export function campaignInboxContractVersion(): string | null {
 
 export function listCampaignInboxAccountIds(db: Database.Database = getDb()): string[] {
   const rows = db.prepare(`
-    SELECT DISTINCT r.account_id AS account_id
-    FROM logs l
-    JOIN runs r ON r.id = l.run_id
-    JOIN accounts a ON a.id = r.account_id
+    SELECT DISTINCT a.id AS account_id
+    FROM accounts a
+    JOIN runs r ON r.account_id = a.id
     WHERE a.is_authenticated = 1
-      AND (l.message LIKE 'Message sent%' OR l.message LIKE 'InMail sent%')
-    ORDER BY r.account_id
+    ORDER BY a.id
   `).all() as Array<{ account_id: string }>;
   return rows.map((row) => row.account_id);
 }
@@ -93,13 +91,24 @@ export function loadCampaignTargetScopes(
       r.workflow_id AS workflowId,
       t.messaging_urn AS messagingUrn,
       t.linkedin_url AS linkedinUrl,
-      MAX(l.created_at) AS outboundAt
-    FROM logs l
-    JOIN runs r ON r.id = l.run_id
-    JOIN run_profiles rp ON rp.run_id = r.id AND rp.target_id = l.target_id
-    JOIN targets t ON t.id = l.target_id
+      COALESCE(
+        MAX(CASE WHEN l.message LIKE 'Message sent%' OR l.message LIKE 'InMail sent%' THEN l.created_at END),
+        t.message_sent_at,
+        t.connection_requested_at,
+        rp.created_at
+      ) AS outboundAt
+    FROM run_profiles rp
+    JOIN runs r ON r.id = rp.run_id
+    JOIN targets t ON t.id = rp.target_id
+    LEFT JOIN logs l ON l.run_id = r.id AND l.target_id = t.id
     WHERE r.account_id = ?
-      AND (l.message LIKE 'Message sent%' OR l.message LIKE 'InMail sent%')
+      AND (
+        t.message_sent_at IS NOT NULL
+        OR t.connection_requested_at IS NOT NULL
+        OR l.message LIKE 'Message sent%'
+        OR l.message LIKE 'InMail sent%'
+        OR l.message LIKE 'Connection request sent%'
+      )
     GROUP BY t.id, r.account_id, r.id, r.workflow_id
     ORDER BY outboundAt DESC
   `).all(accountId) as CampaignTargetScope[];
