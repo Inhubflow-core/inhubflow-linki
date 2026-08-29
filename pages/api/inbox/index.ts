@@ -35,6 +35,11 @@ export interface InboxReply {
   dispatched_at: string | null;
   dispatch_result_json: string | null;
   manually_edited: number;
+  // Latest campaign-attributed LinkedIn inbound event (account-scoped).
+  linkedin_thread_id: string | null;
+  linkedin_message_id: string | null;
+  linkedin_reply_body: string | null;
+  linkedin_reply_received_at: string | null;
 }
 
 const VALID_CHANNELS = new Set(["email", "linkedin"]);
@@ -60,19 +65,19 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   // OOO-followup replies intentionally leave email_replied_at NULL, so the captured
-  // email_replies row must also qualify a contact for the inbox.
+  // email_replies row must also qualify a contact for the inbox. LinkedIn events
+  // are already campaign-attributed before entering this table.
   let channelFilter =
-    "AND (t.email_replied_at IS NOT NULL OR t.last_replied_at IS NOT NULL OR er.id IS NOT NULL)";
+    "AND (t.email_replied_at IS NOT NULL OR er.id IS NOT NULL OR lie.id IS NOT NULL)";
   if (channel === "email") channelFilter = "AND (t.email_replied_at IS NOT NULL OR er.id IS NOT NULL)";
-  if (channel === "linkedin") channelFilter = "AND t.last_replied_at IS NOT NULL";
+  if (channel === "linkedin") channelFilter = "AND lie.id IS NOT NULL";
 
   const params: string[] = [];
   let accountFilter = "";
   if (accountId) {
     accountFilter = `
       AND (
-        (t.last_replied_at IS NOT NULL
-          AND COALESCE(t.last_replied_account_id, context_run.account_id, lc.account_id) = ?)
+        (lie.id IS NOT NULL AND lie.account_id = ?)
         OR
         ((t.email_replied_at IS NOT NULL OR er.id IS NOT NULL)
           AND COALESCE(context_run.account_id, lc.account_id) = ?)
@@ -80,11 +85,24 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     params.push(accountId, accountId);
   }
 
-  // Both reply and run context are ranked before joining. This guarantees one row
-  // per target and avoids SQLite choosing arbitrary non-aggregated values from a
-  // GROUP BY when the same target belongs to multiple campaigns.
+  const linkedinAccountFilter = accountId ? "WHERE m.account_id = ?" : "";
+  if (accountId) params.unshift(accountId);
+
   const rows = db.prepare(`
-    WITH ranked_email_replies AS (
+    WITH ranked_linkedin_events AS (
+      SELECT
+        m.*,
+        ROW_NUMBER() OVER (
+          PARTITION BY m.target_id${accountId ? ", m.account_id" : ""}
+          ORDER BY datetime(m.sent_at) DESC, datetime(m.captured_at) DESC, m.id DESC
+        ) AS row_num
+      FROM linkedin_inbox_messages m
+      ${linkedinAccountFilter}
+    ),
+    latest_linkedin_event AS (
+      SELECT * FROM ranked_linkedin_events WHERE row_num = 1
+    ),
+    ranked_email_replies AS (
       SELECT
         er0.*,
         ROW_NUMBER() OVER (
@@ -128,23 +146,25 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       t.email_replied_at,
       t.last_replied_at,
       CASE
-        WHEN (t.email_replied_at IS NOT NULL OR er.id IS NOT NULL) AND t.last_replied_at IS NOT NULL THEN 'both'
+        WHEN (t.email_replied_at IS NOT NULL OR er.id IS NOT NULL) AND (t.last_replied_at IS NOT NULL OR lie.id IS NOT NULL) THEN 'both'
         WHEN t.email_replied_at IS NOT NULL OR er.id IS NOT NULL THEN 'email'
         ELSE 'linkedin'
       END AS channel,
       MAX(
         COALESCE(t.email_replied_at, ''),
         COALESCE(t.last_replied_at, ''),
-        COALESCE(er.received_at, '')
+        COALESCE(er.received_at, ''),
+        COALESCE(lie.sent_at, '')
       ) AS replied_at,
-      context_run.id AS run_id,
-      context_run.workflow_id,
-      w.name AS workflow_name,
-      linkedin_account.id AS linkedin_account_id,
-      linkedin_account.name AS linkedin_account_name,
-      linkedin_account.email AS linkedin_account_email,
+      COALESCE(er.run_id, lie.run_id, context_run.id) AS run_id,
+      COALESCE(lie.workflow_id, context_run.workflow_id) AS workflow_id,
+      COALESCE(w.name, linked_workflow.name) AS workflow_name,
+      COALESCE(lie.account_id, linkedin_account.id) AS linkedin_account_id,
+      COALESCE(lie_account.name, linkedin_account.name) AS linkedin_account_name,
+      COALESCE(lie_account.email, linkedin_account.email) AS linkedin_account_email,
       CASE
-        WHEN t.last_replied_account_id IS NULL AND linkedin_account.id IS NOT NULL THEN 1
+        WHEN lie.id IS NOT NULL OR t.last_replied_account_id IS NOT NULL THEN 0
+        WHEN linkedin_account.id IS NOT NULL THEN 1
         ELSE 0
       END AS linkedin_account_inferred,
       ea.id AS email_account_id,
@@ -157,18 +177,25 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       er.classification_error,
       er.dispatched_at,
       er.dispatch_result_json,
-      COALESCE(er.manually_edited, 0) AS manually_edited
+      COALESCE(er.manually_edited, 0) AS manually_edited,
+      lie.external_thread_id AS linkedin_thread_id,
+      lie.external_message_id AS linkedin_message_id,
+      lie.body AS linkedin_reply_body,
+      lie.sent_at AS linkedin_reply_received_at
     FROM targets t
     LEFT JOIN latest_email_reply er ON er.target_id = t.id
+    LEFT JOIN latest_linkedin_event lie ON lie.target_id = t.id
     LEFT JOIN latest_context lc ON lc.target_id = t.id
     LEFT JOIN run_profiles reply_rp
       ON reply_rp.target_id = t.id AND reply_rp.run_id = er.run_id
-    LEFT JOIN runs context_run ON context_run.id = COALESCE(er.run_id, lc.run_id)
+    LEFT JOIN runs context_run ON context_run.id = COALESCE(er.run_id, lie.run_id, lc.run_id)
     LEFT JOIN workflows w ON w.id = context_run.workflow_id
+    LEFT JOIN workflows linked_workflow ON linked_workflow.id = lie.workflow_id
     LEFT JOIN email_accounts ea
       ON ea.id = COALESCE(reply_rp.email_account_id, context_run.email_account_id, lc.email_account_id)
+    LEFT JOIN accounts lie_account ON lie_account.id = lie.account_id
     LEFT JOIN accounts linkedin_account
-      ON linkedin_account.id = COALESCE(t.last_replied_account_id, context_run.account_id, lc.account_id)
+      ON linkedin_account.id = COALESCE(t.last_replied_account_id, lie.account_id, context_run.account_id, lc.account_id)
     WHERE 1=1
       ${channelFilter}
       ${accountFilter}

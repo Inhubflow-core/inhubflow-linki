@@ -1,89 +1,127 @@
 # LinkedIn Inbox Contract
 
-**Status: `UNVERIFIED`**
+**Status: `CANDIDATE_CANARY`**
 
-This document is a gate for the SDR LinkedIn inbox adapter. No LinkedIn messaging endpoint, GraphQL operation, decoration ID, request payload, response mapping, or pagination assumption may be added to production code until the contract is observed in an authorized, controlled account and recorded here with a sanitized fixture.
+This document gates the read-only LinkedIn campaign-inbox adapter. The source is disabled by default and must fail closed when LinkedIn no longer returns the exact recognized shape.
 
-## Current state
+## Current implementation
 
-- Phase 2A adapter: provider-neutral normalization, account ownership checks, and explicit read-only capture only.
-- Base SHA: `1095e5d`.
-- No production network source is implemented.
-- No runner/scheduler integration exists.
-- Gemini, AI processing, and LinkedIn outbound actions remain disabled.
-- `ee/` is absent from this checkout; the legacy premium reply sync is unavailable.
-- Blocker: a controlled LinkedIn account and a current, consented observation of the inbox wire contract are required for Phase 2B.
+- The existing Linki Inbox UI/API remains the only Inbox.
+- `lib/linkedin/campaign-inbox-source.ts` contains a **read-only GET-only candidate source** for the legacy normalized Voyager messaging contract.
+- `lib/linkedin/campaign-inbox.ts` admits only contacts for which the exact LinkedIn account/run has a persisted `Message sent` or `InMail sent` campaign log.
+- Personal/unmatched/ambiguous/cross-slot conversations are not persisted and message bodies are never logged.
+- Captured campaign replies are idempotent in `linkedin_inbox_messages`, update `targets.last_replied_at`/slot attribution, stop remaining tracks, and appear in the existing Inbox.
+- The automatic scheduler requires all three environment gates:
 
-## Observation record
+```text
+LINKEDIN_CAMPAIGN_INBOX_SYNC_ENABLED=true
+LINKEDIN_INBOX_CONTRACT_VERIFIED=true
+LINKEDIN_INBOX_CONTRACT_VERSION=legacy-voyager-v1
+```
 
-Complete this section only after an authorized observation:
+Keep the scheduler flag `false` until the controlled canary below succeeds. The manual authenticated endpoint can run while the scheduler remains disabled, but still requires the verified/version gates:
 
-- Observation date:
-- Linki application SHA:
-- Controlled account designation (no email or personal identifier):
-- Observer / authorization reference:
-- LinkedIn page action that caused inbox data to load:
-- Whether the action was read-only (no send, mark-read, archive, reaction, or delete):
+```text
+POST /api/accounts/<account-id>/sync-linkedin-inbox
+```
 
-## Request contract (redacted)
+## Candidate request contract
 
-- URL and path:
-- Method:
-- Content type:
-- Query parameters (values containing identifiers or tokens removed):
-- Request body shape (message text, cookies, tokens, and personal data removed):
-- Required non-secret headers:
-- Authentication/session behavior (describe, do not copy credential values):
-- Response status codes observed:
+### Current-user identity
 
-## Response mapping (redacted)
+```text
+GET https://www.linkedin.com/voyager/api/me
+Accept: application/vnd.linkedin.normalized+json+2.1
+x-restli-protocol-version: 2.0.0
+csrf-token: <JSESSIONID value, never logged>
+credentials: include
+```
 
-Record exact paths from the sanitized response fixture; do not infer or paraphrase them.
+### Conversation list
 
-- Thread identifier path and type:
-- Message identifier path and type:
-- Participant identity path and type:
-- Current-user / sender discriminator path:
-- Direction discriminator and values:
-- Message body/content path and type:
-- Timestamp path, unit, and timezone semantics:
-- Participant profile URL/vanity path:
-- Participant messaging URN path and identity type:
-- Conversation ordering semantics:
-- Empty response shape:
-- Malformed-record behavior:
+```text
+GET https://www.linkedin.com/voyager/api/messaging/conversations
+  ?keyVersion=LEGACY_INBOX
+  &q=participants
+  &start=<offset>
+  &count=20
+```
 
-## Pagination and failure behavior
+### Thread events
 
-- Page size:
-- Cursor or continuation path:
-- End-of-page marker:
-- Duplicate behavior across pages:
-- Maximum safe page count:
-- Login/session-expired response:
-- Auth wall/checkpoint response:
-- Provider error and retry behavior:
-- Rate-limit behavior:
+```text
+GET https://www.linkedin.com/voyager/api/messaging/conversations/<encoded-thread-id>/events
+  ?start=<offset>
+  &count=100
+```
 
-## Fixture provenance and redaction
+All requests are made through the already-authenticated Playwright page context. The adapter has no send, mark-read, archive, reaction, delete, POST, PUT, PATCH, or DELETE path.
 
-A future exact-response fixture must be stored under `fixtures/linkedin-inbox/` only after this contract is verified. It must be sanitized before being committed:
+## Candidate response mapping
 
-- Replace names, profile URLs, URNs, thread IDs, message IDs, timestamps, and message bodies with synthetic values while preserving types and relationships.
-- Remove cookies, CSRF values, authorization headers, browser storage, access tokens, request signatures, account emails, and full unneeded envelopes.
-- Retain only fields needed to prove the mappings above.
-- Mark the fixture as an exact observed response and link each parser mapping to a response path.
+The adapter accepts a normalized collection only when it contains `elements[]` and/or `included[]`.
 
-Until then, the repository fixtures are explicitly `synthetic-provider-neutral` normalized observations. They are not claims about LinkedIn's current API response format.
+- Conversation ID: `entityUrn` (or explicit `id` fallback).
+- Participants: `participants[]` or `members[]`, normalized through referenced entities in `included[]`.
+- Participant identity: exact profile `entityUrn/profileUrn/objectUrn`, plus `publicIdentifier/flagshipProfileUrl` for vanity agreement.
+- Message ID: event `entityUrn` (or explicit `id` fallback).
+- Sender: `from`, `sender`, `actor`, or `author`, resolved through normalized entity references.
+- Body: `attributedBody.text`, `body.text`, `body`, `text`, `message`, or `eventContent` as recognized by the strict recursive parser.
+- Timestamp: epoch-ms `createdAt`, `deliveredAt`, `sentAt`, or `timestamp`.
+- Direction: current-user profile URN from `/voyager/api/me` versus the exact campaign participant URN/vanity.
+- Pagination: bounded `start/count`; a short page terminates. Page caps are 50 conversations and 10 event pages per candidate thread.
 
-## Approval gate for Phase 2B
+A contract mismatch returns `contract_mismatch`, persists no observations from that pass, and does not advance `linkedin_inbox_synced_at`.
 
-Change `UNVERIFIED` to `VERIFIED` only when:
+## Campaign-only admission gate
 
-1. The observation was made with authorization and a controlled account.
-2. The complete request/response and pagination mapping is documented above.
-3. A sanitized fixture reproduces the observed mapping without secrets or live personal data.
-4. Read-only behavior, session-wall handling, identity attribution, and deduplication pass automated tests.
-5. The source is reviewed to confirm it cannot send or mutate LinkedIn state.
+A conversation is eligible only when:
 
-A verified contract still does not authorize runner scheduling, AI classification, or outbound replies; those require their own checkpoints and gates in `docs/SDR_AGENT_PLAN.md`.
+1. Its participant resolves exactly and unambiguously to a target for the same `account_id`.
+2. That target/run has a `logs` entry beginning with `Message sent` or `InMail sent`.
+3. The fetched thread contains an outbound event from the current LinkedIn user at or after that campaign log (10-minute timestamp tolerance).
+4. The captured event is inbound from the matched participant and occurred after that outbound event.
+
+A list membership, visit, connection, accepted connection, target row, or display-name match is never sufficient. Names are not used for identity.
+
+## Controlled canary procedure
+
+Use only the authorized test pair already used for `RobertoOrSe Agencia`.
+
+1. Keep `LINKEDIN_CAMPAIGN_INBOX_SYNC_ENABLED=false`.
+2. Set only after authorization:
+
+```text
+LINKEDIN_INBOX_CONTRACT_VERIFIED=true
+LINKEDIN_INBOX_CONTRACT_VERSION=legacy-voyager-v1
+```
+
+3. Redeploy and call the manual endpoint once for the `Roberto OrSe` slot.
+4. Verify the response reports one or more campaign candidates and captures the known reply exactly once.
+5. Verify the existing Inbox shows the body under the correct slot and campaign.
+6. Verify a known personal conversation is absent from `linkedin_inbox_messages` and the Inbox.
+7. Call the endpoint again and verify `captured=0` with duplicates only.
+8. Inspect logs for counts only; no message body, cookie, CSRF token, full URN, or raw provider payload may appear.
+9. If the endpoint reports `contract_mismatch`, `auth_wall`, `api_error`, an unexpected personal capture, or the known reply is absent, disable the verified flag and keep the scheduler off.
+10. Only after these checks may `LINKEDIN_CAMPAIGN_INBOX_SYNC_ENABLED=true` be enabled for a one-slot canary.
+
+## Sanitized fixture requirement
+
+Before promoting from candidate canary to fully verified production operation, save a synthetic fixture under `fixtures/linkedin-inbox/` that preserves only types and reference relationships. Replace all names, URLs, URNs, thread/message IDs, timestamps, and bodies; remove cookies, CSRF values, request signatures, browser storage and account emails.
+
+## Failure behavior
+
+- `401/403`, login/authwall/checkpoint: mark account for reauthentication; no sync marker advance.
+- `429` or non-2xx: `api_error`; no sync marker advance.
+- Unknown/malformed shape: `contract_mismatch`; no capture/marker advance.
+- Ambiguous, wrong-slot, personal or unmatched participant: skip before body persistence.
+- Duplicate external message: no-op.
+- Scheduler kill switch off: no network source is invoked by the runner.
+
+## External references
+
+The candidate contract was cross-checked against public technical references, but those references do not replace the controlled canary:
+
+- https://github.com/vicnaum/linkedin-toolkit/blob/main/references/endpoints.md
+- https://github.com/mguttmann/linkedin-internal-api/blob/main/docs/ENDPOINTS.md
+- https://github.com/Desearch-ai/linkedin-dms/issues/4

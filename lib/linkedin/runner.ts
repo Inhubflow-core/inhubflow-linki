@@ -5,6 +5,7 @@ import { visitProfile } from "@/lib/linkedin/visit";
 import { sendConnectionRequest, WeeklyLimitError, AlreadyConnectedError, PendingInviteError } from "@/lib/linkedin/connect";
 import { sendMessage, NotConnectedError } from "@/lib/linkedin/message";
 import { shouldSyncAccepted, syncAcceptedConnectionsDetailed, type AcceptedSyncResult } from "@/lib/linkedin/sync-accepted";
+import { campaignInboxSchedulerEnabled, listCampaignInboxAccountIds, shouldSyncLinkedInCampaignInbox, syncLinkedInCampaignInbox } from "@/lib/linkedin/campaign-inbox";
 import { sendEmail } from "@/lib/email/sender";
 import { shouldSyncEmailInbox, syncEmailInbox } from "@/lib/email/inbox";
 import { enrichProfile } from "@/lib/linkedin/enrich";
@@ -1075,7 +1076,27 @@ async function globalLoop(): Promise<void> {
   }
 }
 
+async function syncCampaignInboxAccounts(db: ReturnType<typeof getDb>, accountIds: readonly string[]): Promise<void> {
+  if (!campaignInboxSchedulerEnabled()) return;
+  for (const accountId of accountIds) {
+    if (!shouldSyncLinkedInCampaignInbox(accountId, db)) continue;
+    try {
+      const result = await syncLinkedInCampaignInbox(accountId, { db });
+      if (result.reason && result.reason !== "disabled") {
+        console.warn(`[runner] Campaign LinkedIn inbox sync skipped for ${accountId} (${result.reason})`);
+      } else {
+        console.log(`[runner] Campaign LinkedIn inbox sync: ${result.captured} new, ${result.duplicates} duplicate(s), ${result.conversationsReviewed} conversation(s) reviewed`);
+      }
+    } catch (error) {
+      console.warn(`[runner] Campaign LinkedIn inbox sync error for ${accountId}:`, error instanceof Error ? error.message : error);
+    }
+  }
+}
+
 async function tick(db: ReturnType<typeof getDb>): Promise<void> {
+  const campaignAccountIds = campaignInboxSchedulerEnabled() ? listCampaignInboxAccountIds(db) : [];
+  await syncCampaignInboxAccounts(db, campaignAccountIds);
+
   const activeRuns = db.prepare(`
     SELECT r.id as run_id, r.workflow_id, r.account_id, r.email_account_id,
            a.daily_connection_limit, a.daily_message_limit, a.daily_inmail_limit,

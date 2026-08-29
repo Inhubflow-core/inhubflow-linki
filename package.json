@@ -12,6 +12,7 @@
     "test:sdr-foundation": "node scripts/test-sdr-foundation.cjs",
     "test:sdr-shadow": "node scripts/test-sdr-shadow.cjs",
     "test:linkedin-connection-sync": "node scripts/test-linkedin-connection-sync.cjs",
+    "test:linkedin-campaign-inbox": "node scripts/test-linkedin-campaign-inbox.cjs",
     "mirror:ee": "node scripts/mirror-ee.js"
   },
   "dependencies": {

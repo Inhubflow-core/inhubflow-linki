@@ -480,6 +480,32 @@ function runMigrations(db: Database.Database) {
     "ALTER TABLE lists ADD COLUMN purpose TEXT",
     // Manual/CSV-only field — no automation reads or writes this, reference data only.
     "ALTER TABLE targets ADD COLUMN phone TEXT",
+    // Campaign-attributed LinkedIn inbound projection. This is separate from the
+    // singleton legacy reply fields so multi-slot history remains auditable.
+    `CREATE TABLE IF NOT EXISTS linkedin_inbox_messages (
+      id TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      target_id TEXT NOT NULL REFERENCES targets(id) ON DELETE CASCADE,
+      run_id TEXT REFERENCES runs(id) ON DELETE SET NULL,
+      workflow_id TEXT REFERENCES workflows(id) ON DELETE SET NULL,
+      external_thread_id TEXT NOT NULL,
+      external_message_id TEXT NOT NULL,
+      direction TEXT NOT NULL DEFAULT 'inbound' CHECK(direction = 'inbound'),
+      sender_external_id TEXT,
+      sender_name TEXT,
+      body TEXT NOT NULL,
+      sent_at TEXT NOT NULL,
+      captured_at TEXT NOT NULL DEFAULT (datetime('now')),
+      identity_mode TEXT NOT NULL CHECK(identity_mode IN ('messaging_urn', 'profile_url', 'messaging_urn+profile_url')),
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      UNIQUE(account_id, external_thread_id, external_message_id)
+    )`,
+    "CREATE INDEX IF NOT EXISTS idx_linkedin_inbox_target_time ON linkedin_inbox_messages(target_id, sent_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_linkedin_inbox_account_time ON linkedin_inbox_messages(account_id, sent_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_linkedin_inbox_thread_time ON linkedin_inbox_messages(account_id, external_thread_id, sent_at ASC)",
+    "ALTER TABLE accounts ADD COLUMN linkedin_inbox_synced_at TEXT",
+    "ALTER TABLE accounts ADD COLUMN linkedin_inbox_sync_error TEXT",
+    "ALTER TABLE accounts ADD COLUMN linkedin_inbox_contract_version TEXT",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
@@ -659,7 +685,7 @@ function cleanExistingMessyTargetsMigration(db: Database.Database) {
     for (const t of dirtyTargets) {
       let raw = t.full_name;
       let title = t.title;
-      let location = t.location;
+      const location = t.location;
       let company = t.company;
 
       if (raw.includes("•")) {

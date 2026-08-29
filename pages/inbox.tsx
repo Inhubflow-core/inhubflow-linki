@@ -21,6 +21,17 @@ type Translate = (key: string, params?: TranslationParams) => string;
 
 type ChannelFilter = "all" | "email" | "linkedin";
 
+interface LinkedInThreadMessage {
+  externalThreadId: string;
+  externalMessageId: string;
+  direction: "inbound" | "outbound" | "system";
+  body: string;
+  sentAt: string;
+  senderExternalId: string | null;
+  senderName: string | null;
+  metadataJson: string;
+}
+
 interface LinkedInAccountOption {
   id: string;
   name: string;
@@ -141,7 +152,9 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
   const hasLinkedInReply = reply.channel === "linkedin" || reply.channel === "both";
   const canReplyByEmail = hasEmailReply && !!reply.email && !!reply.email_account_id;
   const [messages, setMessages] = useState<EmailMessage[]>([]);
+  const [linkedinMessages, setLinkedinMessages] = useState<LinkedInThreadMessage[]>([]);
   const [loadingThread, setLoadingThread] = useState(canReplyByEmail);
+  const [loadingLinkedInThread, setLoadingLinkedInThread] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [replySubject, setReplySubject] = useState("");
   const [sending, setSending] = useState(false);
@@ -220,8 +233,38 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
   }, [canReplyByEmail, reply.id, reply.email_account_id, reply.email, t]);
 
   useEffect(() => {
+    if (!hasLinkedInReply || !reply.linkedin_account_id || !reply.linkedin_thread_id) {
+      setLoadingLinkedInThread(false);
+      setLinkedinMessages([]);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingLinkedInThread(true);
+    const params = new URLSearchParams({
+      targetId: reply.id,
+      accountId: reply.linkedin_account_id,
+      threadId: reply.linkedin_thread_id,
+    });
+    fetch(`/api/inbox/linkedin-thread?${params}`)
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error ?? t("inbox.errors.loadLinkedInThread"));
+        return data as { messages?: LinkedInThreadMessage[] };
+      })
+      .then((data) => {
+        if (!cancelled) setLinkedinMessages(data.messages ?? []);
+      })
+      .catch((error) => {
+        if (!cancelled) toast.error(error instanceof Error ? error.message : t("inbox.errors.loadLinkedInThread"));
+      })
+      .finally(() => { if (!cancelled) setLoadingLinkedInThread(false); });
+
+    return () => { cancelled = true; };
+  }, [hasLinkedInReply, reply.id, reply.linkedin_account_id, reply.linkedin_thread_id, t]);
+  useEffect(() => {
     threadEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, linkedinMessages]);
 
   async function handleSend() {
     if (!replyText.trim() || !reply.email || !reply.email_account_id) return;
@@ -344,8 +387,57 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
           </div>
         )}
 
+        <div className="flex-1 overflow-y-auto min-h-0">
+        {hasLinkedInReply && (
+          <div className="px-5 py-4 space-y-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-base-content/45">
+              {t("inbox.linkedinConversation")}
+            </div>
+            {loadingLinkedInThread ? (
+              <div className="flex items-center justify-center gap-2 text-base-content/30 py-8">
+                <RiLoader4Line size={18} className="animate-spin" />
+                <span className="text-sm">{t("inbox.linkedinConversationLoading")}</span>
+              </div>
+            ) : linkedinMessages.length === 0 ? (
+              reply.linkedin_reply_body ? (
+                <div className="rounded-lg p-3.5 bg-base-200 border border-base-300/40">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-base-content/60">{reply.full_name ?? t("inbox.unknown")}</span>
+                    {reply.linkedin_reply_received_at && (
+                      <span className="text-xs text-base-content/30">{formatDate(reply.linkedin_reply_received_at, locale)}</span>
+                    )}
+                  </div>
+                  <p className="text-sm text-base-content whitespace-pre-wrap leading-relaxed">{reply.linkedin_reply_body}</p>
+                </div>
+              ) : (
+                <p className="text-center text-base-content/30 text-sm py-8">{t("inbox.linkedinNotCaptured")}</p>
+              )
+            ) : (
+              linkedinMessages.map((message) => {
+                const isInbound = message.direction === "inbound";
+                return (
+                  <div
+                    key={`${message.externalThreadId}-${message.externalMessageId}`}
+                    className={`rounded-lg p-3.5 ${
+                      isInbound ? "bg-base-200 border border-base-300/40" : "bg-primary/8 border border-primary/20"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2 gap-2">
+                      <span className="text-xs font-medium text-base-content/60">
+                        {isInbound ? (message.senderName ?? reply.full_name ?? t("inbox.unknown")) : t("inbox.linkedinOutbound")}
+                      </span>
+                      <span className="text-xs text-base-content/30 whitespace-nowrap">{formatDate(message.sentAt, locale)}</span>
+                    </div>
+                    <p className="text-sm text-base-content whitespace-pre-wrap leading-relaxed">{message.body}</p>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
         {hasEmailReply && (
-          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
+          <div className="px-5 py-4 space-y-4 border-t border-base-300/40">
             {loadingThread ? (
               <div className="flex items-center justify-center gap-2 text-base-content/30 py-10">
                 <RiLoader4Line size={18} className="animate-spin" />
@@ -381,6 +473,7 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
             <div ref={threadEndRef} />
           </div>
         )}
+        </div>
 
         {canReplyByEmail && (
           <div className="border-t border-base-300/50 px-5 py-4 space-y-2.5">
