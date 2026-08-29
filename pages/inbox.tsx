@@ -9,6 +9,7 @@ import {
   RiLinkedinBoxLine,
   RiLoader4Line,
   RiMailLine,
+  RiPulseLine,
   RiSearchLine,
   RiSendPlaneLine,
 } from "react-icons/ri";
@@ -645,6 +646,34 @@ export default function InboxPage() {
     }
   }
 
+  const [diagnosing, setDiagnosing] = useState(false);
+  const [diagnosticReport, setDiagnosticReport] = useState<any | null>(null);
+
+  async function handleDiagnose() {
+    const authAccounts = accounts.filter((a) => a.is_authenticated === 1);
+    if (authAccounts.length === 0) {
+      toast.error("No hay cuentas de LinkedIn autenticadas para diagnosticar.");
+      return;
+    }
+
+    setDiagnosing(true);
+    try {
+      const targetAcc = authAccounts[0];
+      const res = await fetch(`/api/accounts/${targetAcc.id}/diagnose-inbox-live`);
+      const data = await res.json();
+      setDiagnosticReport(data);
+      if (res.ok) {
+        toast.success("Diagnóstico en vivo completado con éxito.");
+      } else {
+        toast.error(data.error || "Error en diagnóstico");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Error al ejecutar diagnóstico");
+    } finally {
+      setDiagnosing(false);
+    }
+  }
+
   const filtered = replies.filter((reply) => {
     if (verdict !== "all" && verdictKey(reply) !== verdict) return false;
     if (!search) return true;
@@ -668,6 +697,103 @@ export default function InboxPage() {
         <meta name="robots" content="noindex, nofollow" />
       </Head>
 
+      {diagnosticReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-base-100 border border-base-300 rounded-xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-base-300">
+              <div className="flex items-center gap-2">
+                <RiPulseLine className="text-warning text-lg" />
+                <h3 className="font-semibold text-base">Diagnóstico en Vivo de Bandeja LinkedIn</h3>
+              </div>
+              <button
+                onClick={() => setDiagnosticReport(null)}
+                className="p-1 rounded-lg hover:bg-base-200 text-base-content/50 hover:text-base-content"
+              >
+                <RiCloseLine size={20} />
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto space-y-4 text-sm">
+              <div className="grid grid-cols-2 gap-3 bg-base-200/50 p-3.5 rounded-lg border border-base-300/40 text-xs">
+                <div>
+                  <span className="text-base-content/50">Cuenta:</span>{" "}
+                  <span className="font-semibold">{diagnosticReport.account?.name} ({diagnosticReport.account?.email})</span>
+                </div>
+                <div>
+                  <span className="text-base-content/50">Estado Autenticación:</span>{" "}
+                  <span className="font-semibold text-success">{diagnosticReport.account?.is_authenticated ? "Conectado" : "Desconectado"}</span>
+                </div>
+                <div>
+                  <span className="text-base-content/50">URL Actual Navegador:</span>{" "}
+                  <span className="font-mono">{diagnosticReport.browser?.currentUrl || "N/A"}</span>
+                </div>
+                <div>
+                  <span className="text-base-content/50">Muro de Login/AuthWall:</span>{" "}
+                  <span className={diagnosticReport.browser?.isAuthWall ? "text-error font-bold" : "text-success font-semibold"}>
+                    {diagnosticReport.browser?.isAuthWall ? "SÍ (Requiere Re-login)" : "NO (Sesión Válida)"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-base-content/50">Chats Detectados en DOM:</span>{" "}
+                  <span className="font-bold text-primary">{diagnosticReport.browser?.dom?.conversationsFoundInDom ?? 0}</span>
+                </div>
+                <div>
+                  <span className="text-base-content/50">Prospectos Enrolados en DB:</span>{" "}
+                  <span className="font-semibold">{diagnosticReport.database?.campaignTargetCount ?? 0}</span>
+                </div>
+              </div>
+
+              {diagnosticReport.browser?.screenshot && (
+                <div className="space-y-1.5">
+                  <span className="text-xs font-semibold text-base-content/70">Captura de Pantalla Real de LinkedIn:</span>
+                  <div className="rounded-lg overflow-hidden border border-base-300 bg-black/40">
+                    <img
+                      src={diagnosticReport.browser.screenshot}
+                      alt="LinkedIn Live Screen"
+                      className="w-full h-auto max-h-80 object-contain mx-auto"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {diagnosticReport.browser?.dom?.conversations?.length > 0 && (
+                <div className="space-y-1.5">
+                  <span className="text-xs font-semibold text-base-content/70">Conversaciones Visibles en el Chat:</span>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {diagnosticReport.browser.dom.conversations.map((c: any, i: number) => (
+                      <div key={i} className="p-2.5 bg-base-200/60 rounded-lg text-xs border border-base-300/30 flex justify-between items-center">
+                        <div>
+                          <span className="font-semibold text-base-content">{c.name || "Sin nombre"}</span>
+                          <span className="text-base-content/50 ml-2">({c.profileUrl || "Sin enlace"})</span>
+                          <p className="text-base-content/70 mt-0.5">{c.lastMessage || "Sin snippet"}</p>
+                        </div>
+                        <span className="text-base-content/40 shrink-0">{c.timeText}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <span className="text-xs font-semibold text-base-content/70">Reporte JSON Completo:</span>
+                <pre className="p-3 bg-base-300/40 rounded-lg text-xs font-mono overflow-x-auto max-h-40">
+                  {JSON.stringify(diagnosticReport, null, 2)}
+                </pre>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-base-300 flex justify-end">
+              <button
+                onClick={() => setDiagnosticReport(null)}
+                className="px-4 py-1.5 rounded-lg bg-base-200 hover:bg-base-300 text-xs font-semibold"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {selectedReply && (
         <ReplyModal
           reply={selectedReply}
@@ -690,6 +816,15 @@ export default function InboxPage() {
           <p className="text-base-content/40 text-sm mt-0.5">{t("inbox.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleDiagnose}
+            disabled={diagnosing}
+            title="Diagnosticar sesión y ver captura real de LinkedIn"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-warning/10 border border-warning/30 text-warning hover:bg-warning/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
+          >
+            {diagnosing ? <RiLoader4Line size={13} className="animate-spin" /> : <RiPulseLine size={14} />}
+            {diagnosing ? "Diagnosticando..." : "🔍 Diagnóstico en Vivo"}
+          </button>
           <button
             onClick={handleSyncLinkedIn}
             disabled={syncingLinkedIn}
