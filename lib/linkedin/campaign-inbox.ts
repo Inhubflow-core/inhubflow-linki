@@ -70,11 +70,21 @@ export function campaignInboxContractVersion(): string | null {
 
 export function listCampaignInboxAccountIds(db: Database.Database = getDb()): string[] {
   const rows = db.prepare(`
-    SELECT DISTINCT a.id AS account_id
-    FROM accounts a
-    JOIN runs r ON r.account_id = a.id
+    SELECT DISTINCT r.account_id AS account_id
+    FROM logs l
+    JOIN runs r ON r.id = l.run_id
+    JOIN accounts a ON a.id = r.account_id
     WHERE a.is_authenticated = 1
-    ORDER BY a.id
+      AND (l.message LIKE 'Message sent%' OR l.message LIKE 'InMail sent%')
+    UNION
+    SELECT DISTINCT r.account_id AS account_id
+    FROM targets t
+    JOIN run_profiles rp ON rp.target_id = t.id
+    JOIN runs r ON r.id = rp.run_id
+    JOIN accounts a ON a.id = r.account_id
+    WHERE a.is_authenticated = 1
+      AND t.message_sent_at IS NOT NULL
+    ORDER BY account_id
   `).all() as Array<{ account_id: string }>;
   return rows.map((row) => row.account_id);
 }
@@ -94,7 +104,6 @@ export function loadCampaignTargetScopes(
       COALESCE(
         MAX(CASE WHEN l.message LIKE 'Message sent%' OR l.message LIKE 'InMail sent%' THEN l.created_at END),
         t.message_sent_at,
-        t.connection_requested_at,
         rp.created_at
       ) AS outboundAt
     FROM run_profiles rp
@@ -104,10 +113,8 @@ export function loadCampaignTargetScopes(
     WHERE r.account_id = ?
       AND (
         t.message_sent_at IS NOT NULL
-        OR t.connection_requested_at IS NOT NULL
         OR l.message LIKE 'Message sent%'
         OR l.message LIKE 'InMail sent%'
-        OR l.message LIKE 'Connection request sent%'
       )
     GROUP BY t.id, r.account_id, r.id, r.workflow_id
     ORDER BY outboundAt DESC
@@ -224,14 +231,11 @@ export function captureCampaignInboxObservations(
   for (const observation of observations) {
     const key = observationKey(observation);
     const receivedAtMs = typeof observation.receivedAt === "string" ? parseTimestamp(observation.receivedAt) : NaN;
-    const outboundAtMs = typeof observation.campaignOutboundObservedAt === "string" ? parseTimestamp(observation.campaignOutboundObservedAt) : NaN;
     if (
       observation.direction !== "inbound"
       || typeof observation.body !== "string"
       || !observation.body.trim()
       || !Number.isFinite(receivedAtMs)
-      || !Number.isFinite(outboundAtMs)
-      || receivedAtMs <= outboundAtMs
       || observation.body.length > 100_000
       || !observation.externalThreadId
       || !observation.externalMessageId
@@ -243,17 +247,6 @@ export function captureCampaignInboxObservations(
     const match = findScope(observation, scopes);
     if ("reason" in match) {
       result.skipped.push({ ...key, reason: match.reason });
-      continue;
-    }
-    if (
-      observation.campaignRunId
-      && observation.campaignRunId !== match.scope.runId
-    ) {
-      result.skipped.push({ ...key, reason: "not_campaign_message" });
-      continue;
-    }
-    if (outboundAtMs < parseTimestamp(match.scope.outboundAt) - 5 * 60 * 1000) {
-      result.skipped.push({ ...key, reason: "not_campaign_message" });
       continue;
     }
 

@@ -43,6 +43,7 @@ function createDb() {
     CREATE TABLE accounts (id TEXT PRIMARY KEY, name TEXT, email TEXT, is_authenticated INTEGER DEFAULT 1,
       linkedin_inbox_synced_at TEXT, linkedin_inbox_sync_error TEXT, linkedin_inbox_contract_version TEXT);
     CREATE TABLE targets (id TEXT PRIMARY KEY, full_name TEXT, linkedin_url TEXT, messaging_urn TEXT,
+      connection_requested_at TEXT, message_sent_at TEXT,
       last_replied_at TEXT, last_replied_account_id TEXT REFERENCES accounts(id));
     CREATE TABLE workflows (id TEXT PRIMARY KEY, name TEXT);
     CREATE TABLE runs (id TEXT PRIMARY KEY, account_id TEXT REFERENCES accounts(id), workflow_id TEXT REFERENCES workflows(id), status TEXT);

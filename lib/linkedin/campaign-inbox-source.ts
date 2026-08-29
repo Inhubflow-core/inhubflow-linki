@@ -372,14 +372,12 @@ export class CampaignLinkedInMessagingSource {
     const observations: CampaignInboxObservation[] = [];
     for (const candidate of candidates) {
       const messages = await this.loadConversationMessages(page, candidate, currentUrns);
-      const campaignOutbound = messages
-        .filter((message) => message.isFromCurrentUser)
-        .filter((message) => Date.parse(message.sentAt) >= Date.parse(candidate.scope.outboundAt) - CAMPAIGN_TIME_TOLERANCE_MS)
-        .sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt))[0];
-      if (!campaignOutbound) continue;
+      const outbounds = messages.filter((m) => m.isFromCurrentUser).sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt));
+      const firstOutbound = outbounds[0];
+      const outboundTimeStr = firstOutbound ? firstOutbound.sentAt : candidate.scope.outboundAt;
 
       for (const message of messages) {
-        if (message.isFromCurrentUser || Date.parse(message.sentAt) <= Date.parse(campaignOutbound.sentAt)) continue;
+        if (message.isFromCurrentUser) continue;
         observations.push({
           externalThreadId: candidate.threadId,
           externalMessageId: message.messageId,
@@ -392,7 +390,7 @@ export class CampaignLinkedInMessagingSource {
           senderProfileUrl: message.sender.profileUrl,
           providerEventId: message.messageId,
           rawKind: "message",
-          campaignOutboundObservedAt: campaignOutbound.sentAt,
+          campaignOutboundObservedAt: outboundTimeStr,
           campaignRunId: candidate.scope.runId,
           campaignWorkflowId: candidate.scope.workflowId,
         });
