@@ -286,6 +286,31 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
     threadEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, linkedinMessages]);
 
+  // Live polling for LinkedIn messages while chat modal is open
+  useEffect(() => {
+    if (!hasLinkedInReply && !reply.linkedin_url) return;
+
+    const interval = setInterval(() => {
+      const params = new URLSearchParams({ targetId: reply.id });
+      if (reply.linkedin_account_id) params.set("accountId", reply.linkedin_account_id);
+      fetch(`/api/inbox/linkedin-thread?${params}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.ok && Array.isArray(data.messages) && data.messages.length > 0) {
+            setLinkedinMessages((prev) => {
+              if (data.messages.length !== prev.length || JSON.stringify(data.messages) !== JSON.stringify(prev)) {
+                return data.messages;
+              }
+              return prev;
+            });
+          }
+        })
+        .catch(() => {});
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [hasLinkedInReply, reply.id, reply.linkedin_account_id, reply.linkedin_url]);
+
   const [suggesting, setSuggesting] = useState(false);
 
   async function handleSuggestReply() {
@@ -752,6 +777,26 @@ export default function InboxPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Silent live auto-refresh for inbox list every 15s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const params = new URLSearchParams();
+      if (channel !== "all") params.set("channel", channel);
+      if (accountId) params.set("accountId", accountId);
+
+      fetch(`/api/inbox?${params}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.replies && Array.isArray(data.replies)) {
+            setReplies(data.replies);
+          }
+        })
+        .catch(() => {});
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [accountId, channel]);
 
   async function handleBackfill() {
     setBackfilling(true);

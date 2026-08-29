@@ -324,7 +324,10 @@ export function shouldSyncLinkedInCampaignInbox(
     | { linkedin_inbox_synced_at: string | null }
     | undefined;
   if (!row?.linkedin_inbox_synced_at) return true;
-  return Date.now() - parseTimestamp(row.linkedin_inbox_synced_at) >= 15 * 60 * 1000;
+  const intervalMs = process.env.LINKEDIN_INBOX_SYNC_INTERVAL_MS
+    ? parseInt(process.env.LINKEDIN_INBOX_SYNC_INTERVAL_MS, 10)
+    : 60 * 1000;
+  return Date.now() - parseTimestamp(row.linkedin_inbox_synced_at) >= intervalMs;
 }
 
 export async function syncLinkedInCampaignInbox(
