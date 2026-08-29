@@ -4,8 +4,10 @@ import { getDb } from "@/lib/db";
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const targetId = Array.isArray(req.query.id) ? req.query.id[0] : req.query.id;
-  if (!targetId) return res.status(400).json({ error: "Missing target id" });
+  const targetId = req.body?.targetId || req.query.targetId;
+  if (!targetId || typeof targetId !== "string") {
+    return res.status(400).json({ error: "Missing targetId" });
+  }
 
   const db = getDb();
   const current = db.prepare("SELECT id, sdr_autopilot, full_name FROM targets WHERE id = ?").get(targetId) as

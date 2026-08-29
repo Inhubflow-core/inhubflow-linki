@@ -377,10 +377,10 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
     setTogglingAutopilot(true);
     try {
       const next = !autopilot;
-      const res = await fetch(`/api/inbox/${reply.id}/toggle-autopilot`, {
+      const res = await fetch("/api/inbox/toggle-autopilot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: next }),
+        body: JSON.stringify({ targetId: reply.id, enabled: next }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al cambiar piloto automático");
