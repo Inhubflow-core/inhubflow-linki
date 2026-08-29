@@ -3,8 +3,14 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
+  RiAttachment2,
   RiCloseLine,
+  RiDeleteBinLine,
+  RiEmotionLine,
   RiExternalLinkLine,
+  RiFilePdfLine,
+  RiFileTextLine,
+  RiImageLine,
   RiInboxLine,
   RiLinkedinBoxLine,
   RiLoader4Line,
@@ -14,6 +20,7 @@ import {
   RiSearchLine,
   RiSendPlaneLine,
   RiSparklingLine,
+  RiVideoLine,
 } from "react-icons/ri";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import type { Locale, TranslationParams } from "@/lib/i18n/types";
@@ -142,6 +149,18 @@ function OriginBadges({ reply, t }: { reply: InboxReply; t: Translate }) {
   );
 }
 
+interface ChatAttachment {
+  name: string;
+  type: string;
+  size: number;
+  dataUrl: string;
+}
+
+const EMOJI_CATEGORIES = [
+  { label: "Populares B2B", emojis: ["👍", "🤝", "🚀", "💼", "📈", "🎯", "✅", "💡", "🔥", "⭐"] },
+  { label: "Expresiones", emojis: ["😀", "😊", "😉", "🤗", "🤩", "😎", "🥳", "🤔", "💬", "🙏"] },
+  { label: "Oficina & Tech", emojis: ["💻", "📱", "📊", "📅", "📍", "✉️", "🔗", "🏆", "📂", "🔍"] },
+];
 interface ReplyModalProps {
   reply: InboxReply;
   onClose: () => void;
@@ -160,9 +179,37 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
   const [loadingLinkedInThread, setLoadingLinkedInThread] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [replySubject, setReplySubject] = useState("");
+  const [attachment, setAttachment] = useState<ChatAttachment | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [sending, setSending] = useState(false);
   const [acting, setActing] = useState<"reclassify" | "cancel" | null>(null);
   const threadEndRef = useRef<HTMLDivElement>(null);
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("El archivo supera el límite de 20 MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAttachment({
+        name: file.name,
+        type: file.type || "application/octet-stream",
+        size: file.size,
+        dataUrl: reader.result as string,
+      });
+      toast.success(`Archivo adjunto: ${file.name}`);
+    };
+    reader.readAsDataURL(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function handleInsertEmoji(emoji: string) {
+    setReplyText((prev) => prev + emoji);
+  }
 
   const verdict = verdictBadge(reply, t);
   const dispatch = (() => {
@@ -344,7 +391,7 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
   }
 
   async function handleSendLinkedIn() {
-    if (!replyText.trim()) return;
+    if (!replyText.trim() && !attachment) return;
     const accountId = reply.linkedin_account_id;
     if (!accountId) {
       toast.error("No se encontró la cuenta de LinkedIn asociada.");
@@ -360,6 +407,13 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
           accountId,
           messageText: replyText,
           threadId: reply.linkedin_thread_id,
+          attachment: attachment
+            ? {
+                name: attachment.name,
+                type: attachment.type,
+                dataUrl: attachment.dataUrl,
+              }
+            : null,
         }),
       });
       const data = await response.json();
@@ -372,8 +426,8 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
         direction: "outbound",
         senderName: reply.linkedin_account_name || "Me",
         senderExternalId: null,
-        metadataJson: "{}",
-        body: replyText.trim(),
+        metadataJson: JSON.stringify(data.metadata || {}),
+        body: data.body || replyText.trim() || (attachment ? `📎 [Archivo: ${attachment.name}]` : ""),
         sentAt: data.sentAt || new Date().toISOString(),
       };
       setLinkedinMessages((prev) => {
@@ -393,6 +447,8 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
         return [...prev, newMsg];
       });
       setReplyText("");
+      setAttachment(null);
+      setShowEmojiPicker(false);
       onActionDone();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al enviar mensaje a LinkedIn");
@@ -670,6 +726,33 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
                 className="w-full bg-base-200 border border-base-300/50 rounded-lg px-3 py-1.5 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:border-primary/40"
               />
             )}
+            {attachment && (
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-base-200 border border-primary/30 text-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  {attachment.type.startsWith("image/") ? (
+                    <RiImageLine size={18} className="text-primary shrink-0" />
+                  ) : attachment.type.startsWith("video/") ? (
+                    <RiVideoLine size={18} className="text-info shrink-0" />
+                  ) : attachment.type.includes("pdf") ? (
+                    <RiFilePdfLine size={18} className="text-error shrink-0" />
+                  ) : (
+                    <RiFileTextLine size={18} className="text-base-content/60 shrink-0" />
+                  )}
+                  <span className="font-medium truncate text-base-content">{attachment.name}</span>
+                  <span className="text-base-content/40 shrink-0">
+                    ({(attachment.size / 1024).toFixed(0)} KB)
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAttachment(null)}
+                  className="text-error/70 hover:text-error p-1 transition-colors"
+                  title="Quitar archivo adjunto"
+                >
+                  <RiDeleteBinLine size={14} />
+                </button>
+              </div>
+            )}
             <textarea
               value={replyText}
               onChange={(event) => setReplyText(event.target.value)}
@@ -678,22 +761,84 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
               className="w-full bg-base-200 border border-base-300/50 rounded-lg px-3 py-2 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:border-primary/40 resize-none"
             />
             <div className="flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={handleSuggestReply}
-                disabled={suggesting || sending}
-                title="Generar respuesta inteligente contextual con el Agente SDR IA"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-warning/10 border border-warning/30 text-warning hover:bg-warning/20 disabled:opacity-40 transition-all shadow-sm"
-              >
-                {suggesting ? <RiLoader4Line size={13} className="animate-spin" /> : <RiSparklingLine size={14} />}
-                {suggesting ? "Pensando respuesta..." : "✨ Sugerir con SDR IA"}
-              </button>
+              <div className="flex items-center gap-1.5 relative">
+                <button
+                  type="button"
+                  onClick={handleSuggestReply}
+                  disabled={suggesting || sending}
+                  title="Generar respuesta inteligente contextual con el Agente SDR IA"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-warning/10 border border-warning/30 text-warning hover:bg-warning/20 disabled:opacity-40 transition-all shadow-sm"
+                >
+                  {suggesting ? <RiLoader4Line size={13} className="animate-spin" /> : <RiSparklingLine size={14} />}
+                  {suggesting ? "Pensando..." : "✨ Sugerir"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowEmojiPicker((prev) => !prev)}
+                  title="Insertar emojis y emoticonos"
+                  className={`p-1.5 rounded-lg text-base-content/60 hover:text-base-content hover:bg-base-200 border transition-all ${
+                    showEmojiPicker ? "bg-base-200 border-primary/40 text-primary" : "border-transparent"
+                  }`}
+                >
+                  <RiEmotionLine size={18} />
+                </button>
+
+                {hasLinkedInReply && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      title="Adjuntar Documento (PDF/Word), Imagen o Video"
+                      className="p-1.5 rounded-lg text-base-content/60 hover:text-base-content hover:bg-base-200 border border-transparent transition-all"
+                    >
+                      <RiAttachment2 size={18} />
+                    </button>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileSelect}
+                      accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+                      className="hidden"
+                    />
+                  </>
+                )}
+
+                {showEmojiPicker && (
+                  <div className="absolute bottom-full left-0 mb-2 p-3 bg-base-100 border border-base-300 rounded-xl shadow-2xl z-50 w-72 space-y-2.5 backdrop-blur-md">
+                    <div className="flex items-center justify-between text-xs font-semibold text-base-content/60 border-b border-base-300 pb-1.5">
+                      <span>Emoticonos</span>
+                      <button onClick={() => setShowEmojiPicker(false)} className="hover:text-base-content">✕</button>
+                    </div>
+                    {EMOJI_CATEGORIES.map((cat) => (
+                      <div key={cat.label} className="space-y-1">
+                        <div className="text-[10px] uppercase tracking-wider text-base-content/40 font-semibold">{cat.label}</div>
+                        <div className="grid grid-cols-5 gap-1">
+                          {cat.emojis.map((emoji) => (
+                            <button
+                              key={emoji}
+                              type="button"
+                              onClick={() => {
+                                handleInsertEmoji(emoji);
+                                setShowEmojiPicker(false);
+                              }}
+                              className="text-lg p-1.5 rounded hover:bg-base-200 transition-transform active:scale-125 text-center"
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <div className="flex items-center gap-2">
                 {hasLinkedInReply && (
                   <button
                     onClick={handleSendLinkedIn}
-                    disabled={!replyText.trim() || sending}
+                    disabled={(!replyText.trim() && !attachment) || sending}
                     className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold bg-primary text-primary-content hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
                   >
                     {sending ? <RiLoader4Line size={13} className="animate-spin" /> : <RiLinkedinBoxLine size={14} />}
