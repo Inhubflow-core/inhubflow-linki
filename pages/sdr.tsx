@@ -471,7 +471,7 @@ export default function SdrPage() {
                 >
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
-                      RECOMENDADO PARA INICIAR
+                      RECOMENDADO
                     </span>
                     {mode === "shadow" && <RiCheckLine className="text-amber-400" size={18} />}
                   </div>
