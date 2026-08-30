@@ -271,7 +271,7 @@ export default function Sidebar({
         <button
           type="button"
           onClick={() => onCollapse?.(!isCollapsed)}
-          title={isCollapsed ? "Expandir menú lateral" : "Colapsar menú lateral"}
+          title={isCollapsed ? t("nav.expandMenu") : t("nav.collapseMenu")}
           className={`flex items-center gap-3 w-full rounded-xl px-3 py-1.5 text-sm font-normal text-gray-500 hover:bg-gray-100/80 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white transition-colors ${
             isCollapsed ? "justify-center px-0" : ""
           }`}
@@ -279,7 +279,7 @@ export default function Sidebar({
           <div className="flex h-6.5 w-6.5 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400">
             {isCollapsed ? <RiMenuUnfoldLine size={17} /> : <RiMenuFoldLine size={17} />}
           </div>
-          {!isCollapsed && <span className="text-xs font-medium truncate">Colapsar menú</span>}
+          {!isCollapsed && <span className="text-xs font-medium truncate">{t("nav.collapseMenu")}</span>}
         </button>
       </div>
     </aside>

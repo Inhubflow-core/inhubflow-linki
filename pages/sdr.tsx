@@ -272,20 +272,20 @@ export default function SdrPage() {
   const getModeBadge = (m: string) => {
     switch (m) {
       case "auto":
-        return { label: "Modo Autónomo (Auto)", color: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" };
+        return { label: t("sdr.badgeAuto"), color: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" };
       case "approval":
-        return { label: "Modo Copiloto (Aprobación)", color: "bg-blue-500/15 text-blue-400 border-blue-500/30" };
+        return { label: t("sdr.badgeApproval"), color: "bg-blue-500/15 text-blue-400 border-blue-500/30" };
       case "shadow":
-        return { label: "Modo Sombra (Shadow)", color: "bg-amber-500/15 text-amber-400 border-amber-500/30" };
+        return { label: t("sdr.badgeShadow"), color: "bg-amber-500/15 text-amber-400 border-amber-500/30" };
       default:
-        return { label: "Desactivado (Off)", color: "bg-slate-500/15 text-slate-400 border-slate-500/30" };
+        return { label: t("sdr.badgeOff"), color: "bg-slate-500/15 text-slate-400 border-slate-500/30" };
     }
   };
 
   return (
     <>
       <Head>
-        <title>Agente SDR IA — Linki InHubFlow</title>
+        <title>{t("sdr.title")} — Linki InHubFlow</title>
       </Head>
 
       <div className="space-y-6 pb-12">
@@ -399,28 +399,28 @@ export default function SdrPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="p-5 rounded-2xl bg-base-200/60 border border-base-300/60 shadow-sm">
                 <div className="text-xs font-medium text-base-content/50 mb-1 flex items-center gap-1.5">
-                  <RiChatCheckLine className="text-violet-400" /> Decisiones IA Totales
+                  <RiChatCheckLine className="text-violet-400" /> {t("sdr.totalDecisions")}
                 </div>
                 <div className="text-2xl font-bold text-base-content">{data?.stats.totalDecisions ?? 0}</div>
               </div>
 
               <div className="p-5 rounded-2xl bg-base-200/60 border border-base-300/60 shadow-sm">
                 <div className="text-xs font-medium text-base-content/50 mb-1 flex items-center gap-1.5">
-                  <RiAlertLine className="text-amber-400" /> Handoffs a Humano
+                  <RiAlertLine className="text-amber-400" /> {t("sdr.totalHandoffs")}
                 </div>
                 <div className="text-2xl font-bold text-amber-400">{data?.stats.totalHandoffs ?? 0}</div>
               </div>
 
               <div className="p-5 rounded-2xl bg-base-200/60 border border-base-300/60 shadow-sm">
                 <div className="text-xs font-medium text-base-content/50 mb-1 flex items-center gap-1.5">
-                  <RiRobotLine className="text-emerald-400" /> Hilos con IA Activa
+                  <RiRobotLine className="text-emerald-400" /> {t("sdr.activeThreads")}
                 </div>
                 <div className="text-2xl font-bold text-emerald-400">{data?.stats.activeThreads ?? 0}</div>
               </div>
 
               <div className="p-5 rounded-2xl bg-base-200/60 border border-base-300/60 shadow-sm">
                 <div className="text-xs font-medium text-base-content/50 mb-1 flex items-center gap-1.5">
-                  <RiShieldCheckLine className="text-blue-400" /> Nivel de Confianza
+                  <RiShieldCheckLine className="text-blue-400" /> {t("sdr.confidenceLevel")}
                 </div>
                 <div className="text-2xl font-bold text-base-content">{(confidenceThreshold * 100).toFixed(0)}%</div>
               </div>
@@ -429,9 +429,9 @@ export default function SdrPage() {
             {/* Mode Selection Cards */}
             <div className="space-y-4">
               <div>
-                <h2 className="text-lg font-semibold text-base-content">Modo de Operación del SDR</h2>
+                <h2 className="text-lg font-semibold text-base-content">{t("sdr.operatingModeTitle")}</h2>
                 <p className="text-sm text-base-content/50">
-                  Selecciona cómo debe actuar la IA cuando reciba un mensaje en la bandeja de entrada o LinkedIn.
+                  {t("sdr.operatingModeSubtitle")}
                 </p>
               </div>
 
@@ -447,13 +447,13 @@ export default function SdrPage() {
                 >
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-500/20 text-slate-400">
-                      OFF
+                      {t("sdr.badgeOffLabel")}
                     </span>
                     {mode === "off" && <RiCheckLine className="text-slate-400" size={18} />}
                   </div>
-                  <h3 className="font-semibold text-base-content text-base mb-1">Desactivado</h3>
+                  <h3 className="font-semibold text-base-content text-base mb-1">{t("sdr.modeOff")}</h3>
                   <p className="text-xs text-base-content/60 leading-relaxed">
-                    El módulo no realiza análisis, ni clasificaciones, ni propuestas de respuesta.
+                    {t("sdr.modeOffDesc")}
                   </p>
                 </div>
 
@@ -468,13 +468,13 @@ export default function SdrPage() {
                 >
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
-                      RECOMENDADO
+                      {t("sdr.badgeRecommended")}
                     </span>
                     {mode === "shadow" && <RiCheckLine className="text-amber-400" size={18} />}
                   </div>
-                  <h3 className="font-semibold text-base-content text-base mb-1">Modo Sombra (Shadow)</h3>
+                  <h3 className="font-semibold text-base-content text-base mb-1">{t("sdr.modeShadow")}</h3>
                   <p className="text-xs text-base-content/60 leading-relaxed">
-                    La IA analiza y genera borradores en segundo plano para auditoría, pero garantiza 0 envíos salientes.
+                    {t("sdr.modeShadowDesc")}
                   </p>
                 </div>
 
@@ -489,13 +489,13 @@ export default function SdrPage() {
                 >
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400">
-                      COPILOTO
+                      {t("sdr.badgeCopilot")}
                     </span>
                     {mode === "approval" && <RiCheckLine className="text-blue-400" size={18} />}
                   </div>
-                  <h3 className="font-semibold text-base-content text-base mb-1">Modo Aprobación</h3>
+                  <h3 className="font-semibold text-base-content text-base mb-1">{t("sdr.modeApproval")}</h3>
                   <p className="text-xs text-base-content/60 leading-relaxed">
-                    La IA prepara la respuesta sugerida en tu Inbox para que la apruebes o edites con un solo clic.
+                    {t("sdr.modeApprovalDesc")}
                   </p>
                 </div>
 
@@ -510,13 +510,13 @@ export default function SdrPage() {
                 >
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">
-                      AUTÓNOMO
+                      {t("sdr.badgeAutonomous")}
                     </span>
                     {mode === "auto" && <RiCheckLine className="text-emerald-400" size={18} />}
                   </div>
-                  <h3 className="font-semibold text-base-content text-base mb-1">Modo Automático</h3>
+                  <h3 className="font-semibold text-base-content text-base mb-1">{t("sdr.modeAuto")}</h3>
                   <p className="text-xs text-base-content/60 leading-relaxed">
-                    La IA responde de inmediato a mensajes de alta confianza, con hard-stops estrictos ante objeciones complejas.
+                    {t("sdr.modeAutoDesc")}
                   </p>
                 </div>
               </div>
@@ -525,30 +525,30 @@ export default function SdrPage() {
             {/* Core Settings */}
             <div className="p-6 rounded-2xl bg-base-200/60 border border-base-300/60 space-y-6">
               <h3 className="font-semibold text-base-content text-base flex items-center gap-2">
-                <RiSettings4Line className="text-violet-400" /> Parámetros del Motor de IA
+                <RiSettings4Line className="text-violet-400" /> {t("sdr.engineParameters")}
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <label className="block text-xs font-semibold text-base-content/70 uppercase tracking-wider mb-2">
-                    Modelo de Inteligencia Artificial
+                    {t("sdr.aiModel")}
                   </label>
                   <select
                     value={model}
                     onChange={(e) => setModel(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl bg-base-100 border border-base-300/80 text-sm font-medium text-base-content focus:outline-none focus:border-violet-500"
                   >
-                    <option value="gemini-3.6-flash">Google Gemini 3.6 Flash (Recomendado - Ultrarrápido)</option>
+                    <option value="gemini-3.6-flash">{t("sdr.aiModelRecommended")}</option>
                     <option value="gemini-3.7-flash">Google Gemini 3.7 Flash</option>
                   </select>
                   <p className="text-xs text-base-content/40 mt-1.5">
-                    Utiliza la API de Gemini configurada en .env.local con salida JSON estructurada.
+                    {t("sdr.aiModelDesc")}
                   </p>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-base-content/70 uppercase tracking-wider mb-2">
-                    Umbral Mínimo de Confianza: {(confidenceThreshold * 100).toFixed(0)}%
+                    {t("sdr.minConfidence", { pct: (confidenceThreshold * 100).toFixed(0) })}
                   </label>
                   <input
                     type="range"
@@ -560,13 +560,13 @@ export default function SdrPage() {
                     className="w-full accent-violet-500 cursor-pointer mt-2"
                   />
                   <p className="text-xs text-base-content/40 mt-1.5">
-                    Si la confianza es inferior, la IA solicitará revisión humana automáticamente.
+                    {t("sdr.minConfidenceDesc")}
                   </p>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-base-content/70 uppercase tracking-wider mb-2">
-                    Máximo de Turnos Consecutivos
+                    {t("sdr.maxAutoTurns")}
                   </label>
                   <input
                     type="number"
@@ -577,7 +577,7 @@ export default function SdrPage() {
                     className="w-full px-4 py-2.5 rounded-xl bg-base-100 border border-base-300/80 text-sm font-medium text-base-content focus:outline-none focus:border-violet-500"
                   />
                   <p className="text-xs text-base-content/40 mt-1.5">
-                    Límite de respuestas de IA continuas antes de requerir intervención humana.
+                    {t("sdr.maxAutoTurnsDesc")}
                   </p>
                 </div>
               </div>
@@ -591,17 +591,17 @@ export default function SdrPage() {
             <div className="p-6 rounded-2xl bg-base-200/60 border border-base-300/60 space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-base-content mb-1">
-                  Prompt del Sistema / Rol del SDR
+                  {t("sdr.systemPromptTitle")}
                 </label>
                 <p className="text-xs text-base-content/50 mb-3">
-                  Define la identidad, el tono, las directivas comerciales y cómo debe presentarse tu agente ante los prospectos.
+                  {t("sdr.systemPromptDesc")}
                 </p>
                 <textarea
                   rows={8}
                   value={systemPrompt}
                   onChange={(e) => setSystemPrompt(e.target.value)}
                   className="w-full p-4 rounded-xl bg-base-100 border border-base-300/80 font-mono text-xs text-base-content leading-relaxed focus:outline-none focus:border-violet-500"
-                  placeholder="Instrucciones del rol del SDR..."
+                  placeholder={t("sdr.systemPromptPlaceholder")}
                 />
               </div>
             </div>
@@ -609,33 +609,33 @@ export default function SdrPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="p-6 rounded-2xl bg-base-200/60 border border-base-300/60 space-y-3">
                 <label className="block text-sm font-semibold text-base-content">
-                  Reglas de Seguridad y Handoff (Hard Stops)
+                  {t("sdr.handoffRulesTitle")}
                 </label>
                 <p className="text-xs text-base-content/50">
-                  Situaciones donde la IA debe detenerse de inmediato y derivar la conversación a un humano.
+                  {t("sdr.handoffRulesDesc")}
                 </p>
                 <textarea
                   rows={5}
                   value={handoffRules}
                   onChange={(e) => setHandoffRules(e.target.value)}
                   className="w-full p-3 rounded-xl bg-base-100 border border-base-300/80 text-xs text-base-content focus:outline-none focus:border-violet-500"
-                  placeholder="Ej: Si el prospecto pide un descuento personalizado, tiene dudas legales o solicita hablar con el dueño..."
+                  placeholder={t("sdr.handoffRulesPlaceholder")}
                 />
               </div>
 
               <div className="p-6 rounded-2xl bg-base-200/60 border border-base-300/60 space-y-3">
                 <label className="block text-sm font-semibold text-base-content">
-                  Instrucciones Personalizadas Adicionales
+                  {t("sdr.customInstructionsTitle")}
                 </label>
                 <p className="text-xs text-base-content/50">
-                  Instrucciones específicas temporales (ej: promociones del mes, enlaces a webinars o demos).
+                  {t("sdr.customInstructionsDesc")}
                 </p>
                 <textarea
                   rows={5}
                   value={customInstructions}
                   onChange={(e) => setCustomInstructions(e.target.value)}
                   className="w-full p-3 rounded-xl bg-base-100 border border-base-300/80 text-xs text-base-content focus:outline-none focus:border-violet-500"
-                  placeholder="Ej: Para clientes en Brasil, ofrecer soporte en portugués nativo..."
+                  placeholder={t("sdr.customInstructionsPlaceholder")}
                 />
               </div>
             </div>
@@ -648,24 +648,24 @@ export default function SdrPage() {
             {/* General Company Context */}
             <div className="p-6 rounded-2xl bg-base-200/60 border border-base-300/60 space-y-3">
               <label className="block text-sm font-semibold text-base-content">
-                Contexto Principal de la Empresa y Servicios
+                {t("sdr.companyContextTitle")}
               </label>
               <p className="text-xs text-base-content/50">
-                Información general de InHubFlow que el agente siempre tendrá en memoria como base de verdad.
+                {t("sdr.companyContextDesc")}
               </p>
               <textarea
                 rows={6}
                 value={companyContext}
                 onChange={(e) => setCompanyContext(e.target.value)}
                 className="w-full p-4 rounded-xl bg-base-100 border border-base-300/80 text-xs text-base-content leading-relaxed focus:outline-none focus:border-violet-500"
-                placeholder="Servicios, propuesta de valor, diferenciadores comerciales..."
+                placeholder={t("sdr.companyContextPlaceholder")}
               />
             </div>
 
             {/* Add Knowledge Item Form */}
             <form onSubmit={handleAddKnowledge} className="p-6 rounded-2xl bg-base-200/60 border border-base-300/60 space-y-4">
               <h3 className="font-semibold text-base-content text-base flex items-center gap-2">
-                <RiAddLine className="text-violet-400" /> Añadir Documento / FAQ / Catálogo
+                <RiAddLine className="text-violet-400" /> {t("sdr.addKnowledgeTitle")}
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -674,7 +674,7 @@ export default function SdrPage() {
                     type="text"
                     value={newSourceTitle}
                     onChange={(e) => setNewSourceTitle(e.target.value)}
-                    placeholder="Título (ej: Preguntas Frecuentes de Integración con LinkedIn)"
+                    placeholder={t("sdr.sourceTitlePlaceholder")}
                     className="w-full px-4 py-2 rounded-xl bg-base-100 border border-base-300/80 text-sm text-base-content focus:outline-none focus:border-violet-500"
                   />
                 </div>
@@ -684,9 +684,9 @@ export default function SdrPage() {
                     onChange={(e) => setNewSourceType(e.target.value)}
                     className="w-full px-4 py-2 rounded-xl bg-base-100 border border-base-300/80 text-sm text-base-content focus:outline-none focus:border-violet-500"
                   >
-                    <option value="catalog">Catálogo de Productos / Servicios</option>
-                    <option value="policy">Políticas & FAQs</option>
-                    <option value="text">Documento de Texto Libre</option>
+                    <option value="catalog">{t("sdr.typeCatalog")}</option>
+                    <option value="policy">{t("sdr.typePolicy")}</option>
+                    <option value="text">{t("sdr.typeText")}</option>
                   </select>
                 </div>
               </div>
@@ -696,7 +696,7 @@ export default function SdrPage() {
                   rows={4}
                   value={newSourceContent}
                   onChange={(e) => setNewSourceContent(e.target.value)}
-                  placeholder="Detalle o respuestas a preguntas frecuentes para que la IA consulte..."
+                  placeholder={t("sdr.sourceContentPlaceholder")}
                   className="w-full p-4 rounded-xl bg-base-100 border border-base-300/80 text-xs text-base-content focus:outline-none focus:border-violet-500"
                 />
               </div>
@@ -708,17 +708,17 @@ export default function SdrPage() {
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-violet-600 hover:bg-violet-700 text-white transition-colors disabled:opacity-50"
                 >
                   <RiAddLine size={16} />
-                  {addingSource ? "Añadiendo..." : "Añadir a la Base"}
+                  {addingSource ? t("sdr.addingSource") : t("sdr.addSourceBtn")}
                 </button>
               </div>
             </form>
 
             {/* List of Knowledge Sources */}
             <div className="space-y-3">
-              <h3 className="font-semibold text-base-content text-sm">Documentos Guardados ({knowledgeSources.length})</h3>
+              <h3 className="font-semibold text-base-content text-sm">{t("sdr.savedDocs", { count: knowledgeSources.length })}</h3>
               {knowledgeSources.length === 0 ? (
                 <div className="p-8 text-center rounded-2xl bg-base-200/30 border border-base-300/40 text-sm text-base-content/40">
-                  No hay documentos adicionales registrados. La IA usará el contexto general.
+                  {t("sdr.noSavedDocs")}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -756,15 +756,15 @@ export default function SdrPage() {
             {/* Input Simulation Form */}
             <div className="p-6 rounded-2xl bg-base-200/60 border border-base-300/60 space-y-4">
               <h3 className="font-semibold text-base-content text-base flex items-center gap-2">
-                <RiSparklingLine className="text-violet-400" /> Simulador de Mensaje Entrante
+                <RiSparklingLine className="text-violet-400" /> {t("sdr.simTitle")}
               </h3>
               <p className="text-xs text-base-content/50">
-                Prueba cómo respondería tu Agente SDR en tiempo real con la configuración actual antes de activarlo en vivo.
+                {t("sdr.simSubtitle")}
               </p>
 
               <div>
                 <label className="block text-xs font-semibold text-base-content/70 uppercase tracking-wider mb-1.5">
-                  Nombre del Prospecto
+                  {t("sdr.simSender")}
                 </label>
                 <input
                   type="text"
@@ -776,14 +776,14 @@ export default function SdrPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-base-content/70 uppercase tracking-wider mb-1.5">
-                  Mensaje del Prospecto (Inbound)
+                  {t("sdr.simMessage")}
                 </label>
                 <textarea
                   rows={5}
                   value={simMessage}
                   onChange={(e) => setSimMessage(e.target.value)}
                   className="w-full p-4 rounded-xl bg-base-100 border border-base-300/80 text-sm text-base-content leading-relaxed focus:outline-none focus:border-violet-500"
-                  placeholder="Escribe el mensaje del prospecto aquí..."
+                  placeholder={t("sdr.simMessagePlaceholder")}
                 />
               </div>
 
@@ -794,7 +794,7 @@ export default function SdrPage() {
                 className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl font-semibold bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-600/20 transition-all disabled:opacity-50"
               >
                 <RiSendPlaneLine size={18} />
-                {simLoading ? "Procesando con Gemini..." : "Simular Respuesta con IA"}
+                {simLoading ? t("sdr.simLoading") : t("sdr.simBtn")}
               </button>
             </div>
 
@@ -804,7 +804,7 @@ export default function SdrPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between border-b border-base-300/40 pb-3">
                     <span className="text-xs font-semibold uppercase tracking-wider text-base-content/50">
-                      Resultado del Análisis
+                      {t("sdr.analysisResult")}
                     </span>
                     <span className="text-xs text-base-content/40 flex items-center gap-1">
                       <RiTimeLine size={12} /> {simResult.latencyMs} ms ({simResult.model})
@@ -813,41 +813,41 @@ export default function SdrPage() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="p-3 rounded-xl bg-base-100 border border-base-300/60">
-                      <div className="text-[10px] uppercase font-bold text-base-content/40">Intención</div>
+                      <div className="text-[10px] uppercase font-bold text-base-content/40">{t("sdr.intent")}</div>
                       <div className="text-sm font-bold text-violet-400 uppercase mt-0.5">
                         {simResult.decision.intent}
                       </div>
                     </div>
 
                     <div className="p-3 rounded-xl bg-base-100 border border-base-300/60">
-                      <div className="text-[10px] uppercase font-bold text-base-content/40">Confianza</div>
+                      <div className="text-[10px] uppercase font-bold text-base-content/40">{t("sdr.confidence")}</div>
                       <div className="text-sm font-bold text-emerald-400 mt-0.5">
                         {(simResult.decision.confidence * 100).toFixed(1)}%
                       </div>
                     </div>
 
                     <div className="p-3 rounded-xl bg-base-100 border border-base-300/60">
-                      <div className="text-[10px] uppercase font-bold text-base-content/40">Acción Sugerida</div>
+                      <div className="text-[10px] uppercase font-bold text-base-content/40">{t("sdr.suggestedAction")}</div>
                       <div className="text-sm font-semibold text-base-content mt-0.5">
                         {simResult.decision.recommended_action}
                       </div>
                     </div>
 
                     <div className="p-3 rounded-xl bg-base-100 border border-base-300/60">
-                      <div className="text-[10px] uppercase font-bold text-base-content/40">Requiere Humano</div>
+                      <div className="text-[10px] uppercase font-bold text-base-content/40">{t("sdr.requiresHuman")}</div>
                       <div
                         className={`text-sm font-semibold mt-0.5 ${
                           simResult.decision.requires_human ? "text-amber-400" : "text-emerald-400"
                         }`}
                       >
-                        {simResult.decision.requires_human ? "⚠️ SÍ" : "NO"}
+                        {simResult.decision.requires_human ? t("sdr.yes") : t("sdr.no")}
                       </div>
                     </div>
                   </div>
 
                   {simResult.decision.reply_draft && (
                     <div className="space-y-1.5">
-                      <div className="text-xs font-semibold text-base-content/60">Borrador Sugerido por la IA:</div>
+                      <div className="text-xs font-semibold text-base-content/60">{t("sdr.suggestedDraft")}</div>
                       <div className="p-4 rounded-xl bg-base-100 border border-violet-500/30 text-sm text-base-content leading-relaxed whitespace-pre-line">
                         {simResult.decision.reply_draft}
                       </div>
@@ -855,14 +855,14 @@ export default function SdrPage() {
                   )}
 
                   <div className="text-xs text-base-content/50 italic bg-base-100/50 p-3 rounded-xl border border-base-300/40">
-                    <span className="font-semibold not-italic">Justificación IA:</span> {simResult.decision.reasoning_summary}
+                    <span className="font-semibold not-italic">{t("sdr.aiReasoning")}</span> {simResult.decision.reasoning_summary}
                   </div>
                 </div>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-center p-8 text-base-content/40">
                   <RiRobotLine size={48} className="mb-3 opacity-30" />
-                  <p className="text-sm font-medium">No hay simulaciones recientes</p>
-                  <p className="text-xs mt-1">Escribe un mensaje de prueba y haz clic en "Simular Respuesta con IA".</p>
+                  <p className="text-sm font-medium">{t("sdr.noRecentSims")}</p>
+                  <p className="text-xs mt-1">{t("sdr.noRecentSimsHint")}</p>
                 </div>
               )}
             </div>
@@ -873,28 +873,28 @@ export default function SdrPage() {
         {activeTab === "history" && (
           <div className="p-6 rounded-2xl bg-base-200/60 border border-base-300/60 space-y-4">
             <h3 className="font-semibold text-base-content text-base flex items-center gap-2">
-              <RiHistoryLine className="text-violet-400" /> Registro de Decisiones Recientes
+              <RiHistoryLine className="text-violet-400" /> {t("sdr.historyTitle")}
             </h3>
             <p className="text-xs text-base-content/50">
-              Auditoría completa de todas las clasificaciones y borradores generados por el SDR.
+              {t("sdr.historySubtitle")}
             </p>
 
             {data?.recentDecisions?.length === 0 ? (
               <div className="p-8 text-center text-sm text-base-content/40">
-                Aún no hay decisiones registradas en la base de datos.
+                {t("sdr.noHistory")}
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-base-300/40 text-left text-xs font-semibold text-base-content/40 uppercase">
-                      <th className="py-3 px-4">Fecha</th>
-                      <th className="py-3 px-4">Prospecto</th>
-                      <th className="py-3 px-4">Intención</th>
-                      <th className="py-3 px-4">Confianza</th>
-                      <th className="py-3 px-4">Acción</th>
-                      <th className="py-3 px-4">Humano</th>
-                      <th className="py-3 px-4">Borrador</th>
+                      <th className="py-3 px-4">{t("sdr.colDate")}</th>
+                      <th className="py-3 px-4">{t("sdr.colProspect")}</th>
+                      <th className="py-3 px-4">{t("sdr.colIntent")}</th>
+                      <th className="py-3 px-4">{t("sdr.colConfidence")}</th>
+                      <th className="py-3 px-4">{t("sdr.colAction")}</th>
+                      <th className="py-3 px-4">{t("sdr.colHuman")}</th>
+                      <th className="py-3 px-4">{t("sdr.colDraft")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-base-300/30">
@@ -904,7 +904,7 @@ export default function SdrPage() {
                           {new Date(d.created_at).toLocaleString()}
                         </td>
                         <td className="py-3 px-4 font-medium text-base-content">
-                          {d.target_name || "Prospecto"}
+                          {d.target_name || t("sdr.colProspect")}
                           {d.target_company && <span className="block text-xs text-base-content/40">{d.target_company}</span>}
                         </td>
                         <td className="py-3 px-4">
@@ -919,10 +919,10 @@ export default function SdrPage() {
                         <td className="py-3 px-4">
                           {d.requires_human ? (
                             <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-400">
-                              Requerido
+                              {t("sdr.humanRequired")}
                             </span>
                           ) : (
-                            <span className="text-xs text-base-content/40">No</span>
+                            <span className="text-xs text-base-content/40">{t("sdr.no")}</span>
                           )}
                         </td>
                         <td className="py-3 px-4 text-xs text-base-content/60 max-w-xs truncate">

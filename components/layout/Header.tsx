@@ -68,7 +68,7 @@ export default function Header({
           <button
             onClick={onToggleSidebar}
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:border-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white shadow-2xs"
-            title={isSidebarCollapsed ? "Expandir menú lateral" : "Colapsar menú lateral"}
+            title={isSidebarCollapsed ? t("nav.expandMenu") : t("nav.collapseMenu")}
           >
             {isSidebarCollapsed ? <RiMenuUnfoldLine size={18} /> : <RiMenuFoldLine size={18} />}
           </button>
