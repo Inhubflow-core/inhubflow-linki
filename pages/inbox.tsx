@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
+  RiAlertLine,
   RiAttachment2,
   RiBuildingLine,
   RiCheckDoubleLine,
@@ -445,7 +446,7 @@ function ChatPanel({ reply, onActionDone, hasPremium }: ChatPanelProps) {
           reasoning: data.reasoning || "Generada según el conocimiento de tu empresa y el perfil del prospecto.",
           confidence: data.confidence ? `${Math.round(data.confidence * 100)}%` : undefined,
         });
-        toast.success("✨ Sugerencia de SDR IA generada.");
+        toast.success("Sugerencia de SDR IA generada.");
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al generar sugerencia.");
@@ -670,7 +671,7 @@ function ChatPanel({ reply, onActionDone, hasPremium }: ChatPanelProps) {
             }`}
           >
             {togglingAutopilot ? <RiLoader4Line size={13} className="animate-spin" /> : <RiRobotLine size={14} />}
-            {autopilot ? "🤖 SDR: ACTIVO" : "🤖 SDR: OFF"}
+            {autopilot ? "SDR: ACTIVO" : "SDR: OFF"}
           </button>
         </div>
       </div>
@@ -930,7 +931,7 @@ function ChatPanel({ reply, onActionDone, hasPremium }: ChatPanelProps) {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-primary/10 border border-primary/25 text-primary hover:bg-primary/20 disabled:opacity-40 transition-all shadow-sm"
             >
               {suggesting ? <RiLoader4Line size={13} className="animate-spin" /> : <RiSparklingLine size={14} />}
-              {suggesting ? "Pensando..." : "✨ Sugerir con IA"}
+              {suggesting ? "Pensando..." : "Sugerir con IA"}
             </button>
           </div>
 
@@ -1338,9 +1339,9 @@ export default function InboxPage() {
           >
             <RiNotification3Line
               size={14}
-              className={notificationPermission === "granted" ? "text-success animate-pulse" : ""}
+              className={notificationPermission === "granted" ? "text-success" : ""}
             />
-            {notificationPermission === "granted" ? "🔔 Alertas (🔊 Probar)" : "Activar Alertas 🔔"}
+            {notificationPermission === "granted" ? "Alertas (Probar)" : "Activar Alertas"}
           </button>
 
           <button
@@ -1350,7 +1351,7 @@ export default function InboxPage() {
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-warning/10 border border-warning/30 text-warning hover:bg-warning/20 disabled:opacity-40 transition-all shadow-sm"
           >
             {diagnosing ? <RiLoader4Line size={13} className="animate-spin" /> : <RiPulseLine size={14} />}
-            {diagnosing ? "Diagnosticando..." : "🔍 Diagnóstico"}
+            {diagnosing ? "Diagnosticando..." : "Diagnóstico"}
           </button>
 
           <button
@@ -1416,24 +1417,28 @@ export default function InboxPage() {
             {/* Quick Filter Pills (LinkedIn Style) */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
               {[
-                { id: "all", label: "Todos" },
-                { id: "linkedin", label: "LinkedIn" },
-                { id: "email", label: "Email" },
-                { id: "autopilot", label: "🤖 Autopilot" },
-                { id: "handoff", label: "⚠️ Intervención" },
-              ].map((filter) => (
-                <button
-                  key={filter.id}
-                  onClick={() => setQuickFilter(filter.id as QuickFilter)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold shrink-0 transition-all ${
-                    quickFilter === filter.id
-                      ? "bg-primary text-primary-content shadow-sm"
-                      : "bg-base-200 text-base-content/60 hover:bg-base-300 hover:text-base-content"
-                  }`}
-                >
-                  {filter.label}
-                </button>
-              ))}
+                { id: "all", label: "Todos", icon: null },
+                { id: "linkedin", label: "LinkedIn", icon: RiLinkedinBoxLine },
+                { id: "email", label: "Email", icon: RiMailLine },
+                { id: "autopilot", label: "Autopilot", icon: RiRobotLine },
+                { id: "handoff", label: "Intervención", icon: RiAlertLine },
+              ].map((filter) => {
+                const Icon = filter.icon;
+                return (
+                  <button
+                    key={filter.id}
+                    onClick={() => setQuickFilter(filter.id as QuickFilter)}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold shrink-0 transition-all ${
+                      quickFilter === filter.id
+                        ? "bg-primary text-primary-content shadow-sm"
+                        : "bg-base-200 text-base-content/60 hover:bg-base-300 hover:text-base-content"
+                    }`}
+                  >
+                    {Icon && <Icon size={12} />}
+                    <span>{filter.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Account Slot Selector if multiple exist */}
@@ -1542,8 +1547,8 @@ export default function InboxPage() {
                         )}
 
                         {reply.sdr_autopilot === 1 && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-success/15 text-success">
-                            🤖 Autopilot
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-success/15 text-success">
+                            <RiRobotLine size={10} /> Autopilot
                           </span>
                         )}
 
