@@ -4,6 +4,7 @@ import { GetServerSideProps } from "next";
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { toast } from "sonner";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { RiAddLine, RiDeleteBinLine, RiBuildingLine, RiGlobalLine } from "react-icons/ri";
 
 interface Company {
@@ -34,6 +35,7 @@ export const getServerSideProps: GetServerSideProps = async () => {
 };
 
 export default function CompaniesPage({ initialCompanies }: { initialCompanies: Company[] }) {
+  const { t } = useTranslation();
   const [companies, setCompanies] = useState<Company[]>(initialCompanies);
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -85,15 +87,15 @@ export default function CompaniesPage({ initialCompanies }: { initialCompanies: 
       : await fetch("/api/companies", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     setLoading(false);
     if (!res.ok) { toast.error((await res.json()).error ?? "Failed"); return; }
-    toast.success(editId ? "Company updated" : "Company created");
+    toast.success(editId ? t("companies.companyUpdated") : t("companies.companyCreated"));
     setShowModal(false);
     refresh();
   }
 
   async function deleteCompany(id: string) {
-    if (!confirm("Delete this company? Contacts will be unlinked but not deleted.")) return;
+    if (!confirm(t("companies.deleteConfirm"))) return;
     await fetch(`/api/companies/${id}`, { method: "DELETE" });
-    toast.success("Deleted");
+    toast.success(t("companies.companyDeleted"));
     setCompanies((prev) => prev.filter((c) => c.id !== id));
   }
 
@@ -113,14 +115,14 @@ export default function CompaniesPage({ initialCompanies }: { initialCompanies: 
         <div className="space-y-1">
           <div className="flex items-center gap-2.5">
             <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-              Empresas
+              {t("companies.title")}
             </h1>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500/15 text-brand-600 dark:text-brand-400">
-              {companies.length} {companies.length === 1 ? "empresa" : "empresas"}
+              {companies.length} {companies.length === 1 ? t("companies.companiesCount", { count: 1 }) : t("companies.companiesCountPlural", { count: companies.length })}
             </span>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Organizaciones y cuentas asociadas a tus contactos y campañas.
+            {t("companies.subtitle")}
           </p>
         </div>
 
@@ -129,7 +131,7 @@ export default function CompaniesPage({ initialCompanies }: { initialCompanies: 
             onClick={openCreate}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-all shadow-xs"
           >
-            <RiAddLine size={16} /> Añadir Empresa
+            <RiAddLine size={16} /> {t("companies.addCompany")}
           </button>
         </div>
       </div>
@@ -137,7 +139,7 @@ export default function CompaniesPage({ initialCompanies }: { initialCompanies: 
         <div className="mb-4">
           <input
             className="input input-bordered input-sm w-72 bg-base-300/50"
-            placeholder="Search companies..."
+            placeholder={t("companies.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -145,18 +147,18 @@ export default function CompaniesPage({ initialCompanies }: { initialCompanies: 
 
         {filtered.length === 0 ? (
           <div className="text-center py-16 text-base-content/40 text-sm">
-            {search ? "No companies match your search." : "No companies yet."}
+            {search ? t("companies.noCompaniesMatching") : t("companies.noCompanies")}
           </div>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-base-300/50">
             <table className="table w-full text-sm">
               <thead>
                 <tr className="border-base-300/50 text-base-content/50 text-xs uppercase tracking-wide">
-                  <th>Name</th>
-                  <th>Domain</th>
-                  <th>Industry</th>
-                  <th>Location</th>
-                  <th>Contacts</th>
+                  <th>{t("companies.columns.name")}</th>
+                  <th>{t("companies.columns.domain")}</th>
+                  <th>{t("companies.columns.industry")}</th>
+                  <th>{t("companies.columns.location")}</th>
+                  <th>{t("companies.columns.contacts")}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -189,7 +191,7 @@ export default function CompaniesPage({ initialCompanies }: { initialCompanies: 
                           className="inline-flex items-center px-2 py-1 rounded-md text-xs text-base-content/40 hover:text-base-content hover:bg-base-300/50 transition-colors"
                           onClick={() => openEdit(c)}
                         >
-                          Edit
+                          {t("common.edit")}
                         </button>
                         <button
                           className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-error/10 text-error border border-error/20 hover:bg-error/20 transition-colors"
@@ -209,44 +211,44 @@ export default function CompaniesPage({ initialCompanies }: { initialCompanies: 
         {showModal && (
           <div className="modal modal-open">
             <div className="modal-box bg-base-200 border border-base-300/50 max-w-md">
-              <h3 className="font-semibold text-base mb-4">{editId ? "Edit Company" : "Add Company"}</h3>
+              <h3 className="font-semibold text-base mb-4">{editId ? t("common.edit") : t("companies.addCompany")}</h3>
               <form onSubmit={submit} className="flex flex-col gap-3">
                 <div>
-                  <label className="label text-xs text-base-content/50 pb-1">Company name <span className="text-error">*</span></label>
+                  <label className="label text-xs text-base-content/50 pb-1">{t("companies.companyName")} <span className="text-error">*</span></label>
                   <input className="input input-bordered input-sm w-full bg-base-300/50" placeholder="Acme Inc." value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="label text-xs text-base-content/50 pb-1">Domain</label>
+                    <label className="label text-xs text-base-content/50 pb-1">{t("companies.domain")}</label>
                     <input className="input input-bordered input-sm w-full bg-base-300/50" placeholder="acme.com" value={form.domain} onChange={(e) => setForm({ ...form, domain: e.target.value })} />
                   </div>
                   <div>
-                    <label className="label text-xs text-base-content/50 pb-1">Industry</label>
+                    <label className="label text-xs text-base-content/50 pb-1">{t("companies.industry")}</label>
                     <input className="input input-bordered input-sm w-full bg-base-300/50" placeholder="SaaS" value={form.industry} onChange={(e) => setForm({ ...form, industry: e.target.value })} />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="label text-xs text-base-content/50 pb-1">Location</label>
+                    <label className="label text-xs text-base-content/50 pb-1">{t("companies.location")}</label>
                     <input className="input input-bordered input-sm w-full bg-base-300/50" placeholder="Berlin, Germany" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
                   </div>
                   <div>
-                    <label className="label text-xs text-base-content/50 pb-1">Website</label>
+                    <label className="label text-xs text-base-content/50 pb-1">{t("companies.domain")}</label>
                     <input className="input input-bordered input-sm w-full bg-base-300/50" placeholder="https://acme.com" value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} />
                   </div>
                 </div>
                 <div>
-                  <label className="label text-xs text-base-content/50 pb-1">LinkedIn URL</label>
+                  <label className="label text-xs text-base-content/50 pb-1">{t("companies.linkedinUrl")}</label>
                   <input className="input input-bordered input-sm w-full bg-base-300/50" placeholder="https://linkedin.com/company/acme" value={form.linkedin_url} onChange={(e) => setForm({ ...form, linkedin_url: e.target.value })} />
                 </div>
                 <div>
-                  <label className="label text-xs text-base-content/50 pb-1">Notes</label>
-                  <textarea className="textarea textarea-bordered w-full bg-base-300/50 text-sm h-20 resize-none" placeholder="Any notes..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+                  <label className="label text-xs text-base-content/50 pb-1">{t("companies.notes")}</label>
+                  <textarea className="textarea textarea-bordered w-full bg-base-300/50 text-sm h-20 resize-none" placeholder="Notes..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
                 </div>
                 <div className="modal-action mt-1">
-                  <button type="button" className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors" onClick={() => setShowModal(false)}>Cancel</button>
+                  <button type="button" className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors" onClick={() => setShowModal(false)}>{t("common.cancel")}</button>
                   <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-50" disabled={loading}>
-                    {loading ? <span className="loading loading-spinner loading-xs" /> : (editId ? "Save Changes" : "Add Company")}
+                    {loading ? <span className="loading loading-spinner loading-xs" /> : (editId ? t("common.saveChanges") : t("companies.addCompany"))}
                   </button>
                 </div>
               </form>

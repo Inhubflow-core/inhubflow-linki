@@ -294,7 +294,7 @@ export default function SdrPage() {
           <div className="space-y-1">
             <div className="flex items-center gap-2.5 flex-wrap">
               <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                Agente SDR con IA
+                {t("sdr.title")}
               </h1>
               <span
                 className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${getModeBadge(mode).color}`}
@@ -303,7 +303,7 @@ export default function SdrPage() {
               </span>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Calificación de prospectos, respuestas inteligentes y agendamiento automático para LinkedIn e Inbox.
+              {t("sdr.subtitle")}
             </p>
           </div>
 
@@ -315,7 +315,7 @@ export default function SdrPage() {
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
             >
               <RiRefreshLine size={16} className={loading ? "animate-spin" : ""} />
-              Actualizar
+              {t("common.refresh")}
             </button>
             <button
               type="button"
@@ -324,7 +324,7 @@ export default function SdrPage() {
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-all shadow-xs disabled:opacity-50"
             >
               <RiSaveLine size={16} />
-              {saving ? "Guardando..." : "Guardar Cambios"}
+              {saving ? t("common.saving") : t("common.saveChanges")}
             </button>
           </div>
         </div>
@@ -340,7 +340,7 @@ export default function SdrPage() {
             }`}
           >
             <RiSettings4Line size={18} />
-            Resumen & Modos
+            {t("sdr.tabOverview")}
           </button>
 
           <button
@@ -352,7 +352,7 @@ export default function SdrPage() {
             }`}
           >
             <RiUserVoiceLine size={18} />
-            Prompts & Personalidad
+            {t("sdr.tabPrompts")}
           </button>
 
           <button
@@ -364,7 +364,7 @@ export default function SdrPage() {
             }`}
           >
             <RiBookOpenLine size={18} />
-            Base de Conocimiento ({knowledgeSources.length})
+            {t("sdr.tabKnowledge", { count: knowledgeSources.length })}
           </button>
 
           <button
@@ -376,7 +376,7 @@ export default function SdrPage() {
             }`}
           >
             <RiSparklingLine size={18} />
-            Playground & Simulador
+            {t("sdr.tabSimulator")}
           </button>
 
           <button
@@ -388,7 +388,7 @@ export default function SdrPage() {
             }`}
           >
             <RiHistoryLine size={18} />
-            Historial de Decisiones
+            {t("sdr.tabHistory")}
           </button>
         </div>
 

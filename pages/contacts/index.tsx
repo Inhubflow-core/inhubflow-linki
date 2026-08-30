@@ -5,6 +5,7 @@ import { GetServerSideProps } from "next";
 import { useRouter } from "next/router";
 import { getDb } from "@/lib/db";
 import { toast } from "sonner";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 import {
   RiExternalLinkLine, RiArrowLeftSLine, RiArrowRightSLine,
   RiUserFollowLine, RiUserAddLine, RiUserLine, RiUserSearchLine,
@@ -76,6 +77,7 @@ function ConnectionIcon({ t }: { t: Contact }) {
 
 export default function ContactsPage({ lists, total: initialTotal }: { lists: ListOption[]; total: number }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [total, setTotal] = useState(initialTotal);
   const [page, setPage] = useState(0);
@@ -151,20 +153,16 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
     const res = await fetch(`/api/lists/${addToListId}/add-members`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contact_ids: [...selected] }),
+      body: JSON.stringify({ target_ids: Array.from(selected) }),
     });
     setAddToListLoading(false);
-    const data = await res.json();
-    if (!res.ok) { toast.error(data.error ?? "Failed to add to list"); return; }
-    const listName = lists.find((l) => l.id === addToListId)?.name ?? "list";
-    toast.success(
-      data.already_members > 0
-        ? `Added ${data.added} to ${listName} (${data.already_members} already there)`
-        : `Added ${data.added} to ${listName}`
-    );
-    setShowAddToList(false);
-    setAddToListId("");
-    setSelected(new Set());
+    if (res.ok) {
+      toast.success("Added to list");
+      setShowAddToList(false);
+      setSelected(new Set());
+    } else {
+      toast.error("Failed to add to list");
+    }
   }
 
   async function deleteSelected() {
@@ -173,15 +171,18 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
     const res = await fetch("/api/targets", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ target_ids: [...selected] }),
+      body: JSON.stringify({ ids: Array.from(selected) }),
     });
     setDeleteLoading(false);
-    const data = await res.json();
-    if (!res.ok) { toast.error(data.error ?? "Failed to delete contacts"); return; }
-    toast.success(`Deleted ${data.deleted} contact${data.deleted !== 1 ? "s" : ""}`);
-    setShowDeleteConfirm(false);
-    setSelected(new Set());
-    fetch_(page, listId, debouncedSearch, filters);
+    if (res.ok) {
+      const data = await res.json();
+      toast.success(t("contacts.deletedCount", { count: data.deleted }));
+      setShowDeleteConfirm(false);
+      setSelected(new Set());
+      fetch_(page, listId, debouncedSearch, filters);
+    } else {
+      toast.error("Failed to delete contacts");
+    }
   }
 
   async function createContact(e: React.FormEvent) {
@@ -194,11 +195,11 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
     });
     setNewContactLoading(false);
     if (!res.ok) {
-      const data = await res.json();
-      toast.error(data.error ?? "Failed to create contact");
+      const d = await res.json();
+      toast.error(d.error || "Failed to create contact");
       return;
     }
-    toast.success("Contact created");
+    toast.success(t("contacts.contactCreated"));
     setShowNewContact(false);
     setNewContactForm({ full_name: "", linkedin_url: "", title: "", company: "", location: "", email: "", phone: "", list_id: "" });
     fetch_(0, listId, debouncedSearch, filters);
@@ -219,14 +220,14 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
           <div className="space-y-1">
             <div className="flex items-center gap-2.5">
               <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                Contactos
+                {t("contacts.title")}
               </h1>
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500/15 text-brand-600 dark:text-brand-400">
-                {total.toLocaleString()} {total === 1 ? "contacto" : "contactos"}
+                {total.toLocaleString()} {total === 1 ? t("contacts.contactsCount", { count: 1 }) : t("contacts.contactsCountPlural", { count: total })}
               </span>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Base de datos unificada de prospectos capturados, enriquecidos y contactados.
+              {t("contacts.subtitle")}
             </p>
           </div>
 
@@ -235,13 +236,13 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
               href="/lead-finder"
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
             >
-              <RiUserSearchLine size={16} /> Lead Finder
+              <RiUserSearchLine size={16} /> {t("nav.leadFinder")}
             </Link>
             <button
               onClick={() => setShowNewContact(true)}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-all shadow-xs"
             >
-              <RiAddLine size={16} /> Nuevo Contacto
+              <RiAddLine size={16} /> {t("contacts.newContact")}
             </button>
           </div>
         </div>
@@ -256,7 +257,7 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
             <input
               type="text"
               className="w-56 bg-base-200 border border-base-300/50 rounded-lg pl-8 pr-3 py-1.5 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:border-primary/40"
-              placeholder="Search name, company…"
+              placeholder={t("contacts.searchPlaceholder")}
               value={search}
               onChange={(e) => changeSearch(e.target.value)}
             />
@@ -268,7 +269,7 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
             value={listId}
             onChange={(e) => changeList(e.target.value)}
           >
-            <option value="">All lists</option>
+            <option value="">{t("contacts.allLists")}</option>
             {lists.map((l) => (
               <option key={l.id} value={l.id}>
                 {l.name} ({l.target_count})
@@ -296,13 +297,13 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-error/10 text-error border border-error/20 hover:bg-error/20 transition-colors"
               onClick={() => setShowDeleteConfirm(true)}
             >
-              <RiDeleteBinLine size={13} /> Delete
+              <RiDeleteBinLine size={13} /> {t("common.delete")}
             </button>
             <button
               className="text-xs text-base-content/40 hover:text-base-content transition-colors"
               onClick={() => setSelected(new Set())}
             >
-              Clear
+              {t("common.clear")}
             </button>
           </div>
         )}
@@ -310,11 +311,11 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
         {/* Table */}
         {loading && contacts.length === 0 ? (
           <div className="flex items-center justify-center py-20 text-base-content/30 text-sm gap-2">
-            <span className="loading loading-spinner loading-sm" /> Loading...
+            <span className="loading loading-spinner loading-sm" /> {t("common.loading")}
           </div>
         ) : contacts.length === 0 ? (
           <div className="text-center py-20 text-base-content/30 text-sm">
-            {hasActiveFilters ? "No contacts match these filters." : listId ? "No contacts in this list." : "No contacts yet. Import from a list."}
+            {hasActiveFilters ? t("contacts.noContactsMatching") : t("contacts.noContacts")}
           </div>
         ) : (
           <>
@@ -325,12 +326,12 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
                     <th className="w-8" data-tour="contacts-select">
                       <input type="checkbox" className="w-3.5 h-3.5 rounded border border-base-300 bg-base-300/50 accent-primary cursor-pointer" checked={allPageSelected} onChange={toggleAll} />
                     </th>
-                    <th>Name</th>
-                    <th>Title</th>
-                    <th>Company</th>
-                    <th>Location</th>
-                    <th>Email</th>
-                    <th className="w-24">Status</th>
+                    <th>{t("contacts.columns.name")}</th>
+                    <th>{t("contacts.columns.title")}</th>
+                    <th>{t("contacts.columns.company")}</th>
+                    <th>{t("contacts.columns.location")}</th>
+                    <th>{t("contacts.columns.email")}</th>
+                    <th className="w-24">{t("contacts.columns.signals")}</th>
                     <th className="w-8"></th>
                   </tr>
                 </thead>

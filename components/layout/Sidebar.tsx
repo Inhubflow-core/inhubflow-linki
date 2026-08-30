@@ -156,7 +156,7 @@ export default function Sidebar({
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
         {!isCollapsed && (
           <p className="px-3 text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1.5">
-            Navegación
+            {t("nav.navigation")}
           </p>
         )}
 

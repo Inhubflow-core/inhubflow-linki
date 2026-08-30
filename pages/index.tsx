@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { useEffect, useState, useRef } from "react";
 import { FiUserPlus, FiMessageSquare, FiEye, FiRepeat, FiUsers, FiRefreshCw } from "react-icons/fi";
 import { RiMailSendLine, RiReplyLine, RiRobot2Line, RiLinkedinBoxLine, RiFilterLine } from "react-icons/ri";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 
 interface DashboardStats {
   totals: {
@@ -159,14 +160,6 @@ function FunnelRow({
 
 // ── Activity chart ────────────────────────────────────────────────────────────
 
-const SERIES = [
-  { key: "visits" as const,      color: "#5aa2ff", label: "Visits" },
-  { key: "connections" as const, color: "#32d583", label: "Connects" },
-  { key: "messages" as const,    color: "#f4b740", label: "Messages" },
-  { key: "inmails" as const,     color: "#e879f9", label: "InMails" },
-  { key: "emails" as const,      color: "#fb923c", label: "Emails" },
-];
-
 const DAY_OPTIONS = [7, 14, 30, 90];
 
 function ActivityChart({
@@ -176,9 +169,17 @@ function ActivityChart({
   days: number;
   onDaysChange: (d: number) => void;
 }) {
-  const [activeSeries, setActiveSeries] = useState<Set<string>>(new Set(SERIES.map(s => s.key)));
+  const { t } = useTranslation();
+  const seriesConfig = [
+    { key: "visits" as const,      color: "#5aa2ff", label: t("leadFinder.title") ? "Visits" : "Visits" },
+    { key: "connections" as const, color: "#32d583", label: "Connects" },
+    { key: "messages" as const,    color: "#f4b740", label: "Messages" },
+    { key: "inmails" as const,     color: "#e879f9", label: "InMails" },
+    { key: "emails" as const,      color: "#fb923c", label: "Emails" },
+  ];
+  const [activeSeries, setActiveSeries] = useState<Set<string>>(new Set(seriesConfig.map(s => s.key)));
   const maxVal = Math.max(
-    ...data.flatMap(d => SERIES.filter(s => activeSeries.has(s.key)).map(s => d[s.key])),
+    ...data.flatMap(d => seriesConfig.filter(s => activeSeries.has(s.key)).map(s => d[s.key])),
     1
   );
   const labelEvery = days <= 7 ? 1 : days <= 14 ? 2 : days <= 30 ? 5 : 15;
@@ -198,9 +199,9 @@ function ActivityChart({
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-4">
-          <span className="text-sm font-semibold text-gray-900 dark:text-white">Activity</span>
+          <span className="text-sm font-semibold text-gray-900 dark:text-white">{t("dashboard.activity")}</span>
           <div className="flex items-center gap-2">
-            {SERIES.map(s => (
+            {seriesConfig.map(s => (
               <button
                 key={s.key}
                 onClick={() => toggleSeries(s.key)}
@@ -248,7 +249,7 @@ function ActivityChart({
                 {/* Tooltip */}
                 <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-gray-800 text-white rounded-xl px-3 py-2 text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-10 shadow-xl transition-opacity">
                   <div className="text-gray-400 mb-1.5 font-medium">{d.day}</div>
-                  {SERIES.filter(s => activeSeries.has(s.key)).map(s => (
+                  {seriesConfig.filter(s => activeSeries.has(s.key)).map(s => (
                     <div key={s.key} className="flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.color }} />
                       <span style={{ color: s.color }}>{d[s.key]} {s.label.toLowerCase()}</span>
@@ -257,7 +258,7 @@ function ActivityChart({
                 </div>
                 {/* Bars */}
                 <div className="flex items-end gap-px w-full">
-                  {SERIES.filter(s => activeSeries.has(s.key)).map(s => (
+                  {seriesConfig.filter(s => activeSeries.has(s.key)).map(s => (
                     <div
                       key={s.key}
                       className="flex-1 rounded-t-sm transition-all duration-300"
@@ -294,6 +295,7 @@ function LinkedInCard({
   cachedStats?: LiStats | null;
   cachedSyncedAt?: string | null;
 }) {
+  const { t } = useTranslation();
   const [syncing, setSyncing] = useState(false);
   const [liStats, setLiStats] = useState<LiStats | null>(cachedStats ?? null);
   const [syncedAt, setSyncedAt] = useState<string | null>(cachedSyncedAt ?? null);
@@ -360,7 +362,7 @@ function LinkedInCard({
       </div>
 
       {syncError && <p className="text-xs text-red-500 mt-2">{syncError}</p>}
-      {!accountId && <p className="text-xs text-gray-400 mt-2">No authenticated account.</p>}
+      {!accountId && <p className="text-xs text-gray-400 mt-2">{t("dashboard.noAccountAuth")}</p>}
     </div>
   );
 }
@@ -368,6 +370,7 @@ function LinkedInCard({
 // ── AI usage panel ────────────────────────────────────────────────────────────
 
 function AiUsagePanel({ data, days }: { data: AgentStats["daily"]; days: number }) {
+  const { t } = useTranslation();
   const totalCost = data.reduce((s, d) => s + (d.cost_usd ?? 0), 0);
   const totalTokens = data.reduce((s, d) => s + (d.input_tokens ?? 0) + (d.output_tokens ?? 0), 0);
   const hasData = totalCost > 0 || totalTokens > 0;
@@ -379,18 +382,18 @@ function AiUsagePanel({ data, days }: { data: AgentStats["daily"]; days: number 
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <RiRobot2Line size={16} className="text-gray-400" />
-          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">AI Usage</span>
+          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t("dashboard.aiUsage")}</span>
         </div>
         {hasData && (
           <div className="flex items-center gap-3 text-xs font-medium">
-            <span className="text-gray-500 dark:text-gray-400 tabular-nums">{totalTokens.toLocaleString()} tokens</span>
+            <span className="text-gray-500 dark:text-gray-400 tabular-nums">{totalTokens.toLocaleString()} {t("dashboard.tokens")}</span>
             <span className="font-bold tabular-nums" style={{ color: "#a78bfa" }}>${totalCost.toFixed(4)}</span>
           </div>
         )}
       </div>
 
       {!hasData ? (
-        <p className="text-xs text-gray-400 py-2">No AI usage in this period.</p>
+        <p className="text-xs text-gray-400 py-2">{t("dashboard.noAiUsage")}</p>
       ) : (
         <div className="flex items-end gap-0.5" style={{ height: 52 }}>
           {data.map((d, i) => {
@@ -401,7 +404,7 @@ function AiUsagePanel({ data, days }: { data: AgentStats["daily"]; days: number 
                 <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 bg-gray-900 text-white rounded-xl px-2.5 py-1.5 text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-10 shadow-xl">
                   <div className="text-gray-400 mb-1">{d.day}</div>
                   <div style={{ color: "#a78bfa" }}>${(d.cost_usd ?? 0).toFixed(5)}</div>
-                  <div className="text-gray-400">{((d.input_tokens ?? 0) + (d.output_tokens ?? 0)).toLocaleString()} tok</div>
+                  <div className="text-gray-400">{((d.input_tokens ?? 0) + (d.output_tokens ?? 0)).toLocaleString()} {t("dashboard.tokens")}</div>
                 </div>
                 <div
                   className="w-full rounded-t-sm"
@@ -431,6 +434,7 @@ function FilterBar({
   onListChange: (id: string) => void;
   onWorkflowChange: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   const hasFilter = listId || workflowId;
   return (
     <div className="flex items-center gap-2">
@@ -444,7 +448,7 @@ function FilterBar({
             : "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300"
         }`}
       >
-        <option value="">All lists</option>
+        <option value="">{t("dashboard.allLists")}</option>
         {lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
       </select>
       <select
@@ -456,7 +460,7 @@ function FilterBar({
             : "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300"
         }`}
       >
-        <option value="">All campaigns</option>
+        <option value="">{t("dashboard.allCampaigns")}</option>
         {workflows.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
       </select>
       {hasFilter && (
@@ -464,7 +468,7 @@ function FilterBar({
           onClick={() => { onListChange(""); onWorkflowChange(""); }}
           className="h-8 px-2.5 rounded-xl text-xs font-medium text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
         >
-          Clear
+          {t("common.clear")}
         </button>
       )}
     </div>
@@ -475,6 +479,7 @@ function FilterBar({
 
 export default function Dashboard() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [agentStats, setAgentStats] = useState<AgentStats | null>(null);
   // Open-core: the AI usage panel reflects the premium AI writer — hidden in the public build.
@@ -491,6 +496,7 @@ export default function Dashboard() {
       .then((accounts: AccountRow[]) => {
         const auth = accounts.find(a => a.is_authenticated === 1);
         if (auth) setAccount(auth);
+        else if (accounts.length > 0) setAccount(accounts[0]);
       })
       .catch(() => {});
   }, []);
@@ -500,8 +506,7 @@ export default function Dashboard() {
       .then((d) => { if (d) setHasPremium(!!d.hasPremium); }).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadStats = () => {
     const params = new URLSearchParams({ days: String(days) });
     if (listId) params.set("list_id", listId);
     if (workflowId) params.set("workflow_id", workflowId);
@@ -521,58 +526,64 @@ export default function Dashboard() {
       }),
     ])
       .then(([s, a]) => {
-        if (!cancelled && s && s.totals) {
+        if (s && s.totals) {
           setStats(s);
           setAgentStats(a || { daily: [] });
           setError(false);
-        } else if (!cancelled && !s) {
-          // Handled or redirected
-        } else if (!cancelled) {
-          setError(true);
         }
       })
-      .catch((e) => {
-        console.error("Dashboard stats error:", e);
-        if (!cancelled) setError(true);
-      });
-    return () => { cancelled = true; };
-  }, [days, listId, workflowId, router]);
+      .catch(() => setError(true));
+  };
+
+  useEffect(() => {
+    loadStats();
+  }, [days, listId, workflowId]);
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 text-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-xs">
-        <p className="text-red-500 font-semibold mb-3 text-sm">No se pudo cargar el panel de estadísticas.</p>
+      <div className="flex flex-col items-center justify-center p-8 text-center">
+        <p className="text-sm text-red-500 mb-2">{t("dashboard.loadError")}</p>
         <button
-          onClick={() => {
-            setError(false);
-            setStats(null);
-            router.reload();
-          }}
-          className="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-semibold text-xs shadow-xs transition-colors"
+          onClick={() => { setError(false); loadStats(); }}
+          className="text-xs text-brand-500 hover:underline"
         >
-          Reintentar
+          {t("dashboard.retry")}
         </button>
       </div>
     );
   }
 
-  if (!stats || !stats.totals) {
+  if (!stats) {
     return (
-      <div className="flex items-center gap-2 text-gray-400 text-sm py-10 font-medium">
-        <span className="loading loading-spinner loading-xs" />
-        Cargando…
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-sm text-gray-500 dark:text-gray-400">{t("common.loading")}</p>
       </div>
     );
   }
 
   const { totals, today } = stats;
+
   const acceptanceRate = totals.connections_requested > 0
-    ? Math.round((totals.connected / totals.connections_requested) * 100) : 0;
+    ? Math.round((totals.connected / totals.connections_requested) * 100)
+    : 0;
+
   const replyRate = totals.messages_sent > 0
-    ? Math.round((totals.replies_received / totals.messages_sent) * 100) : 0;
+    ? Math.round((totals.replies_received / totals.messages_sent) * 100)
+    : 0;
+
   const emailReplyRate = totals.emails_sent > 0
-    ? Math.round((totals.email_replies / totals.emails_sent) * 100) : 0;
-  const maxFunnelValue = totals.total_targets;
+    ? Math.round((totals.email_replies / totals.emails_sent) * 100)
+    : 0;
+
+  const maxFunnelValue = Math.max(
+    totals.total_targets,
+    totals.connected,
+    totals.replies_received,
+    totals.emails_sent,
+    totals.email_replies,
+    1
+  );
 
   return (
     <>
@@ -588,10 +599,10 @@ export default function Dashboard() {
         {/* Title & Subtitle */}
         <div className="space-y-1">
           <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-            Dashboard
+            {t("dashboard.title")}
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Resumen en tiempo real de prospección, conversiones y actividad.
+            {t("dashboard.subtitle")}
           </p>
         </div>
 
@@ -609,12 +620,12 @@ export default function Dashboard() {
 
           {/* Today pills */}
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 mr-0.5">Hoy</span>
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 mr-0.5">{t("common.today")}</span>
             {[
-              { label: `${today.visits_today} visitas`,       color: "#5aa2ff" },
-              { label: `${today.connections_today} conexiones`, color: "#32d583" },
-              { label: `${today.messages_today} mensajes`,   color: "#f4b740" },
-              { label: `${today.inmails_today} inmails`,     color: "#c084fc" },
+              { label: t("dashboard.todayVisits", { count: today.visits_today }),       color: "#5aa2ff" },
+              { label: t("dashboard.todayConnects", { count: today.connections_today }), color: "#32d583" },
+              { label: t("dashboard.todayMessages", { count: today.messages_today }),   color: "#f4b740" },
+              { label: t("dashboard.todayInmails", { count: today.inmails_today }),     color: "#c084fc" },
             ].map(p => (
               <span
                 key={p.label}
@@ -634,18 +645,18 @@ export default function Dashboard() {
         <div>
           <ChannelHeader
             icon={<RiLinkedinBoxLine size={13} />}
-            label="LinkedIn"
+            label={t("dashboard.channelLinkedin")}
             color="#5aa2ff"
           />
           <div className="grid grid-cols-5 gap-3.5">
             <KpiCard
-              label="Profiles visited"
+              label={t("dashboard.profilesVisited")}
               value={totals.connections_requested}
               color="#5aa2ff"
               icon={<FiEye size={14} />}
             />
             <KpiCard
-              label="Connections sent"
+              label={t("dashboard.connectionRequests")}
               value={totals.connections_requested}
               sub={acceptanceRate > 0 ? `${acceptanceRate}% accepted` : undefined}
               color="#32d583"
@@ -653,20 +664,20 @@ export default function Dashboard() {
               pulse={totals.active_runs > 0}
             />
             <KpiCard
-              label="Messages sent"
+              label={t("dashboard.messagesSent")}
               value={totals.messages_sent}
               sub={replyRate > 0 ? `${replyRate}% replied` : undefined}
               color="#f4b740"
               icon={<FiMessageSquare size={14} />}
             />
             <KpiCard
-              label="InMails sent"
+              label={t("dashboard.inmailsSent")}
               value={totals.inmails_sent}
               color="#e879f9"
               icon={<RiLinkedinBoxLine size={14} />}
             />
             <KpiCard
-              label="LI Replies"
+              label={t("inbox.title")}
               value={totals.replies_received}
               color="#c084fc"
               icon={<FiRepeat size={14} />}
@@ -678,31 +689,31 @@ export default function Dashboard() {
         <div>
           <ChannelHeader
             icon={<RiMailSendLine size={13} />}
-            label="Email"
+            label={t("dashboard.channelEmail")}
             color="#fb923c"
           />
           <div className="grid grid-cols-4 gap-3.5">
             <KpiCard
-              label="Emails sent"
+              label={t("dashboard.emailsSent")}
               value={totals.emails_sent}
               sub={emailReplyRate > 0 ? `${emailReplyRate}% replied` : undefined}
               color="#fb923c"
               icon={<RiMailSendLine size={14} />}
             />
             <KpiCard
-              label="Email replies"
+              label={t("dashboard.emailsReplied")}
               value={totals.email_replies}
               color="#32d583"
               icon={<RiReplyLine size={14} />}
             />
             <KpiCard
-              label="Total targets"
+              label={t("contacts.title")}
               value={totals.total_targets}
               color="#808080"
               icon={<FiUsers size={14} />}
             />
             <KpiCard
-              label="Connected"
+              label={t("dashboard.connected")}
               value={totals.connected}
               color="#32d583"
               icon={<FiUserPlus size={14} />}
@@ -722,11 +733,11 @@ export default function Dashboard() {
               <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Funnel</span>
             </div>
             <div className="divide-y divide-gray-100 dark:divide-gray-800 py-1">
-              <FunnelRow icon={<FiUsers size={12} />}        color="#808080" label="Targets"        value={totals.total_targets}       max={maxFunnelValue} />
-              <FunnelRow icon={<FiUserPlus size={12} />}     color="#32d583" label="Connected"      value={totals.connected}           max={maxFunnelValue} />
-              <FunnelRow icon={<FiRepeat size={12} />}       color="#c084fc" label="LI replies"     value={totals.replies_received}    max={maxFunnelValue} />
-              <FunnelRow icon={<RiMailSendLine size={12} />} color="#fb923c" label="Emails sent"    value={totals.emails_sent}         max={maxFunnelValue} />
-              <FunnelRow icon={<RiReplyLine size={12} />}    color="#32d583" label="Email replies"  value={totals.email_replies}       max={maxFunnelValue} />
+              <FunnelRow icon={<FiUsers size={12} />}        color="#808080" label={t("contacts.title")}        value={totals.total_targets}       max={maxFunnelValue} />
+              <FunnelRow icon={<FiUserPlus size={12} />}     color="#32d583" label={t("dashboard.connected")}      value={totals.connected}           max={maxFunnelValue} />
+              <FunnelRow icon={<FiRepeat size={12} />}       color="#c084fc" label={t("inbox.title")}     value={totals.replies_received}    max={maxFunnelValue} />
+              <FunnelRow icon={<RiMailSendLine size={12} />} color="#fb923c" label={t("dashboard.emailsSent")}    value={totals.emails_sent}         max={maxFunnelValue} />
+              <FunnelRow icon={<RiReplyLine size={12} />}    color="#32d583" label={t("dashboard.emailsReplied")}  value={totals.email_replies}       max={maxFunnelValue} />
             </div>
           </div>
 

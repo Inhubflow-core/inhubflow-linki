@@ -142,11 +142,11 @@ export default function ListsPage({ initialLists }: { initialLists: List[] }) {
         <div className="space-y-1">
           <div className="flex items-center gap-2.5">
             <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-              {t("nav.lists")}
+              {t("lists.title")}
             </h1>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Listas de prospectos y contactos organizados por segmentos y campañas.
+            {t("lists.subtitle")}
           </p>
         </div>
 
@@ -162,7 +162,7 @@ export default function ListsPage({ initialLists }: { initialLists: List[] }) {
             onClick={() => setShowModal(true)}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-all shadow-xs"
           >
-            <RiAddLine size={16} /> Nueva Lista
+            <RiAddLine size={16} /> {t("lists.newList")}
           </button>
         </div>
       </div>
@@ -171,9 +171,9 @@ export default function ListsPage({ initialLists }: { initialLists: List[] }) {
       {activeJobs.length > 0 && (
         <div className="mb-6 rounded-lg border border-base-300/50 bg-base-200/40 p-4" data-tour="lists-jobs">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold">Import jobs</h2>
+            <h2 className="text-sm font-semibold">{t("lists.importJobs")}</h2>
             <span className="text-xs text-base-content/50">
-              {importedToday} / {dailyCap} contacts imported today
+              {t("lists.contactsImportedToday", { current: importedToday, max: dailyCap })}
             </span>
           </div>
           <div className="flex flex-col gap-2">
@@ -186,15 +186,15 @@ export default function ListsPage({ initialLists }: { initialLists: List[] }) {
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-sm truncate">{j.list_name ?? "—"}</span>
                       {j.batch_index > 1 && (
-                        <span className="text-xs text-base-content/40">batch {j.batch_index}</span>
+                        <span className="text-xs text-base-content/40">{t("lists.batch", { index: j.batch_index })}</span>
                       )}
                       {scheduled ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-warning/15 text-warning">
-                          <RiCalendarLine size={11} /> Scheduled {j.scheduled_for}
+                          <RiCalendarLine size={11} /> {t("lists.scheduled", { date: j.scheduled_for ?? "" })}
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-info/15 text-info">
-                          <span className="loading loading-spinner" style={{ width: 9, height: 9 }} /> Scraping {pct}%
+                          <span className="loading loading-spinner" style={{ width: 9, height: 9 }} /> {t("lists.scraping", { pct })}
                         </span>
                       )}
                     </div>
@@ -206,14 +206,14 @@ export default function ListsPage({ initialLists }: { initialLists: List[] }) {
                     <span className="text-xs text-base-content/40">
                       {scheduled
                         ? `Resumes at page ${j.start_page} — capped at ${dailyCap}/day`
-                        : `${j.count} / ${j.total} this batch`}
+                        : `${j.count} / ${j.total}`}
                     </span>
                   </div>
                   <button
                     className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-error/10 text-error border border-error/20 hover:bg-error/20 transition-colors shrink-0"
                     onClick={() => cancelImport(j.id)}
                   >
-                    <RiCloseLine size={12} /> Cancel
+                    <RiCloseLine size={12} /> {t("common.cancel")}
                   </button>
                 </div>
               );
@@ -224,18 +224,18 @@ export default function ListsPage({ initialLists }: { initialLists: List[] }) {
 
       {lists.length === 0 ? (
         <div className="text-center py-16 text-base-content/40 text-sm">
-          No lists yet. Create one and import leads from Sales Navigator.
+          {t("lists.noLists")}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-base-300/50">
           <table className="table w-full text-sm">
             <thead>
               <tr className="border-base-300/50 text-base-content/50 text-xs uppercase tracking-wide">
-                <th>Name</th>
-                <th>Leads</th>
-                <th>Campaign</th>
-                <th>Import</th>
-                <th>Created</th>
+                <th>{t("common.name")}</th>
+                <th>{t("nav.contacts")}</th>
+                <th>{t("nav.campaigns")}</th>
+                <th>{t("common.import")}</th>
+                <th>{t("common.status")}</th>
                 <th></th>
               </tr>
             </thead>
@@ -253,13 +253,15 @@ export default function ListsPage({ initialLists }: { initialLists: List[] }) {
                     )}
                   </td>
                   <td>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-base-300 text-base-content/60">{l.target_count}</span>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-base-300 text-base-content/60">
+                      {l.target_count} {l.target_count === 1 ? t("lists.leadsCount", { count: 1 }) : t("lists.leadsCountPlural", { count: l.target_count })}
+                    </span>
                   </td>
                   <td>
                     {l.active_run_id ? (
                       <span className="inline-flex items-center gap-1.5 text-xs text-base-content/60">
                         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${l.active_run_status === 'running' ? 'bg-success animate-pulse' : 'bg-warning'}`} />
-                        {l.active_workflow_name ?? 'Active'}
+                        {l.active_workflow_name ?? t("common.active")}
                       </span>
                     ) : (
                       <span className="text-base-content/20 text-xs">—</span>
@@ -309,33 +311,33 @@ export default function ListsPage({ initialLists }: { initialLists: List[] }) {
       {showModal && (
         <div className="modal modal-open">
           <div className="modal-box bg-base-200 border border-base-300/50 max-w-md">
-            <h3 className="font-semibold text-base mb-4">New List</h3>
+            <h3 className="font-semibold text-base mb-4">{t("lists.newList")}</h3>
             <form onSubmit={createList} className="flex flex-col gap-3">
               <div>
-                <label className="label text-xs text-base-content/50 pb-1">List name</label>
+                <label className="label text-xs text-base-content/50 pb-1">{t("common.name")}</label>
                 <input
                   className="input input-bordered input-sm w-full bg-base-300/50"
-                  placeholder="e.g. Q1 SaaS Founders"
+                  placeholder={t("lists.namePlaceholder")}
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   required
                 />
               </div>
               <div>
-                <label className="label text-xs text-base-content/50 pb-1">Description (optional)</label>
+                <label className="label text-xs text-base-content/50 pb-1">{t("common.description")} {t("common.optional")}</label>
                 <input
                   className="input input-bordered input-sm w-full bg-base-300/50"
-                  placeholder="e.g. Founders from Sales Nav search"
+                  placeholder={t("lists.descPlaceholder")}
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                 />
               </div>
               <div className="modal-action mt-2">
                 <button type="button" className="btn btn-ghost btn-sm text-base-content/60" onClick={() => setShowModal(false)}>
-                  Cancel
+                  {t("common.cancel")}
                 </button>
                 <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-50" disabled={loading}>
-                  {loading ? <span className="loading loading-spinner loading-xs" /> : "Create"}
+                  {loading ? <span className="loading loading-spinner loading-xs" /> : t("lists.createList")}
                 </button>
               </div>
             </form>

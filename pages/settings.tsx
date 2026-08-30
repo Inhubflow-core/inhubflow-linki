@@ -157,6 +157,7 @@ export default function SettingsPage({
   initialTab: Tab;
 }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>(initialTab);
 
   // Open-core: the Integrations tab holds Apollo (free) + OpenRouter/Claude (premium AI)
@@ -167,11 +168,18 @@ export default function SettingsPage({
     fetch("/api/premium-status").then((r) => r.ok ? r.json() : null)
       .then((d) => { if (d) setHasPremium(!!d.hasPremium); }).catch(() => {});
   }, []);
-  const visibleTabs = TABS;
+  
+  const visibleTabs = [
+    { key: "linkedin" as Tab, label: t("settings.tabLinkedin"), icon: RiLinkedinBoxLine },
+    { key: "email" as Tab, label: t("settings.tabEmail"), icon: RiMailLine },
+    { key: "templates" as Tab, label: t("settings.tabTemplates"), icon: RiMessage2Line },
+    { key: "integrations" as Tab, label: t("settings.tabIntegrations"), icon: RiPlugLine },
+    { key: "general" as Tab, label: t("settings.tabGeneral"), icon: RiSettings3Line },
+  ];
 
-  function switchTab(t: Tab) {
-    setTab(t);
-    router.replace(`/settings?tab=${t}`, undefined, { shallow: true });
+  function switchTab(tKey: Tab) {
+    setTab(tKey);
+    router.replace(`/settings?tab=${tKey}`, undefined, { shallow: true });
   }
 
   return (
@@ -187,11 +195,11 @@ export default function SettingsPage({
           <div className="space-y-1">
             <div className="flex items-center gap-2.5">
               <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                Configuración
+                {t("settings.title")}
               </h1>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Cuentas de LinkedIn, Email, plantillas, integraciones y preferencias generales.
+              {t("settings.subtitle")}
             </p>
           </div>
         </div>

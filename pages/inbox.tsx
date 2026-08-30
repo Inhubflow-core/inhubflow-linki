@@ -1316,7 +1316,7 @@ export default function InboxPage() {
             </h1>
             {!loading && filtered.length > 0 && (
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500/15 text-brand-600 dark:text-brand-400">
-                {filtered.length} {filtered.length === 1 ? "conversación" : "conversaciones"}
+                {filtered.length} {filtered.length === 1 ? t("inbox.conversationsCount", { count: 1 }) : t("inbox.conversationsCountPlural", { count: filtered.length })}
               </span>
             )}
           </div>
@@ -1344,7 +1344,7 @@ export default function InboxPage() {
               size={15}
               className={notificationPermission === "granted" ? "text-success" : ""}
             />
-            {notificationPermission === "granted" ? "Alertas (Probar)" : "Activar Alertas"}
+            {notificationPermission === "granted" ? t("inbox.alertsActive") : t("inbox.activateAlerts")}
           </button>
 
           <button
@@ -1354,7 +1354,7 @@ export default function InboxPage() {
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs md:text-sm font-medium bg-warning/10 border border-warning/30 text-warning hover:bg-warning/20 disabled:opacity-40 transition-all shadow-xs"
           >
             {diagnosing ? <RiLoader4Line size={14} className="animate-spin" /> : <RiPulseLine size={15} />}
-            {diagnosing ? "Diagnosticando..." : "Diagnóstico"}
+            {diagnosing ? t("inbox.diagnosing") : t("inbox.diagnose")}
           </button>
 
           <button
@@ -1364,7 +1364,7 @@ export default function InboxPage() {
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs md:text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-all shadow-xs disabled:opacity-40"
           >
             {syncingLinkedIn ? <RiLoader4Line size={14} className="animate-spin" /> : <RiLinkedinBoxLine size={15} />}
-            {syncingLinkedIn ? "Sincronizando..." : "Sincronizar LinkedIn"}
+            {syncingLinkedIn ? t("inbox.syncing") : t("inbox.syncLinkedIn")}
           </button>
 
           <button
@@ -1374,7 +1374,7 @@ export default function InboxPage() {
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 disabled:opacity-40 transition-colors shadow-xs"
           >
             {backfilling ? <RiLoader4Line size={13} className="animate-spin" /> : <RiRefreshLine size={14} />}
-            {backfilling ? t("inbox.backfilling") : "Recuperar"}
+            {backfilling ? t("inbox.backfilling") : t("inbox.backfill")}
           </button>
 
           <button
@@ -1383,7 +1383,7 @@ export default function InboxPage() {
             title={t("inbox.reclassifyAllTitle")}
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 disabled:opacity-40 transition-colors shadow-xs"
           >
-            {reclassifyingAll ? <RiLoader4Line size={13} className="animate-spin" /> : null}
+            {reclassifyingAll ? <RiLoader4Line size={13} className="animate-spin" /> : <RiRefreshLine size={14} />}
             {reclassifyingAll ? t("inbox.reclassifying") : t("inbox.reclassifyAll")}
           </button>
         </div>

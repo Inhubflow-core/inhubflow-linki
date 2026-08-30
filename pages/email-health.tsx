@@ -1,6 +1,7 @@
 import Head from "next/head";
 import { useEffect, useState, useCallback } from "react";
 import { RiMailLine, RiRefreshLine, RiShieldCheckLine, RiAlertLine } from "react-icons/ri";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 
 interface DayData { day: string; sent: number; limit: number; }
 interface AccountRow {
@@ -36,6 +37,7 @@ function formatDateTime(ts: string) {
 }
 
 export default function EmailHealth() {
+  const { t } = useTranslation();
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
@@ -70,18 +72,18 @@ export default function EmailHealth() {
           <div className="space-y-1">
             <div className="flex items-center gap-2.5">
               <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                Email Health
+                {t("emailHealth.title")}
               </h1>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Salud, límites de calentamiento (ramp-up) y volumen diario por cuenta de correo.
+              {t("emailHealth.subtitle")}
             </p>
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
             {lastRefresh && (
               <span className="text-xs text-gray-400">
-                Actualizado {formatTime(lastRefresh.toISOString())}
+                {t("emailHealth.updatedAt", { time: formatTime(lastRefresh.toISOString()) })}
               </span>
             )}
             <button
@@ -90,7 +92,7 @@ export default function EmailHealth() {
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
             >
               <RiRefreshLine size={16} className={loading ? "animate-spin" : ""} />
-              Actualizar
+              {t("common.refresh")}
             </button>
           </div>
         </div>
@@ -98,15 +100,15 @@ export default function EmailHealth() {
         {/* Summary pills */}
         <div className="flex items-center gap-4 mb-8">
           <div className="px-4 py-3 rounded-xl bg-base-200 border border-base-300/50">
-            <div className="text-xs text-base-content/40 mb-1">Sent today</div>
+            <div className="text-xs text-base-content/40 mb-1">{t("emailHealth.sentToday")}</div>
             <div className="text-2xl font-semibold text-base-content">{totalToday}</div>
           </div>
           <div className="px-4 py-3 rounded-xl bg-base-200 border border-base-300/50">
-            <div className="text-xs text-base-content/40 mb-1">Total limit today</div>
+            <div className="text-xs text-base-content/40 mb-1">{t("emailHealth.totalLimitToday")}</div>
             <div className="text-2xl font-semibold text-base-content">{totalLimit}</div>
           </div>
           <div className="px-4 py-3 rounded-xl bg-base-200 border border-base-300/50">
-            <div className="text-xs text-base-content/40 mb-1">Accounts active</div>
+            <div className="text-xs text-base-content/40 mb-1">{t("emailHealth.accountsActive")}</div>
             <div className="text-2xl font-semibold text-base-content">
               {data?.accounts.filter(a => a.sent_today > 0).length ?? 0}
             </div>

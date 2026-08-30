@@ -4,6 +4,7 @@ import { GetServerSideProps } from "next";
 import { useRouter } from "next/router";
 import { getDb } from "@/lib/db";
 import { toast } from "sonner";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 import {
   RiAddLine,
   RiDeleteBinLine,
@@ -160,6 +161,7 @@ export const getServerSideProps: GetServerSideProps = async () => {
 
 export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: WorkflowCard[] }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [workflows, setWorkflows] = useState<WorkflowCard[]>(initialWorkflows);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: "", description: "" });
@@ -186,7 +188,7 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
 
   async function deleteWorkflow(id: string) {
     await fetch(`/api/workflows/${id}`, { method: "DELETE" });
-    toast.success("Campaign deleted");
+    toast.success(t("workflows.campaignDeleted"));
     setWorkflows((prev) => prev.filter((w) => w.id !== id));
     setDeleteId(null);
   }
@@ -206,7 +208,7 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
       body: JSON.stringify({ is_archived: archive }),
     });
     setWorkflows((prev) => prev.map((w) => w.id === id ? { ...w, is_archived: archive ? 1 : 0 } : w));
-    toast.success(archive ? "Campaign archived" : "Campaign restored");
+    toast.success(archive ? t("workflows.campaignArchived") : t("workflows.campaignRestored"));
   }
 
   async function pauseRun(workflowId: string, runId: string) {
@@ -234,14 +236,14 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
         <div className="space-y-1">
           <div className="flex items-center gap-2.5">
             <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-              Campañas
+              {t("workflows.title")}
             </h1>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500/15 text-brand-600 dark:text-brand-400">
-              {activeWorkflows.length} {activeWorkflows.length === 1 ? "activa" : "activas"}
+              {activeWorkflows.length} {activeWorkflows.length === 1 ? t("workflows.activeCount", { count: 1 }) : t("workflows.activeCountPlural", { count: activeWorkflows.length })}
             </span>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Automatización y secuencias omnicanal de prospección en LinkedIn y Cold Email.
+            {t("workflows.subtitle")}
           </p>
         </div>
 
@@ -251,21 +253,21 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
             onClick={() => setShowModal(true)}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-all shadow-xs"
           >
-            <RiAddLine size={16} /> Nueva Campaña
+            <RiAddLine size={16} /> {t("workflows.newCampaign")}
           </button>
         </div>
       </div>
 
       {workflows.length === 0 ? (
         <div className="text-center py-20 border border-dashed border-base-300/60 rounded-xl text-base-content/30 text-sm">
-          No campaigns yet. Create one to start your outreach.
+          {t("workflows.noCampaigns")}
         </div>
       ) : (
         <>
         {/* Active campaigns */}
         {activeWorkflows.length === 0 ? (
           <div className="text-center py-12 border border-dashed border-base-300/60 rounded-xl text-base-content/30 text-sm mb-4">
-            No active campaigns. Create one or restore from the archive below.
+            {t("workflows.noActiveCampaigns")}
           </div>
         ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 mb-6">
@@ -491,13 +493,13 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
       {showModal && (
         <div className="modal modal-open">
           <div className="modal-box bg-base-200 border border-base-300/50 max-w-md">
-            <h3 className="font-semibold text-base mb-4">New Campaign</h3>
+            <h3 className="font-semibold text-base mb-4">{t("workflows.newCampaign")}</h3>
             <form onSubmit={createWorkflow} className="flex flex-col gap-3">
               <div>
-                <label className="label text-xs text-base-content/50 pb-1">Campaign name</label>
+                <label className="label text-xs text-base-content/50 pb-1">{t("common.name")}</label>
                 <input
                   className="input input-bordered input-sm w-full bg-base-300/50"
-                  placeholder="e.g. SaaS Founders Q1"
+                  placeholder={t("workflows.namePlaceholder")}
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   required
@@ -505,20 +507,20 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
                 />
               </div>
               <div>
-                <label className="label text-xs text-base-content/50 pb-1">Description (optional)</label>
+                <label className="label text-xs text-base-content/50 pb-1">{t("common.description")} {t("common.optional")}</label>
                 <input
                   className="input input-bordered input-sm w-full bg-base-300/50"
-                  placeholder="e.g. Visit → Connect → Message after 2 days"
+                  placeholder={t("workflows.descPlaceholder")}
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                 />
               </div>
               <div className="modal-action mt-2">
                 <button type="button" className="px-4 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300 transition-colors" onClick={() => setShowModal(false)}>
-                  Cancel
+                  {t("common.cancel")}
                 </button>
                 <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-50" disabled={loading}>
-                  {loading ? <span className="loading loading-spinner loading-xs" /> : "Create"}
+                  {loading ? <span className="loading loading-spinner loading-xs" /> : t("workflows.createCampaign")}
                 </button>
               </div>
             </form>
@@ -531,13 +533,10 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
       {deleteId !== null && (
         <div className="modal modal-open">
           <div className="modal-box bg-base-200 border border-base-300/50 max-w-sm">
-            <h3 className="font-semibold text-base mb-2">Delete campaign?</h3>
-            <p className="text-sm text-base-content/60 mb-4">
-              This will permanently delete the campaign and all its history. Cannot be undone.
-            </p>
+            <h3 className="font-semibold text-base mb-2">{t("workflows.deleteConfirm")}</h3>
             <div className="modal-action">
-              <button className="px-4 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300 transition-colors" onClick={() => setDeleteId(null)}>Cancel</button>
-              <button className="px-4 py-1.5 rounded-lg text-sm font-medium bg-error/15 text-error border border-error/25 hover:bg-error/25 transition-colors" onClick={() => deleteWorkflow(deleteId)}>Delete</button>
+              <button className="px-4 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300 transition-colors" onClick={() => setDeleteId(null)}>{t("common.cancel")}</button>
+              <button className="px-4 py-1.5 rounded-lg text-sm font-medium bg-error/15 text-error border border-error/25 hover:bg-error/25 transition-colors" onClick={() => deleteWorkflow(deleteId)}>{t("common.delete")}</button>
             </div>
           </div>
           <div className="modal-backdrop" onClick={() => setDeleteId(null)} />
