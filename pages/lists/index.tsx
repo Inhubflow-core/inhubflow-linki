@@ -131,26 +131,38 @@ export default function ListsPage({ initialLists }: { initialLists: List[] }) {
 
   return (
     <>
-    <Head>
-      <title>Lists — Dashboard B2B</title>
-      <meta name="description" content="Lead lists imported from LinkedIn Sales Navigator." />
-      <meta name="robots" content="noindex, nofollow" />
-    </Head>
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-semibold">Lists</h1>
-          <p className="text-base-content/50 text-sm mt-0.5">Lead lists imported from Sales Navigator</p>
+      <Head>
+        <title>Lists — Dashboard B2B</title>
+        <meta name="description" content="Lead lists imported from LinkedIn Sales Navigator." />
+        <meta name="robots" content="noindex, nofollow" />
+      </Head>
+      <div>
+        {/* ── Top Header Banner (Lead Finder Style) ── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 border border-brand-500/20 dark:border-brand-500/10 p-5 md:p-6 rounded-2xl mb-6">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+              {t("nav.lists")}
+            </h1>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Listas de prospectos y contactos organizados por segmentos y campañas.
+          </p>
         </div>
-        <div className="flex items-center gap-2.5">
+
+        <div className="flex items-center gap-2 shrink-0">
           <Link
             href="/lead-finder"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary hover:bg-primary/90 !text-white text-primary-content transition-colors shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
           >
-            <RiUserSearchLine size={15} /> {t("nav.leadFinder")}
+            <RiUserSearchLine size={16} /> {t("nav.leadFinder")}
           </Link>
-          <button data-tour="lists-new" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors" onClick={() => setShowModal(true)}>
-            <RiAddLine size={15} /> New List
+          <button
+            data-tour="lists-new"
+            onClick={() => setShowModal(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-all shadow-xs"
+          >
+            <RiAddLine size={16} /> Nueva Lista
           </button>
         </div>
       </div>

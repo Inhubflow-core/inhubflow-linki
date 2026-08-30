@@ -1307,19 +1307,22 @@ export default function InboxPage() {
         </div>
       )}
 
-      {/* ── Top Header Bar ── */}
-      <div className="flex items-center justify-between gap-3 mb-4 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold tracking-tight">{t("inbox.title")}</h1>
+      {/* ── Top Header Banner (Lead Finder Style) ── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 border border-brand-500/20 dark:border-brand-500/10 p-5 md:p-6 rounded-2xl mb-4 shrink-0">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+              {t("inbox.title")}
+            </h1>
             {!loading && filtered.length > 0 && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-primary/15 text-primary">
-                {filtered.length}
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500/15 text-brand-600 dark:text-brand-400">
+                {filtered.length} {filtered.length === 1 ? "conversación" : "conversaciones"}
               </span>
             )}
           </div>
-          <span className="hidden sm:inline text-xs text-base-content/40">·</span>
-          <p className="hidden sm:inline text-xs text-base-content/50">{t("inbox.subtitle")}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {t("inbox.subtitle")}
+          </p>
         </div>
 
         {/* Global Toolbar Buttons */}
@@ -1331,14 +1334,14 @@ export default function InboxPage() {
                 ? "Alertas activas: Haz clic para probar el timbre sonoro"
                 : "Activar notificaciones de escritorio y sonido"
             }
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all shadow-sm ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs md:text-sm font-medium border transition-all shadow-xs ${
               notificationPermission === "granted"
                 ? "bg-success/15 border-success/35 text-success hover:bg-success/25"
-                : "bg-base-200 border-base-300 text-base-content/70 hover:text-base-content hover:bg-base-300"
+                : "text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750"
             }`}
           >
             <RiNotification3Line
-              size={14}
+              size={15}
               className={notificationPermission === "granted" ? "text-success" : ""}
             />
             {notificationPermission === "granted" ? "Alertas (Probar)" : "Activar Alertas"}
@@ -1348,9 +1351,9 @@ export default function InboxPage() {
             onClick={handleDiagnose}
             disabled={diagnosing}
             title="Diagnosticar sesión y ver captura real de LinkedIn"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-warning/10 border border-warning/30 text-warning hover:bg-warning/20 disabled:opacity-40 transition-all shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs md:text-sm font-medium bg-warning/10 border border-warning/30 text-warning hover:bg-warning/20 disabled:opacity-40 transition-all shadow-xs"
           >
-            {diagnosing ? <RiLoader4Line size={13} className="animate-spin" /> : <RiPulseLine size={14} />}
+            {diagnosing ? <RiLoader4Line size={14} className="animate-spin" /> : <RiPulseLine size={15} />}
             {diagnosing ? "Diagnosticando..." : "Diagnóstico"}
           </button>
 
@@ -1358,9 +1361,9 @@ export default function InboxPage() {
             onClick={handleSyncLinkedIn}
             disabled={syncingLinkedIn}
             title="Sincronizar respuestas entrantes de LinkedIn ahora"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-primary/10 border border-primary/25 text-primary hover:bg-primary/20 disabled:opacity-40 transition-all shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs md:text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-all shadow-xs disabled:opacity-40"
           >
-            {syncingLinkedIn ? <RiLoader4Line size={13} className="animate-spin" /> : <RiLinkedinBoxLine size={14} />}
+            {syncingLinkedIn ? <RiLoader4Line size={14} className="animate-spin" /> : <RiLinkedinBoxLine size={15} />}
             {syncingLinkedIn ? "Sincronizando..." : "Sincronizar LinkedIn"}
           </button>
 
@@ -1368,9 +1371,9 @@ export default function InboxPage() {
             onClick={handleBackfill}
             disabled={backfilling}
             title={t("inbox.backfillTitle")}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium bg-base-200 border border-base-300/50 text-base-content/70 hover:bg-base-300/50 disabled:opacity-40 transition-colors"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 disabled:opacity-40 transition-colors shadow-xs"
           >
-            {backfilling ? <RiLoader4Line size={12} className="animate-spin" /> : <RiRefreshLine size={13} />}
+            {backfilling ? <RiLoader4Line size={13} className="animate-spin" /> : <RiRefreshLine size={14} />}
             {backfilling ? t("inbox.backfilling") : "Recuperar"}
           </button>
 
@@ -1378,9 +1381,9 @@ export default function InboxPage() {
             onClick={handleReclassifyAll}
             disabled={reclassifyingAll}
             title={t("inbox.reclassifyAllTitle")}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium bg-base-200 border border-base-300/50 text-base-content/70 hover:bg-base-300/50 disabled:opacity-40 transition-colors"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 disabled:opacity-40 transition-colors shadow-xs"
           >
-            {reclassifyingAll ? <RiLoader4Line size={12} className="animate-spin" /> : null}
+            {reclassifyingAll ? <RiLoader4Line size={13} className="animate-spin" /> : null}
             {reclassifyingAll ? t("inbox.reclassifying") : t("inbox.reclassifyAll")}
           </button>
         </div>

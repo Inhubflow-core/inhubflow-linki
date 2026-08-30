@@ -1,4 +1,5 @@
 import Head from "next/head";
+import Link from "next/link";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { GetServerSideProps } from "next";
 import { useRouter } from "next/router";
@@ -6,7 +7,7 @@ import { getDb } from "@/lib/db";
 import { toast } from "sonner";
 import {
   RiExternalLinkLine, RiArrowLeftSLine, RiArrowRightSLine,
-  RiUserFollowLine, RiUserAddLine, RiUserLine,
+  RiUserFollowLine, RiUserAddLine, RiUserLine, RiUserSearchLine,
   RiMessage2Line, RiReplyLine, RiMailCheckLine, RiAtLine, RiMailLine,
   RiSearchLine, RiAddLine, RiListCheck2, RiDeleteBinLine,
 } from "react-icons/ri";
@@ -213,21 +214,36 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
         <meta name="robots" content="noindex, nofollow" />
       </Head>
       <div>
-        {/* Header */}
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h1 className="text-xl font-semibold">Contacts</h1>
-            <p className="text-base-content/50 text-sm mt-0.5">
-              {total.toLocaleString()} contact{total !== 1 ? "s" : ""}
-              {hasActiveFilters ? " matching filters" : " total"}
+        {/* ── Top Header Banner (Lead Finder Style) ── */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 border border-brand-500/20 dark:border-brand-500/10 p-5 md:p-6 rounded-2xl mb-6">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                Contactos
+              </h1>
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500/15 text-brand-600 dark:text-brand-400">
+                {total.toLocaleString()} {total === 1 ? "contacto" : "contactos"}
+              </span>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Base de datos unificada de prospectos capturados, enriquecidos y contactados.
             </p>
           </div>
-          <button
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
-            onClick={() => setShowNewContact(true)}
-          >
-            <RiAddLine size={15} /> New Contact
-          </button>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Link
+              href="/lead-finder"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
+            >
+              <RiUserSearchLine size={16} /> Lead Finder
+            </Link>
+            <button
+              onClick={() => setShowNewContact(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-all shadow-xs"
+            >
+              <RiAddLine size={16} /> Nuevo Contacto
+            </button>
+          </div>
         </div>
 
         {/* Filter row */}

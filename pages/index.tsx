@@ -583,14 +583,20 @@ export default function Dashboard() {
 
     <div className="space-y-6">
 
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">Your outreach at a glance.</p>
+      {/* ── Top Header Banner (Lead Finder Style) ── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 border border-brand-500/20 dark:border-brand-500/10 p-5 md:p-6 rounded-2xl">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+              Dashboard
+            </h1>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Resumen en tiempo real de prospección, conversiones y actividad.
+          </p>
         </div>
 
-        <div className="flex items-center gap-3" data-tour="dashboard-filters">
+        <div className="flex flex-wrap items-center gap-3" data-tour="dashboard-filters">
           {/* Filters */}
           <FilterBar
             lists={stats.lists}
@@ -602,18 +608,18 @@ export default function Dashboard() {
           />
 
           {/* Today pills */}
-          <div className="flex items-center gap-1.5 pl-3 border-l border-gray-200 dark:border-gray-800">
-            <span className="text-xs font-medium text-gray-400 mr-0.5">Today</span>
+          <div className="flex items-center gap-1.5 pl-3 border-l border-gray-200 dark:border-gray-700/60 flex-wrap">
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 mr-0.5">Hoy</span>
             {[
-              { label: `${today.visits_today} visits`,       color: "#5aa2ff" },
-              { label: `${today.connections_today} connects`, color: "#32d583" },
-              { label: `${today.messages_today} messages`,   color: "#f4b740" },
+              { label: `${today.visits_today} visitas`,       color: "#5aa2ff" },
+              { label: `${today.connections_today} conexiones`, color: "#32d583" },
+              { label: `${today.messages_today} mensajes`,   color: "#f4b740" },
               { label: `${today.inmails_today} inmails`,     color: "#c084fc" },
             ].map(p => (
               <span
                 key={p.label}
                 className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold"
-                style={{ background: `${p.color}15`, color: p.color }}
+                style={{ background: `${p.color}18`, color: p.color }}
               >
                 {p.label}
               </span>

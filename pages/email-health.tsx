@@ -64,28 +64,33 @@ export default function EmailHealth() {
 
   return (
     <>
-      <Head><title>Email Health — Dashboard B2B</title></Head>
-      <div className="p-8 max-w-7xl">
-
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-xl font-semibold text-base-content">Email Health</h1>
-            <p className="text-sm text-base-content/50 mt-0.5">Daily send volume per account vs ramp limits</p>
+      <div className="space-y-6 pb-12">
+        {/* ── Top Header Banner (Lead Finder Style) ── */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 border border-brand-500/20 dark:border-brand-500/10 p-5 md:p-6 rounded-2xl mb-6">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                Email Health
+              </h1>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Salud, límites de calentamiento (ramp-up) y volumen diario por cuenta de correo.
+            </p>
           </div>
-          <div className="flex items-center gap-3">
+
+          <div className="flex items-center gap-3 shrink-0">
             {lastRefresh && (
-              <span className="text-xs text-base-content/30">
-                Updated {formatTime(lastRefresh.toISOString())}
+              <span className="text-xs text-gray-400">
+                Actualizado {formatTime(lastRefresh.toISOString())}
               </span>
             )}
             <button
               onClick={load}
               disabled={loading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-base-300 text-base-content/70 hover:text-base-content border border-base-300/50 hover:bg-base-300/80 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
             >
-              <RiRefreshLine size={13} className={loading ? "animate-spin" : ""} />
-              Refresh
+              <RiRefreshLine size={16} className={loading ? "animate-spin" : ""} />
+              Actualizar
             </button>
           </div>
         </div>

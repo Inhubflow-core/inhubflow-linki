@@ -181,11 +181,19 @@ export default function SettingsPage({
         <meta name="robots" content="noindex, nofollow" />
       </Head>
 
-      <div className="max-w-3xl">
-        {/* Page header */}
-        <div className="mb-6">
-          <h1 className="text-xl font-semibold">Settings</h1>
-          <p className="text-base-content/50 text-sm mt-0.5">Accounts, integrations, and preferences</p>
+      <div className="space-y-6 pb-12 max-w-5xl">
+        {/* ── Top Header Banner (Lead Finder Style) ── */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 border border-brand-500/20 dark:border-brand-500/10 p-5 md:p-6 rounded-2xl mb-6">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                Configuración
+              </h1>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Cuentas de LinkedIn, Email, plantillas, integraciones y preferencias generales.
+            </p>
+          </div>
         </div>
 
         {/* Tabs */}

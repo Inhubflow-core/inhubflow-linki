@@ -223,24 +223,37 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
 
   return (
     <>
-    <Head>
-      <title>Campaigns — Dashboard B2B</title>
-      <meta name="description" content="Manage your LinkedIn outreach campaigns and sequences." />
-      <meta name="robots" content="noindex, nofollow" />
-    </Head>
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-semibold">Campaigns</h1>
-          <p className="text-base-content/50 text-sm mt-0.5">Your outreach sequences</p>
+      <Head>
+        <title>Campaigns — Dashboard B2B</title>
+        <meta name="description" content="Manage your LinkedIn outreach campaigns and sequences." />
+        <meta name="robots" content="noindex, nofollow" />
+      </Head>
+      <div>
+        {/* ── Top Header Banner (Lead Finder Style) ── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 border border-brand-500/20 dark:border-brand-500/10 p-5 md:p-6 rounded-2xl mb-6">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+              Campañas
+            </h1>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500/15 text-brand-600 dark:text-brand-400">
+              {activeWorkflows.length} {activeWorkflows.length === 1 ? "activa" : "activas"}
+            </span>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Automatización y secuencias omnicanal de prospección en LinkedIn y Cold Email.
+          </p>
         </div>
-        <button
-          data-tour="workflows-new"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
-          onClick={() => setShowModal(true)}
-        >
-          <RiAddLine size={15} /> New Campaign
-        </button>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            data-tour="workflows-new"
+            onClick={() => setShowModal(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-all shadow-xs"
+          >
+            <RiAddLine size={16} /> Nueva Campaña
+          </button>
+        </div>
       </div>
 
       {workflows.length === 0 ? (

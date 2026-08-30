@@ -108,18 +108,31 @@ export default function CompaniesPage({ initialCompanies }: { initialCompanies: 
         <meta name="robots" content="noindex, nofollow" />
       </Head>
       <div>
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-xl font-semibold">Companies</h1>
-            <p className="text-base-content/50 text-sm mt-0.5">Organisations associated with your contacts</p>
+        {/* ── Top Header Banner (Lead Finder Style) ── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 border border-brand-500/20 dark:border-brand-500/10 p-5 md:p-6 rounded-2xl mb-6">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+              Empresas
+            </h1>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500/15 text-brand-600 dark:text-brand-400">
+              {companies.length} {companies.length === 1 ? "empresa" : "empresas"}
+            </span>
           </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Organizaciones y cuentas asociadas a tus contactos y campañas.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
           <button
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
             onClick={openCreate}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-all shadow-xs"
           >
-            <RiAddLine size={15} /> Add Company
+            <RiAddLine size={16} /> Añadir Empresa
           </button>
         </div>
+      </div>
 
         <div className="mb-4">
           <input
