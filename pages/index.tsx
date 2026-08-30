@@ -584,8 +584,9 @@ export default function Dashboard() {
     <div className="space-y-6">
 
       {/* ── Top Header Banner (Lead Finder Style) ── */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 border border-brand-500/20 dark:border-brand-500/10 p-5 md:p-6 rounded-2xl">
-        <div className="space-y-1 shrink-0">
+      <div className="flex flex-col gap-4 bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 border border-brand-500/20 dark:border-brand-500/10 p-5 md:p-6 rounded-2xl">
+        {/* Title & Subtitle */}
+        <div className="space-y-1">
           <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
             Dashboard
           </h1>
@@ -594,7 +595,8 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 shrink-0" data-tour="dashboard-filters">
+        {/* Filters and Today Metrics row (below text) */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-brand-500/15 dark:border-brand-500/10" data-tour="dashboard-filters">
           {/* Filters */}
           <FilterBar
             lists={stats.lists}
@@ -606,7 +608,7 @@ export default function Dashboard() {
           />
 
           {/* Today pills */}
-          <div className="flex items-center gap-1.5 sm:pl-3 sm:border-l border-gray-200 dark:border-gray-700/60 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 mr-0.5">Hoy</span>
             {[
               { label: `${today.visits_today} visitas`,       color: "#5aa2ff" },
@@ -616,7 +618,7 @@ export default function Dashboard() {
             ].map(p => (
               <span
                 key={p.label}
-                className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold"
+                className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap"
                 style={{ background: `${p.color}18`, color: p.color }}
               >
                 {p.label}
