@@ -1,26 +1,34 @@
 import Head from "next/head";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   RiAttachment2,
+  RiBuildingLine,
+  RiCheckDoubleLine,
+  RiCheckLine,
   RiCloseLine,
   RiDeleteBinLine,
   RiEmotionLine,
   RiExternalLinkLine,
   RiFilePdfLine,
   RiFileTextLine,
+  RiFilter3Line,
   RiImageLine,
   RiInboxLine,
+  RiInformationLine,
   RiLinkedinBoxLine,
   RiLoader4Line,
   RiMailLine,
   RiNotification3Line,
   RiPulseLine,
+  RiRefreshLine,
   RiRobotLine,
   RiSearchLine,
   RiSendPlaneLine,
   RiSparklingLine,
+  RiTimeLine,
+  RiUserLine,
   RiVideoLine,
   RiVolumeUpLine,
 } from "react-icons/ri";
@@ -32,6 +40,8 @@ import type { EmailMessage } from "./api/inbox/thread";
 type Translate = (key: string, params?: TranslationParams) => string;
 
 type ChannelFilter = "all" | "email" | "linkedin";
+
+type QuickFilter = "all" | "linkedin" | "email" | "autopilot" | "handoff";
 
 interface LinkedInThreadMessage {
   externalThreadId: string;
@@ -51,37 +61,36 @@ interface LinkedInAccountOption {
   is_authenticated: number;
 }
 
+interface ChatAttachment {
+  name: string;
+  type: string;
+  size: number;
+  dataUrl: string;
+}
+
 const DATE_LOCALES: Record<Locale, string> = {
   en: "en-US",
   es: "es-ES",
   "pt-BR": "pt-BR",
 };
 
-const CHANNELS: ChannelFilter[] = ["all", "email", "linkedin"];
-
-const VERDICT_KEYS = [
-  "all",
-  "ooo_followup",
-  "substitute",
-  "call_task",
-  "human_reply",
-  "not_interested",
-  "pending",
-  "failed",
-  "none",
-] as const;
-
 const VERDICT_CLASSES: Record<string, string> = {
-  ooo_followup: "bg-warning/15 text-warning",
-  substitute: "bg-secondary/15 text-secondary",
-  call_task: "bg-success/15 text-success",
-  human_reply: "bg-info/15 text-info",
-  not_interested: "bg-error/15 text-error",
-  cancelled: "bg-base-300/60 text-base-content/50",
-  pending: "bg-base-300/60 text-base-content/50",
-  failed: "bg-error/15 text-error",
-  none: "bg-base-300/40 text-base-content/30",
+  ooo_followup: "bg-warning/15 text-warning border-warning/30",
+  substitute: "bg-secondary/15 text-secondary border-secondary/30",
+  call_task: "bg-success/15 text-success border-success/30",
+  human_reply: "bg-info/15 text-info border-info/30",
+  not_interested: "bg-error/15 text-error border-error/30",
+  cancelled: "bg-base-300/60 text-base-content/50 border-base-300",
+  pending: "bg-base-300/60 text-base-content/50 border-base-300",
+  failed: "bg-error/15 text-error border-error/30",
+  none: "bg-base-300/40 text-base-content/40 border-base-300/50",
 };
+
+const EMOJI_CATEGORIES = [
+  { label: "Populares B2B", emojis: ["👍", "🤝", "🚀", "💼", "📈", "🎯", "✅", "💡", "🔥", "⭐"] },
+  { label: "Expresiones", emojis: ["😀", "😊", "😉", "🤗", "🤩", "😎", "🥳", "🤔", "💬", "🙏"] },
+  { label: "Oficina & Tech", emojis: ["💻", "📱", "📊", "📅", "📍", "✉️", "🔗", "🏆", "📂", "🔍"] },
+];
 
 function timeAgo(iso: string, locale: Locale, t: Translate): string {
   const diff = Math.max(0, Date.now() - new Date(iso).getTime());
@@ -119,57 +128,6 @@ function verdictBadge(reply: InboxReply, t: Translate): { label: string; cls: st
   };
 }
 
-function OriginBadges({ reply, t }: { reply: InboxReply; t: Translate }) {
-  const hasLinkedIn = reply.channel === "linkedin" || reply.channel === "both";
-  const hasEmail = reply.channel === "email" || reply.channel === "both";
-
-  return (
-    <div className="flex flex-col items-start gap-1">
-      {hasLinkedIn && (
-        <span
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary max-w-48"
-          title={reply.linkedin_account_inferred ? t("inbox.originInferred") : reply.linkedin_account_email ?? undefined}
-        >
-          <RiLinkedinBoxLine size={11} className="shrink-0" />
-          <span className="truncate">
-            {reply.linkedin_account_name ?? reply.linkedin_account_email ?? t("inbox.unattributed")}
-          </span>
-        </span>
-      )}
-      {hasEmail && (
-        <span
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-info/10 text-info max-w-48"
-          title={reply.email_account_from ?? undefined}
-        >
-          <RiMailLine size={11} className="shrink-0" />
-          <span className="truncate">
-            {reply.email_account_name ?? reply.email_account_from ?? t("inbox.unattributed")}
-          </span>
-        </span>
-      )}
-    </div>
-  );
-}
-
-interface ChatAttachment {
-  name: string;
-  type: string;
-  size: number;
-  dataUrl: string;
-}
-
-const EMOJI_CATEGORIES = [
-  { label: "Populares B2B", emojis: ["👍", "🤝", "🚀", "💼", "📈", "🎯", "✅", "💡", "🔥", "⭐"] },
-  { label: "Expresiones", emojis: ["😀", "😊", "😉", "🤗", "🤩", "😎", "🥳", "🤔", "💬", "🙏"] },
-  { label: "Oficina & Tech", emojis: ["💻", "📱", "📊", "📅", "📍", "✉️", "🔗", "🏆", "📂", "🔍"] },
-];
-interface ReplyModalProps {
-  reply: InboxReply;
-  onClose: () => void;
-  onActionDone: () => void;
-  hasPremium: boolean;
-}
-
 function dedupeLinkedInMessages(msgs: LinkedInThreadMessage[]): LinkedInThreadMessage[] {
   const seen = new Set<string>();
   const result: LinkedInThreadMessage[] = [];
@@ -185,7 +143,8 @@ function dedupeLinkedInMessages(msgs: LinkedInThreadMessage[]): LinkedInThreadMe
 
 function playNotificationChime() {
   try {
-    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const AudioCtx =
+      window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
 
@@ -242,11 +201,46 @@ function triggerDesktopNotification(options: {
   }
 }
 
-function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProps) {
+function getInitials(name: string | null | undefined): string {
+  if (!name) return "??";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+function getAvatarColor(name: string | null | undefined): string {
+  if (!name) return "bg-primary/20 text-primary border-primary/30";
+  const colors = [
+    "bg-primary/20 text-primary border-primary/30",
+    "bg-secondary/20 text-secondary border-secondary/30",
+    "bg-accent/20 text-accent border-accent/30",
+    "bg-info/20 text-info border-info/30",
+    "bg-success/20 text-success border-success/30",
+    "bg-warning/20 text-warning border-warning/30",
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+}
+
+// ── RIGHT PANE: Full Chat Panel ──
+interface ChatPanelProps {
+  reply: InboxReply;
+  onActionDone: () => void;
+  hasPremium: boolean;
+}
+
+function ChatPanel({ reply, onActionDone, hasPremium }: ChatPanelProps) {
   const { t, locale } = useTranslation();
   const hasEmailReply = reply.channel === "email" || reply.channel === "both";
   const hasLinkedInReply = reply.channel === "linkedin" || reply.channel === "both";
   const canReplyByEmail = hasEmailReply && !!reply.email && !!reply.email_account_id;
+
+  const [activeChannelTab, setActiveChannelTab] = useState<"linkedin" | "email">(
+    hasLinkedInReply ? "linkedin" : "email"
+  );
   const [messages, setMessages] = useState<EmailMessage[]>([]);
   const [linkedinMessages, setLinkedinMessages] = useState<LinkedInThreadMessage[]>([]);
   const [loadingThread, setLoadingThread] = useState(canReplyByEmail);
@@ -257,8 +251,16 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [sending, setSending] = useState(false);
-  const [acting, setActing] = useState<"reclassify" | "cancel" | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+  const [aiSuggestionMeta, setAiSuggestionMeta] = useState<{ reasoning?: string; confidence?: string } | null>(null);
+  const [autopilot, setAutopilot] = useState(reply.sdr_autopilot === 1);
+  const [togglingAutopilot, setTogglingAutopilot] = useState(false);
   const threadEndRef = useRef<HTMLDivElement>(null);
+
+  // Sync autopilot state when reply prop updates
+  useEffect(() => {
+    setAutopilot(reply.sdr_autopilot === 1);
+  }, [reply.sdr_autopilot, reply.id]);
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -285,47 +287,7 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
     setReplyText((prev) => prev + emoji);
   }
 
-  const verdict = verdictBadge(reply, t);
-  const dispatch = (() => {
-    if (!reply.dispatch_result_json) return null;
-    try { return JSON.parse(reply.dispatch_result_json) as Record<string, unknown>; } catch { return null; }
-  })();
-  const scheduledFor = dispatch?.scheduled_for as string | undefined;
-
-  async function handleReclassify() {
-    if (!reply.reply_id) return;
-    setActing("reclassify");
-    try {
-      const response = await fetch(`/api/inbox/${reply.reply_id}/reclassify`, { method: "POST" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? t("inbox.errors.reclassify"));
-      toast.success(t("inbox.toasts.reclassified"));
-      onActionDone();
-      onClose();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("inbox.errors.reclassify"));
-    } finally {
-      setActing(null);
-    }
-  }
-
-  async function handleCancelFollowup() {
-    if (!reply.reply_id) return;
-    setActing("cancel");
-    try {
-      const response = await fetch(`/api/inbox/${reply.reply_id}/cancel-followup`, { method: "POST" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? t("inbox.errors.cancelFollowup"));
-      toast.success(t("inbox.toasts.followupCancelled"));
-      onActionDone();
-      onClose();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("inbox.errors.cancelFollowup"));
-    } finally {
-      setActing(null);
-    }
-  }
-
+  // Load Email Thread
   useEffect(() => {
     if (!canReplyByEmail || !reply.email_account_id || !reply.email) {
       setLoadingThread(false);
@@ -351,11 +313,16 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
       .catch((error) => {
         if (!cancelled) toast.error(error instanceof Error ? error.message : t("inbox.errors.loadThread"));
       })
-      .finally(() => { if (!cancelled) setLoadingThread(false); });
+      .finally(() => {
+        if (!cancelled) setLoadingThread(false);
+      });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [canReplyByEmail, reply.id, reply.email_account_id, reply.email, t]);
 
+  // Load LinkedIn Thread
   useEffect(() => {
     if (!hasLinkedInReply && !reply.linkedin_url) {
       setLoadingLinkedInThread(false);
@@ -398,16 +365,31 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
       .catch((error) => {
         if (!cancelled) toast.error(error instanceof Error ? error.message : t("inbox.errors.loadLinkedInThread"));
       })
-      .finally(() => { if (!cancelled) setLoadingLinkedInThread(false); });
+      .finally(() => {
+        if (!cancelled) setLoadingLinkedInThread(false);
+      });
 
-    return () => { cancelled = true; };
-  }, [hasLinkedInReply, reply.id, reply.linkedin_account_id, reply.linkedin_thread_id, reply.linkedin_url, reply.linkedin_reply_body, reply.linkedin_reply_received_at, reply.full_name, t]);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    hasLinkedInReply,
+    reply.id,
+    reply.linkedin_account_id,
+    reply.linkedin_thread_id,
+    reply.linkedin_url,
+    reply.linkedin_reply_body,
+    reply.linkedin_reply_received_at,
+    reply.full_name,
+    t,
+  ]);
 
+  // Auto-scroll on new messages
   useEffect(() => {
     threadEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, linkedinMessages]);
 
-  // Live polling for LinkedIn messages while chat modal is open
+  // Live polling for LinkedIn messages every 4s
   useEffect(() => {
     if (!hasLinkedInReply && !reply.linkedin_url) return;
 
@@ -433,15 +415,18 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
     return () => clearInterval(interval);
   }, [hasLinkedInReply, reply.id, reply.linkedin_account_id, reply.linkedin_url]);
 
-  const [suggesting, setSuggesting] = useState(false);
-
   async function handleSuggestReply() {
     setSuggesting(true);
+    setAiSuggestionMeta(null);
     try {
-      const lastMsg = reply.linkedin_reply_body || (linkedinMessages.at(-1)?.body) || (messages.at(-1)?.text) || "";
+      const lastMsg =
+        reply.linkedin_reply_body || linkedinMessages.at(-1)?.body || messages.at(-1)?.text || "";
       const history = hasLinkedInReply
         ? linkedinMessages.map((m) => ({ direction: m.direction, body: m.body }))
-        : messages.map((m) => ({ direction: m.from.includes(reply.email || "") ? "inbound" : "outbound", body: m.text }));
+        : messages.map((m) => ({
+            direction: m.from.includes(reply.email || "") ? "inbound" : "outbound",
+            body: m.text,
+          }));
 
       const response = await fetch("/api/inbox/suggest-reply", {
         method: "POST",
@@ -456,6 +441,10 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
       if (!response.ok) throw new Error(data.error || "No se pudo generar la sugerencia.");
       if (data.suggestedReply) {
         setReplyText(data.suggestedReply);
+        setAiSuggestionMeta({
+          reasoning: data.reasoning || "Generada según el conocimiento de tu empresa y el perfil del prospecto.",
+          confidence: data.confidence ? `${Math.round(data.confidence * 100)}%` : undefined,
+        });
         toast.success("✨ Sugerencia de SDR IA generada.");
       }
     } catch (error) {
@@ -499,7 +488,7 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
         externalThreadId: reply.linkedin_thread_id || `thread-${reply.id}`,
         externalMessageId: data.messageId || `outbound-${Date.now()}`,
         direction: "outbound",
-        senderName: reply.linkedin_account_name || "Me",
+        senderName: reply.linkedin_account_name || "Tú",
         senderExternalId: null,
         metadataJson: JSON.stringify(data.metadata || {}),
         body: data.body || replyText.trim() || (attachment ? `📎 [Archivo: ${attachment.name}]` : ""),
@@ -524,6 +513,7 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
       setReplyText("");
       setAttachment(null);
       setShowEmojiPicker(false);
+      setAiSuggestionMeta(null);
       onActionDone();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al enviar mensaje a LinkedIn");
@@ -532,7 +522,7 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
     }
   }
 
-  async function handleSend() {
+  async function handleSendEmail() {
     if (!replyText.trim() || !reply.email || !reply.email_account_id) return;
     setSending(true);
     try {
@@ -550,6 +540,7 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
       if (!response.ok) throw new Error(data.error ?? t("inbox.errors.send"));
       toast.success(t("inbox.toasts.replySent"));
       setReplyText("");
+      setAiSuggestionMeta(null);
       onActionDone();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("inbox.errors.send"));
@@ -557,9 +548,6 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
       setSending(false);
     }
   }
-
-  const [autopilot, setAutopilot] = useState(reply.sdr_autopilot === 1);
-  const [togglingAutopilot, setTogglingAutopilot] = useState(false);
 
   async function handleToggleAutopilot() {
     setTogglingAutopilot(true);
@@ -573,7 +561,9 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al cambiar piloto automático");
       setAutopilot(data.sdr_autopilot === 1);
-      toast.success(data.message || (next ? "Piloto Automático activado." : "Piloto Automático desactivado."));
+      toast.success(
+        data.message || (next ? "Piloto Automático SDR activado." : "Piloto Automático SDR desactivado.")
+      );
       onActionDone();
     } catch (err: any) {
       toast.error(err.message || "Error al alternar piloto automático");
@@ -582,363 +572,384 @@ function ReplyModal({ reply, onClose, onActionDone, hasPremium }: ReplyModalProp
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-2xl max-h-[85vh] flex flex-col bg-base-100 border border-base-300/50 rounded-xl shadow-2xl mx-4">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-base-300/50">
-          <div className="min-w-0">
-            <div className="font-semibold text-base-content truncate">
-              {reply.full_name ?? reply.email ?? t("inbox.unknown")}
-            </div>
-            <div className="mt-1 flex items-center gap-2 flex-wrap">
-              <OriginBadges reply={reply} t={t} />
-            </div>
-          </div>
-          <div className="flex items-center gap-2.5 shrink-0">
-            <button
-              onClick={handleToggleAutopilot}
-              disabled={togglingAutopilot}
-              title={autopilot ? "Piloto Automático activo: la IA responderá automáticamente" : "Activar Piloto Automático para que la IA responda por ti"}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all shadow-sm ${
-                autopilot
-                  ? "bg-success/15 border-success/30 text-success hover:bg-success/20"
-                  : "bg-base-200 border-base-300/50 text-base-content/60 hover:bg-base-300"
-              }`}
-            >
-              {togglingAutopilot ? <RiLoader4Line size={12} className="animate-spin" /> : <RiRobotLine size={13} />}
-              {autopilot ? "🤖 Piloto Automático: ACTIVO" : "🤖 Piloto Automático: OFF"}
-            </button>
-            <button
-              onClick={onClose}
-              aria-label={t("inbox.close")}
-              className="text-base-content/40 hover:text-base-content transition-colors p-1"
-            >
-              <RiCloseLine size={18} />
-            </button>
-          </div>
-        </div>
+  const vBadge = verdictBadge(reply, t);
 
-        {reply.reply_id && (
-          <div className="px-5 py-3.5 border-b border-base-300/50 bg-base-200/40 space-y-2.5">
+  return (
+    <div className="flex-1 flex flex-col h-full bg-base-100 min-w-0 overflow-hidden">
+      {/* ── Chat Header ── */}
+      <div className="px-5 py-3.5 border-b border-base-300/60 bg-base-100/90 backdrop-blur-sm flex items-center justify-between gap-4 shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="relative shrink-0">
+            <div
+              className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm border shadow-sm ${getAvatarColor(
+                reply.full_name
+              )}`}
+            >
+              {getInitials(reply.full_name ?? reply.email)}
+            </div>
+            <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-success ring-2 ring-base-100" />
+          </div>
+
+          <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${verdict.cls}`}>
-                {verdict.label}
+              <h2 className="font-bold text-base text-base-content truncate">
+                {reply.full_name ?? reply.email ?? t("inbox.unknown")}
+              </h2>
+              {reply.linkedin_url && (
+                <a
+                  href={reply.linkedin_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Abrir perfil en LinkedIn"
+                  className="text-primary hover:text-primary-focus transition-colors p-0.5 rounded"
+                >
+                  <RiExternalLinkLine size={14} />
+                </a>
+              )}
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold border ${vBadge.cls}`}>
+                {vBadge.label}
               </span>
-              {reply.manually_edited === 1 && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-base-300/60 text-base-content/50">
-                  {t("inbox.edited")}
+            </div>
+
+            <div className="flex items-center gap-2 text-xs text-base-content/60 truncate mt-0.5">
+              {reply.company && (
+                <span className="flex items-center gap-1 font-medium text-base-content/80 truncate">
+                  <RiBuildingLine size={12} className="shrink-0 text-base-content/40" />
+                  {reply.company}
                 </span>
               )}
-              {reply.reply_summary && <span className="text-xs text-base-content/60">{reply.reply_summary}</span>}
-            </div>
-
-            {reply.classification_error && (
-              <div className="text-xs text-error/80">
-                {t("inbox.classifierError", { error: reply.classification_error })}
-              </div>
-            )}
-
-            {dispatch && (
-              <div className="text-xs text-base-content/45 space-y-0.5">
-                {scheduledFor && (
-                  <div>{t("inbox.followupScheduled", { date: formatDate(scheduledFor, locale) })}</div>
-                )}
-                {dispatch.substitute_target_id ? <div>{t("inbox.substituteEnrolled")}</div> : null}
-                {dispatch.todo_id ? (
-                  <div>
-                    {t("inbox.callTaskCreated")}
-                    {dispatch.phone_number ? ` · ${dispatch.phone_number}` : ""}
-                  </div>
-                ) : null}
-              </div>
-            )}
-
-            <div className="flex items-center gap-2 pt-0.5">
-              {hasPremium && (
-                <button
-                  onClick={handleReclassify}
-                  disabled={acting !== null}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-base-300/50 text-base-content/70 hover:bg-base-300 disabled:opacity-40 transition-colors"
-                >
-                  {acting === "reclassify" ? <RiLoader4Line size={12} className="animate-spin" /> : null}
-                  {t("inbox.reclassify")}
-                </button>
-              )}
-              {scheduledFor && (
-                <button
-                  onClick={handleCancelFollowup}
-                  disabled={acting !== null}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-error/10 text-error hover:bg-error/20 disabled:opacity-40 transition-colors"
-                >
-                  {acting === "cancel" ? <RiLoader4Line size={12} className="animate-spin" /> : null}
-                  {t("inbox.cancelFollowup")}
-                </button>
+              {reply.headline && <span className="text-base-content/40 truncate">· {reply.headline}</span>}
+              {reply.linkedin_account_name && (
+                <span className="text-primary/80 font-medium shrink-0">
+                  (vía {reply.linkedin_account_name})
+                </span>
               )}
             </div>
           </div>
-        )}
-
-        {hasLinkedInReply && reply.linkedin_url && (
-          <div className="px-5 py-3 border-b border-base-300/50 bg-primary/5 flex items-center justify-between gap-3">
-            <div className="text-xs text-base-content/55">{t("inbox.linkedinReplyDetected")}</div>
-            <a
-              href={reply.linkedin_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors shrink-0"
-            >
-              <RiExternalLinkLine size={12} /> {t("inbox.openInLinkedin")}
-            </a>
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto min-h-0">
-        {hasLinkedInReply && (
-          <div className="px-5 py-4 space-y-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-base-content/45">
-              {t("inbox.linkedinConversation")}
-            </div>
-            {loadingLinkedInThread ? (
-              <div className="flex items-center justify-center gap-2 text-base-content/30 py-8">
-                <RiLoader4Line size={18} className="animate-spin" />
-                <span className="text-sm">{t("inbox.linkedinConversationLoading")}</span>
-              </div>
-            ) : linkedinMessages.length === 0 ? (
-              reply.linkedin_reply_body ? (
-                <div className="rounded-lg p-3.5 bg-base-200 border border-base-300/40">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium text-base-content/60">{reply.full_name ?? t("inbox.unknown")}</span>
-                    {reply.linkedin_reply_received_at && (
-                      <span className="text-xs text-base-content/30">{formatDate(reply.linkedin_reply_received_at, locale)}</span>
-                    )}
-                  </div>
-                  <p className="text-sm text-base-content whitespace-pre-wrap leading-relaxed">{reply.linkedin_reply_body}</p>
-                </div>
-              ) : (
-                <p className="text-center text-base-content/30 text-sm py-8">{t("inbox.linkedinNotCaptured")}</p>
-              )
-            ) : (
-              linkedinMessages.map((message) => {
-                const isInbound = message.direction === "inbound";
-                return (
-                  <div
-                    key={`${message.externalThreadId}-${message.externalMessageId}`}
-                    className={`rounded-lg p-3.5 ${
-                      isInbound ? "bg-base-200 border border-base-300/40" : "bg-primary/8 border border-primary/20"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2 gap-2">
-                      <span className="text-xs font-medium text-base-content/60 flex items-center gap-1.5">
-                        {isInbound ? (
-                          message.senderName ?? reply.full_name ?? t("inbox.unknown")
-                        ) : message.metadataJson?.includes("autopilot") || message.metadataJson?.includes("sdr") ? (
-                          <span className="text-warning font-semibold flex items-center gap-1">
-                            <RiRobotLine size={12} /> SDR IA (Autopilot)
-                          </span>
-                        ) : (
-                          t("inbox.linkedinOutbound")
-                        )}
-                      </span>
-                      <span className="text-xs text-base-content/30 whitespace-nowrap">{formatDate(message.sentAt, locale)}</span>
-                    </div>
-                    <p className="text-sm text-base-content whitespace-pre-wrap leading-relaxed">{message.body}</p>
-                  </div>
-                );
-              })
-            )}
-            <div ref={threadEndRef} />
-          </div>
-        )}
-
-        {hasEmailReply && (
-          <div className="px-5 py-4 space-y-4 border-t border-base-300/40">
-            {loadingThread ? (
-              <div className="flex items-center justify-center gap-2 text-base-content/30 py-10">
-                <RiLoader4Line size={18} className="animate-spin" />
-                <span className="text-sm">{t("inbox.loadingThread")}</span>
-              </div>
-            ) : messages.length === 0 ? (
-              <div className="text-center text-base-content/30 text-sm py-10">
-                {canReplyByEmail ? t("inbox.noMessages") : t("inbox.noEmailAccount")}
-              </div>
-            ) : (
-              messages.map((message, index) => {
-                const isFromContact = message.from.toLowerCase().includes((reply.email ?? "").toLowerCase());
-                return (
-                  <div
-                    key={`${message.uid}-${index}`}
-                    className={`rounded-lg p-3.5 ${
-                      isFromContact
-                        ? "bg-base-200 border border-base-300/40"
-                        : "bg-primary/8 border border-primary/20"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-base-content/60">{message.from}</span>
-                      <span className="text-xs text-base-content/30">{formatDate(message.date, locale)}</span>
-                    </div>
-                    <p className="text-sm text-base-content whitespace-pre-wrap leading-relaxed">
-                      {message.text || t("inbox.noTextContent")}
-                    </p>
-                  </div>
-                );
-              })
-            )}
-            <div ref={threadEndRef} />
-          </div>
-        )}
         </div>
 
-        {(hasLinkedInReply || canReplyByEmail) && (
-          <div className="border-t border-base-300/50 px-5 py-4 space-y-2.5 bg-base-100">
-            {canReplyByEmail && !hasLinkedInReply && (
-              <input
-                type="text"
-                value={replySubject}
-                onChange={(event) => setReplySubject(event.target.value)}
-                placeholder={t("inbox.subject")}
-                className="w-full bg-base-200 border border-base-300/50 rounded-lg px-3 py-1.5 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:border-primary/40"
-              />
-            )}
-            {attachment && (
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-base-200 border border-primary/30 text-xs">
-                <div className="flex items-center gap-2 min-w-0">
-                  {attachment.type.startsWith("image/") ? (
-                    <RiImageLine size={18} className="text-primary shrink-0" />
-                  ) : attachment.type.startsWith("video/") ? (
-                    <RiVideoLine size={18} className="text-info shrink-0" />
-                  ) : attachment.type.includes("pdf") ? (
-                    <RiFilePdfLine size={18} className="text-error shrink-0" />
-                  ) : (
-                    <RiFileTextLine size={18} className="text-base-content/60 shrink-0" />
-                  )}
-                  <span className="font-medium truncate text-base-content">{attachment.name}</span>
-                  <span className="text-base-content/40 shrink-0">
-                    ({(attachment.size / 1024).toFixed(0)} KB)
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setAttachment(null)}
-                  className="text-error/70 hover:text-error p-1 transition-colors"
-                  title="Quitar archivo adjunto"
-                >
-                  <RiDeleteBinLine size={14} />
-                </button>
-              </div>
-            )}
-            <textarea
-              value={replyText}
-              onChange={(event) => setReplyText(event.target.value)}
-              placeholder={`Escribe una respuesta para ${reply.full_name ?? reply.email ?? "el contacto"}...`}
-              rows={3}
-              className="w-full bg-base-200 border border-base-300/50 rounded-lg px-3 py-2 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:border-primary/40 resize-none"
-            />
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5 relative">
-                <button
-                  type="button"
-                  onClick={handleSuggestReply}
-                  disabled={suggesting || sending}
-                  title="Generar respuesta inteligente contextual con el Agente SDR IA"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-warning/10 border border-warning/30 text-warning hover:bg-warning/20 disabled:opacity-40 transition-all shadow-sm"
-                >
-                  {suggesting ? <RiLoader4Line size={13} className="animate-spin" /> : <RiSparklingLine size={14} />}
-                  {suggesting ? "Pensando..." : "✨ Sugerir"}
-                </button>
+        {/* Header Right Actions */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          {reply.channel === "both" && (
+            <div className="join join-horizontal bg-base-200 p-0.5 rounded-lg border border-base-300/60 text-xs">
+              <button
+                onClick={() => setActiveChannelTab("linkedin")}
+                className={`join-item px-2.5 py-1 rounded-md font-medium transition-all ${
+                  activeChannelTab === "linkedin"
+                    ? "bg-primary text-primary-content shadow-sm"
+                    : "text-base-content/60 hover:text-base-content"
+                }`}
+              >
+                LinkedIn
+              </button>
+              <button
+                onClick={() => setActiveChannelTab("email")}
+                className={`join-item px-2.5 py-1 rounded-md font-medium transition-all ${
+                  activeChannelTab === "email"
+                    ? "bg-primary text-primary-content shadow-sm"
+                    : "text-base-content/60 hover:text-base-content"
+                }`}
+              >
+                Email
+              </button>
+            </div>
+          )}
 
-                <button
-                  type="button"
-                  onClick={() => setShowEmojiPicker((prev) => !prev)}
-                  title="Insertar emojis y emoticonos"
-                  className={`p-1.5 rounded-lg text-base-content/60 hover:text-base-content hover:bg-base-200 border transition-all ${
-                    showEmojiPicker ? "bg-base-200 border-primary/40 text-primary" : "border-transparent"
+          <button
+            onClick={handleToggleAutopilot}
+            disabled={togglingAutopilot}
+            title={
+              autopilot
+                ? "Piloto Automático ACTIVO: El SDR responderá automáticamente a este lead"
+                : "Activar Piloto Automático SDR para que la IA responda por ti"
+            }
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all shadow-sm ${
+              autopilot
+                ? "bg-success/15 border-success/35 text-success hover:bg-success/25"
+                : "bg-base-200 border-base-300/60 text-base-content/70 hover:bg-base-300 hover:text-base-content"
+            }`}
+          >
+            {togglingAutopilot ? <RiLoader4Line size={13} className="animate-spin" /> : <RiRobotLine size={14} />}
+            {autopilot ? "🤖 SDR: ACTIVO" : "🤖 SDR: OFF"}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Messages Timeline Area ── */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-base-200/20">
+        {activeChannelTab === "linkedin" ? (
+          loadingLinkedInThread ? (
+            <div className="flex flex-col items-center justify-center py-16 text-base-content/40 gap-2">
+              <RiLoader4Line size={24} className="animate-spin text-primary" />
+              <span className="text-xs font-medium">Cargando conversación de LinkedIn...</span>
+            </div>
+          ) : linkedinMessages.length === 0 ? (
+            <div className="text-center py-16 text-base-content/40">
+              <RiLinkedinBoxLine size={36} className="mx-auto opacity-30 mb-2" />
+              <p className="text-sm font-medium">Sin mensajes de LinkedIn todavía</p>
+              <p className="text-xs mt-1 text-base-content/30">Envía un mensaje o sincroniza para ver el historial.</p>
+            </div>
+          ) : (
+            <div className="space-y-4 max-w-3xl mx-auto">
+              <div className="flex items-center justify-center my-3">
+                <span className="px-3 py-1 bg-base-200 border border-base-300/50 rounded-full text-[11px] font-medium text-base-content/50">
+                  Conversación en LinkedIn · Sincronizada en vivo
+                </span>
+              </div>
+
+              {linkedinMessages.map((msg, index) => {
+                const isOutbound = msg.direction === "outbound";
+                return (
+                  <div
+                    key={msg.externalMessageId || index}
+                    className={`flex items-end gap-2.5 ${isOutbound ? "justify-end" : "justify-start"}`}
+                  >
+                    {!isOutbound && (
+                      <div
+                        className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 border ${getAvatarColor(
+                          reply.full_name
+                        )}`}
+                      >
+                        {getInitials(reply.full_name)}
+                      </div>
+                    )}
+
+                    <div
+                      className={`relative rounded-2xl px-4 py-3 text-sm shadow-sm transition-all max-w-[82%] sm:max-w-[72%] ${
+                        isOutbound
+                          ? "bg-primary text-primary-content rounded-br-xs"
+                          : "bg-base-100 text-base-content border border-base-300/60 rounded-bl-xs"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3 text-[10px] mb-1 opacity-70">
+                        <span className="font-semibold">{isOutbound ? "Tú" : msg.senderName || reply.full_name}</span>
+                        <span>{formatDate(msg.sentAt, locale)}</span>
+                      </div>
+
+                      <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.body}</p>
+
+                      <div className="flex items-center justify-end gap-1 mt-1 text-[10px] opacity-60">
+                        {isOutbound && <RiCheckDoubleLine size={12} />}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              <div ref={threadEndRef} />
+            </div>
+          )
+        ) : loadingThread ? (
+          <div className="flex flex-col items-center justify-center py-16 text-base-content/40 gap-2">
+            <RiLoader4Line size={24} className="animate-spin text-info" />
+            <span className="text-xs font-medium">Cargando hilo de correos...</span>
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="text-center py-16 text-base-content/40">
+            <RiMailLine size={36} className="mx-auto opacity-30 mb-2" />
+            <p className="text-sm font-medium">Sin correos electrónicos registrados</p>
+          </div>
+        ) : (
+          <div className="space-y-4 max-w-3xl mx-auto">
+            {messages.map((msg, idx) => {
+              const isLead = msg.from.toLowerCase().includes((reply.email ?? "").toLowerCase());
+              return (
+                <div
+                  key={msg.uid || msg.messageId || idx}
+                  className={`flex flex-col ${
+                    isLead
+                      ? "bg-base-100 border border-base-300/60 rounded-2xl rounded-tl-xs p-4 shadow-sm"
+                      : "bg-primary/10 border border-primary/20 rounded-2xl rounded-tr-xs p-4 shadow-sm ml-8"
                   }`}
                 >
-                  <RiEmotionLine size={18} />
-                </button>
-
-                {hasLinkedInReply && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      title="Adjuntar Documento (PDF/Word), Imagen o Video"
-                      className="p-1.5 rounded-lg text-base-content/60 hover:text-base-content hover:bg-base-200 border border-transparent transition-all"
-                    >
-                      <RiAttachment2 size={18} />
-                    </button>
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileSelect}
-                      accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
-                      className="hidden"
-                    />
-                  </>
-                )}
-
-                {showEmojiPicker && (
-                  <div className="absolute bottom-full left-0 mb-2 p-3 bg-base-100 border border-base-300 rounded-xl shadow-2xl z-50 w-72 space-y-2.5 backdrop-blur-md">
-                    <div className="flex items-center justify-between text-xs font-semibold text-base-content/60 border-b border-base-300 pb-1.5">
-                      <span>Emoticonos</span>
-                      <button onClick={() => setShowEmojiPicker(false)} className="hover:text-base-content">✕</button>
-                    </div>
-                    {EMOJI_CATEGORIES.map((cat) => (
-                      <div key={cat.label} className="space-y-1">
-                        <div className="text-[10px] uppercase tracking-wider text-base-content/40 font-semibold">{cat.label}</div>
-                        <div className="grid grid-cols-5 gap-1">
-                          {cat.emojis.map((emoji) => (
-                            <button
-                              key={emoji}
-                              type="button"
-                              onClick={() => {
-                                handleInsertEmoji(emoji);
-                                setShowEmojiPicker(false);
-                              }}
-                              className="text-lg p-1.5 rounded hover:bg-base-200 transition-transform active:scale-125 text-center"
-                            >
-                              {emoji}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                  <div className="flex items-center justify-between text-xs text-base-content/60 pb-2 border-b border-base-300/30">
+                    <span className="font-semibold text-base-content">{isLead ? reply.full_name || msg.from : "Tú"}</span>
+                    <span>{formatDate(msg.date, locale)}</span>
                   </div>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2">
-                {hasLinkedInReply && (
-                  <button
-                    onClick={handleSendLinkedIn}
-                    disabled={(!replyText.trim() && !attachment) || sending}
-                    className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold bg-primary text-primary-content hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
-                  >
-                    {sending ? <RiLoader4Line size={13} className="animate-spin" /> : <RiLinkedinBoxLine size={14} />}
-                    {sending ? "Enviando a LinkedIn..." : "Enviar a LinkedIn"}
-                  </button>
-                )}
-                {canReplyByEmail && (
-                  <button
-                    onClick={handleSend}
-                    disabled={!replyText.trim() || !replySubject.trim() || sending}
-                    className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold bg-secondary text-secondary-content hover:bg-secondary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
-                  >
-                    {sending ? <RiLoader4Line size={13} className="animate-spin" /> : <RiMailLine size={14} />}
-                    {sending ? t("inbox.sending") : t("inbox.send")}
-                  </button>
-                )}
-              </div>
-            </div>
+                  <div className="font-medium text-xs text-base-content/70 mt-2 mb-1">Asunto: {msg.subject}</div>
+                  <p className="text-sm whitespace-pre-wrap leading-relaxed mt-1 text-base-content">{msg.text}</p>
+                </div>
+              );
+            })}
+            <div ref={threadEndRef} />
           </div>
         )}
+      </div>
+
+      {/* ── Composer Box ── */}
+      <div className="p-4 border-t border-base-300/60 bg-base-100 shrink-0 space-y-2.5 relative">
+        {/* AI Suggestion Card preview */}
+        {aiSuggestionMeta && (
+          <div className="flex items-center justify-between bg-primary/10 border border-primary/25 rounded-xl px-3 py-2 text-xs text-primary animate-fadeIn">
+            <div className="flex items-center gap-2 min-w-0">
+              <RiSparklingLine className="shrink-0 text-base" />
+              <span className="truncate">
+                <strong>Sugerencia de IA Lista:</strong> {aiSuggestionMeta.reasoning}
+              </span>
+            </div>
+            <button
+              onClick={() => setAiSuggestionMeta(null)}
+              className="p-1 text-primary/60 hover:text-primary rounded-lg transition-colors ml-2"
+            >
+              <RiCloseLine size={14} />
+            </button>
+          </div>
+        )}
+
+        {/* Attachment preview chip */}
+        {attachment && (
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-base-200 border border-base-300 text-xs text-base-content/80 shadow-sm animate-fadeIn">
+            {attachment.type.includes("pdf") ? (
+              <RiFilePdfLine className="text-error text-base" />
+            ) : attachment.type.includes("image") ? (
+              <RiImageLine className="text-info text-base" />
+            ) : (
+              <RiFileTextLine className="text-primary text-base" />
+            )}
+            <span className="font-medium max-w-48 truncate">{attachment.name}</span>
+            <span className="text-[10px] text-base-content/40">({(attachment.size / 1024).toFixed(1)} KB)</span>
+            <button
+              type="button"
+              onClick={() => setAttachment(null)}
+              className="p-0.5 hover:bg-base-300 rounded text-base-content/50 hover:text-error transition-colors"
+            >
+              <RiDeleteBinLine size={13} />
+            </button>
+          </div>
+        )}
+
+        {/* Text Input Area */}
+        <div className="relative">
+          {activeChannelTab === "email" && (
+            <input
+              type="text"
+              placeholder="Asunto del correo..."
+              value={replySubject}
+              onChange={(e) => setReplySubject(e.target.value)}
+              className="w-full mb-2 bg-base-200 border border-base-300/60 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-primary/50"
+            />
+          )}
+
+          <textarea
+            rows={3}
+            placeholder={
+              activeChannelTab === "linkedin"
+                ? "Escribe un mensaje de LinkedIn para este prospecto..."
+                : "Escribe la respuesta de correo..."
+            }
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                if (activeChannelTab === "linkedin") void handleSendLinkedIn();
+                else void handleSendEmail();
+              }
+            }}
+            className="w-full bg-base-200/70 border border-base-300/70 rounded-2xl px-4 py-3 text-sm text-base-content placeholder:text-base-content/35 focus:outline-none focus:border-primary/50 focus:bg-base-200 transition-all resize-none shadow-inner"
+          />
+
+          {/* Emoji Picker Popover */}
+          {showEmojiPicker && (
+            <div className="absolute bottom-16 left-2 z-50 bg-base-100 border border-base-300 rounded-2xl shadow-2xl p-3 w-72 space-y-2.5 animate-fadeIn">
+              <div className="flex items-center justify-between pb-1.5 border-b border-base-300/40 text-xs font-semibold text-base-content/70">
+                <span>Emojis Rápidos</span>
+                <button
+                  type="button"
+                  onClick={() => setShowEmojiPicker(false)}
+                  className="p-1 rounded hover:bg-base-200 text-base-content/40 hover:text-base-content"
+                >
+                  <RiCloseLine size={14} />
+                </button>
+              </div>
+              {EMOJI_CATEGORIES.map((cat) => (
+                <div key={cat.label} className="space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-base-content/40">{cat.label}</span>
+                  <div className="grid grid-cols-5 gap-1 text-lg">
+                    {cat.emojis.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => {
+                          handleInsertEmoji(emoji);
+                          setShowEmojiPicker(false);
+                        }}
+                        className="p-1 hover:bg-base-200 rounded-lg text-center transition-colors"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Hidden File Input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.gif,.mp4"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+
+        {/* Toolbar Bottom Row */}
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <div className="flex items-center gap-1.5">
+            {activeChannelTab === "linkedin" && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Adjuntar documento o imagen (PDF, PNG, JPG, Docx)"
+                  className="p-2 rounded-xl text-base-content/60 hover:text-base-content hover:bg-base-200 transition-colors"
+                >
+                  <RiAttachment2 size={17} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                  title="Insertar emojis"
+                  className={`p-2 rounded-xl transition-colors ${
+                    showEmojiPicker
+                      ? "bg-primary/15 text-primary"
+                      : "text-base-content/60 hover:text-base-content hover:bg-base-200"
+                  }`}
+                >
+                  <RiEmotionLine size={17} />
+                </button>
+              </>
+            )}
+
+            <button
+              type="button"
+              onClick={handleSuggestReply}
+              disabled={suggesting}
+              title="Generar respuesta inteligente usando la base de conocimiento de tu empresa y el perfil del prospecto"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-primary/10 border border-primary/25 text-primary hover:bg-primary/20 disabled:opacity-40 transition-all shadow-sm"
+            >
+              {suggesting ? <RiLoader4Line size={13} className="animate-spin" /> : <RiSparklingLine size={14} />}
+              {suggesting ? "Pensando..." : "✨ Sugerir con IA"}
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={activeChannelTab === "linkedin" ? handleSendLinkedIn : handleSendEmail}
+            disabled={sending || (!replyText.trim() && !attachment)}
+            className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold bg-primary text-primary-content hover:bg-primary-focus disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md active:scale-95"
+          >
+            {sending ? <RiLoader4Line size={14} className="animate-spin" /> : <RiSendPlaneLine size={14} />}
+            {sending ? "Enviando..." : "Enviar"}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
+// ── MAIN INBOX PAGE ──
 export default function InboxPage() {
   const { t, locale } = useTranslation();
   const [replies, setReplies] = useState<InboxReply[]>([]);
@@ -946,12 +957,14 @@ export default function InboxPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [channel, setChannel] = useState<ChannelFilter>("all");
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
   const [accountId, setAccountId] = useState("");
-  const [verdict, setVerdict] = useState<string>("all");
   const [selectedReply, setSelectedReply] = useState<InboxReply | null>(null);
   const [reclassifyingAll, setReclassifyingAll] = useState(false);
   const [backfilling, setBackfilling] = useState(false);
-  const [hasPremium, setHasPremium] = useState(false);
+  const [syncingLinkedIn, setSyncingLinkedIn] = useState(false);
+  const [diagnosing, setDiagnosing] = useState(false);
+  const [diagnosticReport, setDiagnosticReport] = useState<any | null>(null);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default");
   const seenReplyIdsRef = useRef<Set<string>>(new Set());
   const initialLoadDoneRef = useRef(false);
@@ -993,13 +1006,6 @@ export default function InboxPage() {
   }
 
   useEffect(() => {
-    fetch("/api/premium-status")
-      .then((response) => response.ok ? response.json() : null)
-      .then((data) => { if (data) setHasPremium(!!data.hasPremium); })
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
     let cancelled = false;
     fetch("/api/accounts")
       .then(async (response) => {
@@ -1007,11 +1013,15 @@ export default function InboxPage() {
         if (!response.ok) throw new Error(data.error ?? t("inbox.errors.loadAccounts"));
         return data;
       })
-      .then((data) => { if (!cancelled) setAccounts(Array.isArray(data) ? data : []); })
+      .then((data) => {
+        if (!cancelled) setAccounts(Array.isArray(data) ? data : []);
+      })
       .catch((error) => {
         if (!cancelled) toast.error(error instanceof Error ? error.message : t("inbox.errors.loadAccounts"));
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [t]);
 
   const load = useCallback(async () => {
@@ -1068,8 +1078,12 @@ export default function InboxPage() {
                   seenReplyIdsRef.current.add(repKey);
 
                   const sender = rep.full_name || rep.email || "Prospecto";
-                  const snippet = rep.linkedin_reply_body || rep.reply_body || rep.reply_summary || "Nuevo mensaje recibido";
-                  const isHandoff = rep.reply_kind === "human_handoff" || rep.reply_kind === "objection" || rep.reply_kind === "pricing";
+                  const snippet =
+                    rep.linkedin_reply_body || rep.reply_body || rep.reply_summary || "Nuevo mensaje recibido";
+                  const isHandoff =
+                    rep.reply_kind === "human_handoff" ||
+                    rep.reply_kind === "objection" ||
+                    rep.reply_kind === "pricing";
 
                   triggerDesktopNotification({
                     title: isHandoff ? `⚠️ InHubFlow SDR: ¡Intervención Requerida!` : `💬 Nuevo mensaje de ${sender}`,
@@ -1124,99 +1138,106 @@ export default function InboxPage() {
     try {
       const response = await fetch("/api/inbox/reclassify-all", { method: "POST" });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? t("inbox.errors.reclassify"));
+      if (!response.ok) throw new Error(data.error ?? t("inbox.errors.reclassifyAll"));
       toast.success(
-        data.total === 0
+        data.to_process === 0
           ? t("inbox.toasts.nothingToReclassify")
-          : t("inbox.toasts.reclassifiedCount", {
-              classified: data.classified,
-              total: data.total,
-              failed: data.failed ? ` (${data.failed} ${t("inbox.verdicts.failed").toLowerCase()})` : "",
-            })
+          : t("inbox.toasts.reclassifiedAll", { count: data.to_process })
       );
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("inbox.errors.reclassify"));
+      toast.error(error instanceof Error ? error.message : t("inbox.errors.reclassifyAll"));
     } finally {
       setReclassifyingAll(false);
     }
   }
 
-  const [syncingLinkedIn, setSyncingLinkedIn] = useState(false);
-
   async function handleSyncLinkedIn() {
-    const authAccounts = accounts.filter((a) => a.is_authenticated === 1);
-    if (authAccounts.length === 0) {
-      toast.error("No hay cuentas de LinkedIn autenticadas para sincronizar.");
+    const accId = accountId || accounts[0]?.id;
+    if (!accId) {
+      toast.error("Selecciona una cuenta de LinkedIn para sincronizar.");
       return;
     }
-
     setSyncingLinkedIn(true);
-    let totalCaptured = 0;
     try {
-      for (const acc of authAccounts) {
-        const res = await fetch(`/api/accounts/${acc.id}/sync-linkedin-inbox`, { method: "POST" });
-        const data = await res.json();
-        if (data.ok) {
-          totalCaptured += data.captured ?? 0;
-        }
-      }
-      toast.success(
-        totalCaptured > 0
-          ? `Sincronización completada: ${totalCaptured} nueva(s) respuesta(s) capturada(s).`
-          : "Sincronización completada. Bandeja al día."
-      );
+      const res = await fetch(`/api/accounts/${accId}/sync-linkedin-inbox`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al sincronizar LinkedIn");
+      toast.success(`LinkedIn sincronizado: ${data.capturedCount || 0} respuestas capturadas.`);
       await load();
     } catch (err: any) {
-      toast.error(err.message || "Error al sincronizar LinkedIn");
+      toast.error(err.message || "Error al sincronizar");
     } finally {
       setSyncingLinkedIn(false);
     }
   }
 
-  const [diagnosing, setDiagnosing] = useState(false);
-  const [diagnosticReport, setDiagnosticReport] = useState<any | null>(null);
-
   async function handleDiagnose() {
-    const authAccounts = accounts.filter((a) => a.is_authenticated === 1);
-    if (authAccounts.length === 0) {
-      toast.error("No hay cuentas de LinkedIn autenticadas para diagnosticar.");
+    const accId = accountId || accounts[0]?.id;
+    if (!accId) {
+      toast.error("Selecciona una cuenta de LinkedIn para diagnosticar.");
       return;
     }
-
     setDiagnosing(true);
     try {
-      const targetAcc = authAccounts[0];
-      const res = await fetch(`/api/accounts/${targetAcc.id}/diagnose-inbox-live`);
+      const res = await fetch(`/api/accounts/${accId}/diagnose-inbox-live`);
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al ejecutar diagnóstico.");
       setDiagnosticReport(data);
-      if (res.ok) {
-        toast.success("Diagnóstico en vivo completado con éxito.");
-      } else {
-        toast.error(data.error || "Error en diagnóstico");
-      }
+      toast.success("Diagnóstico en vivo completado.");
     } catch (err: any) {
-      toast.error(err.message || "Error al ejecutar diagnóstico");
+      toast.error(err.message || "Error en el diagnóstico.");
     } finally {
       setDiagnosing(false);
     }
   }
 
-  const filtered = replies.filter((reply) => {
-    if (verdict !== "all" && verdictKey(reply) !== verdict) return false;
-    if (!search) return true;
-    const query = search.toLowerCase();
-    return [
-      reply.full_name,
-      reply.email,
-      reply.company,
-      reply.workflow_name,
-      reply.linkedin_account_name,
-      reply.linkedin_account_email,
-      reply.email_account_name,
-      reply.email_account_from,
-    ].some((value) => (value ?? "").toLowerCase().includes(query));
-  });
+  // Filter conversations
+  const filtered = useMemo(() => {
+    return replies.filter((reply) => {
+      // Quick filter
+      if (quickFilter === "linkedin" && reply.channel !== "linkedin" && reply.channel !== "both") return false;
+      if (quickFilter === "email" && reply.channel !== "email" && reply.channel !== "both") return false;
+      if (quickFilter === "autopilot" && reply.sdr_autopilot !== 1) return false;
+      if (
+        quickFilter === "handoff" &&
+        reply.reply_kind !== "human_reply" &&
+        reply.reply_kind !== "human_handoff" &&
+        reply.reply_kind !== "objection" &&
+        reply.reply_kind !== "pricing"
+      ) {
+        return false;
+      }
+
+      // Search query
+      const query = search.toLowerCase().trim();
+      if (!query) return true;
+      return [
+        reply.full_name,
+        reply.email,
+        reply.company,
+        reply.workflow_name,
+        reply.linkedin_account_name,
+        reply.linkedin_account_email,
+        reply.email_account_name,
+        reply.email_account_from,
+        reply.linkedin_reply_body,
+        reply.reply_body,
+        reply.reply_summary,
+      ].some((value) => (value ?? "").toLowerCase().includes(query));
+    });
+  }, [replies, quickFilter, search]);
+
+  // Auto-select first conversation on initial load or if current selection is invalid
+  useEffect(() => {
+    if (filtered.length > 0 && !selectedReply) {
+      setSelectedReply(filtered[0]);
+    } else if (selectedReply && !filtered.some((r) => r.id === selectedReply.id)) {
+      setSelectedReply(filtered[0] || null);
+    }
+  }, [filtered, selectedReply]);
 
   return (
     <>
@@ -1225,9 +1246,10 @@ export default function InboxPage() {
         <meta name="robots" content="noindex, nofollow" />
       </Head>
 
+      {/* ── LinkedIn Diagnostic Report Modal ── */}
       {diagnosticReport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-base-100 border border-base-300 rounded-xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden">
+          <div className="bg-base-100 border border-base-300 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-fadeIn">
             <div className="flex items-center justify-between px-5 py-4 border-b border-base-300">
               <div className="flex items-center gap-2">
                 <RiPulseLine className="text-warning text-lg" />
@@ -1242,72 +1264,34 @@ export default function InboxPage() {
             </div>
 
             <div className="p-5 overflow-y-auto space-y-4 text-sm">
-              <div className="grid grid-cols-2 gap-3 bg-base-200/50 p-3.5 rounded-lg border border-base-300/40 text-xs">
+              <div className="grid grid-cols-2 gap-3 bg-base-200/50 p-3.5 rounded-xl border border-base-300/40 text-xs">
                 <div>
                   <span className="text-base-content/50">Cuenta:</span>{" "}
-                  <span className="font-semibold">{diagnosticReport.account?.name} ({diagnosticReport.account?.email})</span>
-                </div>
-                <div>
-                  <span className="text-base-content/50">Estado Autenticación:</span>{" "}
-                  <span className="font-semibold text-success">{diagnosticReport.account?.is_authenticated ? "Conectado" : "Desconectado"}</span>
-                </div>
-                <div>
-                  <span className="text-base-content/50">URL Actual Navegador:</span>{" "}
-                  <span className="font-mono">{diagnosticReport.browser?.currentUrl || "N/A"}</span>
-                </div>
-                <div>
-                  <span className="text-base-content/50">Muro de Login/AuthWall:</span>{" "}
-                  <span className={diagnosticReport.browser?.isAuthWall ? "text-error font-bold" : "text-success font-semibold"}>
-                    {diagnosticReport.browser?.isAuthWall ? "SÍ (Requiere Re-login)" : "NO (Sesión Válida)"}
+                  <span className="font-semibold">
+                    {diagnosticReport.account?.name} ({diagnosticReport.account?.email})
                   </span>
                 </div>
                 <div>
-                  <span className="text-base-content/50">Chats Detectados en DOM:</span>{" "}
-                  <span className="font-bold text-primary">{diagnosticReport.browser?.dom?.conversationsFoundInDom ?? 0}</span>
-                </div>
-                <div>
-                  <span className="text-base-content/50">Prospectos Enrolados en DB:</span>{" "}
-                  <span className="font-semibold">{diagnosticReport.database?.campaignTargetCount ?? 0}</span>
+                  <span className="text-base-content/50">Estado:</span>{" "}
+                  <span className="font-semibold text-success">
+                    {diagnosticReport.account?.is_authenticated ? "Conectado" : "Desconectado"}
+                  </span>
                 </div>
               </div>
 
-              {diagnosticReport.browser?.screenshot && (
+              {diagnosticReport.browser?.screenshotBase64 && (
                 <div className="space-y-1.5">
-                  <span className="text-xs font-semibold text-base-content/70">Captura de Pantalla Real de LinkedIn:</span>
-                  <div className="rounded-lg overflow-hidden border border-base-300 bg-black/40">
+                  <span className="text-xs font-semibold text-base-content/70">Captura en Vivo:</span>
+                  <div className="rounded-xl overflow-hidden border border-base-300 bg-black/40">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={diagnosticReport.browser.screenshot}
+                      src={`data:image/png;base64,${diagnosticReport.browser.screenshotBase64}`}
                       alt="LinkedIn Live Screen"
                       className="w-full h-auto max-h-80 object-contain mx-auto"
                     />
                   </div>
                 </div>
               )}
-
-              {diagnosticReport.browser?.dom?.conversations?.length > 0 && (
-                <div className="space-y-1.5">
-                  <span className="text-xs font-semibold text-base-content/70">Conversaciones Visibles en el Chat:</span>
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                    {diagnosticReport.browser.dom.conversations.map((c: any, i: number) => (
-                      <div key={i} className="p-2.5 bg-base-200/60 rounded-lg text-xs border border-base-300/30 flex justify-between items-center">
-                        <div>
-                          <span className="font-semibold text-base-content">{c.name || "Sin nombre"}</span>
-                          <span className="text-base-content/50 ml-2">({c.profileUrl || "Sin enlace"})</span>
-                          <p className="text-base-content/70 mt-0.5">{c.lastMessage || "Sin snippet"}</p>
-                        </div>
-                        <span className="text-base-content/40 shrink-0">{c.timeText}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-1.5">
-                <span className="text-xs font-semibold text-base-content/70">Reporte JSON Completo:</span>
-                <pre className="p-3 bg-base-300/40 rounded-lg text-xs font-mono overflow-x-auto max-h-40">
-                  {JSON.stringify(diagnosticReport, null, 2)}
-                </pre>
-              </div>
             </div>
 
             <div className="p-4 border-t border-base-300 flex justify-end">
@@ -1322,259 +1306,284 @@ export default function InboxPage() {
         </div>
       )}
 
-      {selectedReply && (
-        <ReplyModal
-          reply={selectedReply}
-          onClose={() => setSelectedReply(null)}
-          onActionDone={load}
-          hasPremium={hasPremium}
-        />
-      )}
-
-      <div className="flex items-center gap-3 mb-5">
-        <div className="flex-1">
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-semibold">{t("inbox.title")}</h1>
+      {/* ── Top Header Bar ── */}
+      <div className="flex items-center justify-between gap-3 mb-4 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold tracking-tight">{t("inbox.title")}</h1>
             {!loading && filtered.length > 0 && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-success/15 text-success">
-                {t(filtered.length === 1 ? "inbox.replyCount" : "inbox.replyCountPlural", { count: filtered.length })}
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-primary/15 text-primary">
+                {filtered.length}
               </span>
             )}
           </div>
-          <p className="text-base-content/40 text-sm mt-0.5">{t("inbox.subtitle")}</p>
+          <span className="hidden sm:inline text-xs text-base-content/40">·</span>
+          <p className="hidden sm:inline text-xs text-base-content/50">{t("inbox.subtitle")}</p>
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* Global Toolbar Buttons */}
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={handleToggleNotifications}
-            title={notificationPermission === "granted" ? "Notificaciones de escritorio y sonido activas (Haz clic para probar el timbre)" : "Activar notificaciones de escritorio y sonido"}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all shadow-sm ${
+            title={
+              notificationPermission === "granted"
+                ? "Alertas activas: Haz clic para probar el timbre sonoro"
+                : "Activar notificaciones de escritorio y sonido"
+            }
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all shadow-sm ${
               notificationPermission === "granted"
                 ? "bg-success/15 border-success/35 text-success hover:bg-success/25"
                 : "bg-base-200 border-base-300 text-base-content/70 hover:text-base-content hover:bg-base-300"
             }`}
           >
-            <RiNotification3Line size={14} className={notificationPermission === "granted" ? "text-success animate-pulse" : ""} />
-            {notificationPermission === "granted" ? "🔔 Alertas Activas (Probar 🔊)" : "Activar Alertas 🔔"}
+            <RiNotification3Line
+              size={14}
+              className={notificationPermission === "granted" ? "text-success animate-pulse" : ""}
+            />
+            {notificationPermission === "granted" ? "🔔 Alertas (🔊 Probar)" : "Activar Alertas 🔔"}
           </button>
+
           <button
             onClick={handleDiagnose}
             disabled={diagnosing}
             title="Diagnosticar sesión y ver captura real de LinkedIn"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-warning/10 border border-warning/30 text-warning hover:bg-warning/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-warning/10 border border-warning/30 text-warning hover:bg-warning/20 disabled:opacity-40 transition-all shadow-sm"
           >
             {diagnosing ? <RiLoader4Line size={13} className="animate-spin" /> : <RiPulseLine size={14} />}
-            {diagnosing ? "Diagnosticando..." : "🔍 Diagnóstico en Vivo"}
+            {diagnosing ? "Diagnosticando..." : "🔍 Diagnóstico"}
           </button>
+
           <button
             onClick={handleSyncLinkedIn}
             disabled={syncingLinkedIn}
             title="Sincronizar respuestas entrantes de LinkedIn ahora"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary/10 border border-primary/25 text-primary hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-primary/10 border border-primary/25 text-primary hover:bg-primary/20 disabled:opacity-40 transition-all shadow-sm"
           >
             {syncingLinkedIn ? <RiLoader4Line size={13} className="animate-spin" /> : <RiLinkedinBoxLine size={14} />}
             {syncingLinkedIn ? "Sincronizando..." : "Sincronizar LinkedIn"}
           </button>
+
           <button
             onClick={handleBackfill}
             disabled={backfilling}
             title={t("inbox.backfillTitle")}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-base-200 border border-base-300/50 text-base-content/70 hover:bg-base-300/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium bg-base-200 border border-base-300/50 text-base-content/70 hover:bg-base-300/50 disabled:opacity-40 transition-colors"
           >
-            {backfilling ? <RiLoader4Line size={13} className="animate-spin" /> : null}
-            {backfilling ? t("inbox.backfilling") : t("inbox.backfill")}
+            {backfilling ? <RiLoader4Line size={12} className="animate-spin" /> : <RiRefreshLine size={13} />}
+            {backfilling ? t("inbox.backfilling") : "Recuperar"}
           </button>
+
           <button
             onClick={handleReclassifyAll}
             disabled={reclassifyingAll}
             title={t("inbox.reclassifyAllTitle")}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-base-200 border border-base-300/50 text-base-content/70 hover:bg-base-300/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium bg-base-200 border border-base-300/50 text-base-content/70 hover:bg-base-300/50 disabled:opacity-40 transition-colors"
           >
-            {reclassifyingAll ? <RiLoader4Line size={13} className="animate-spin" /> : null}
+            {reclassifyingAll ? <RiLoader4Line size={12} className="animate-spin" /> : null}
             {reclassifyingAll ? t("inbox.reclassifying") : t("inbox.reclassifyAll")}
           </button>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <div className="relative">
-          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-base-content/30 pointer-events-none">
-            <RiSearchLine size={13} />
-          </span>
-          <input
-            type="text"
-            className="w-56 bg-base-200 border border-base-300/50 rounded-lg pl-8 pr-3 py-1.5 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:border-primary/40"
-            placeholder={t("inbox.searchPlaceholder")}
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </div>
-
-        <select
-          aria-label={t("inbox.slotFilter")}
-          value={accountId}
-          onChange={(event) => setAccountId(event.target.value)}
-          className="h-8 min-w-48 bg-base-200 border border-base-300/50 rounded-lg px-2.5 text-xs font-medium text-base-content/70 focus:outline-none focus:border-primary/40 cursor-pointer"
-        >
-          <option value="">{t("inbox.allSlots")}</option>
-          {accounts.map((account) => (
-            <option key={account.id} value={account.id}>
-              {account.name} · {account.email}{account.is_authenticated ? "" : ` · ${t("inbox.disconnected")}`}
-            </option>
-          ))}
-        </select>
-
-        <div className="w-px h-4 bg-base-300/60" />
-
-        <div className="flex items-center gap-1">
-          {CHANNELS.map((item) => (
-            <button
-              key={item}
-              onClick={() => setChannel(item)}
-              className={`h-7 px-3 rounded-lg text-xs font-medium transition-colors ${
-                channel === item
-                  ? "bg-primary/15 text-primary border border-primary/30"
-                  : "text-base-content/50 hover:text-base-content hover:bg-base-300/50"
-              }`}
-            >
-              {t(`inbox.channels.${item}`)}
-            </button>
-          ))}
-        </div>
-
-        <div className="w-px h-4 bg-base-300/60" />
-
-        <select
-          aria-label={t("inbox.verdictFilter")}
-          value={verdict}
-          onChange={(event) => setVerdict(event.target.value)}
-          className="h-7 bg-base-200 border border-base-300/50 rounded-lg px-2.5 text-xs font-medium text-base-content/70 focus:outline-none focus:border-primary/40 cursor-pointer"
-        >
-          {VERDICT_KEYS.map((key) => (
-            <option key={key} value={key}>{t(`inbox.verdictFilters.${key}`)}</option>
-          ))}
-        </select>
-      </div>
-
-      {loading ? (
-        <div className="flex flex-col items-center justify-center gap-3 text-base-content/30 py-24">
-          <span className="loading loading-spinner loading-md" />
-          <span className="text-sm">{t("inbox.loadingReplies")}</span>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 text-base-content/30 py-24">
-          <RiInboxLine size={36} className="opacity-30" />
-          <div className="text-center">
-            <p className="text-sm font-medium">
-              {search ? t("inbox.noSearchMatches") : t("inbox.noReplies")}
-            </p>
-            {!search && <p className="text-xs mt-1 text-base-content/25">{t("inbox.detectedAutomatically")}</p>}
-          </div>
-        </div>
-      ) : (
-        <div className="rounded-lg border border-base-300/50 overflow-x-auto">
-          <table className="w-full text-sm min-w-[900px]">
-            <thead>
-              <tr className="border-b border-base-300/50 bg-base-200/60">
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-base-content/40">{t("inbox.columns.contact")}</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-base-content/40">{t("inbox.columns.channel")}</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-base-content/40">{t("inbox.columns.verdict")}</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-base-content/40">{t("inbox.columns.origin")}</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-base-content/40">{t("inbox.columns.campaign")}</th>
-                <th className="text-right px-4 py-2.5 text-xs font-medium text-base-content/40">{t("inbox.columns.replied")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((reply) => (
-                <tr
-                  key={reply.id}
-                  className="border-b border-base-300/30 hover:bg-base-200/40 transition-colors cursor-pointer"
-                  onClick={() => setSelectedReply(reply)}
+      {/* ── 2-COLUMN SPLIT VIEW CONTAINER (LinkedIn Style) ── */}
+      <div className="flex-1 flex min-h-[640px] h-[calc(100vh-7.5rem)] bg-base-100 rounded-2xl border border-base-300/70 shadow-xl overflow-hidden">
+        {/* ── LEFT COLUMN: Conversations List ── */}
+        <div className="w-full sm:w-80 md:w-96 lg:w-[410px] shrink-0 flex flex-col border-r border-base-300/70 bg-base-100/70 select-none">
+          {/* Top Search & Filter Bar */}
+          <div className="p-3.5 border-b border-base-300/60 space-y-2.5 bg-base-100">
+            {/* Search input */}
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40 pointer-events-none">
+                <RiSearchLine size={14} />
+              </span>
+              <input
+                type="text"
+                className="w-full bg-base-200 border border-base-300/60 rounded-xl pl-9 pr-8 py-2 text-xs text-base-content placeholder:text-base-content/35 focus:outline-none focus:border-primary/50 focus:bg-base-100 transition-all shadow-inner"
+                placeholder="Buscar prospecto o mensaje..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content p-0.5 rounded"
                 >
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2.5">
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-medium text-base-content">
-                            {reply.full_name ?? reply.email ?? reply.linkedin_url ?? t("inbox.unknown")}
+                  <RiCloseLine size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Quick Filter Pills (LinkedIn Style) */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
+              {[
+                { id: "all", label: "Todos" },
+                { id: "linkedin", label: "LinkedIn" },
+                { id: "email", label: "Email" },
+                { id: "autopilot", label: "🤖 Autopilot" },
+                { id: "handoff", label: "⚠️ Intervención" },
+              ].map((filter) => (
+                <button
+                  key={filter.id}
+                  onClick={() => setQuickFilter(filter.id as QuickFilter)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold shrink-0 transition-all ${
+                    quickFilter === filter.id
+                      ? "bg-primary text-primary-content shadow-sm"
+                      : "bg-base-200 text-base-content/60 hover:bg-base-300 hover:text-base-content"
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Account Slot Selector if multiple exist */}
+            {accounts.length > 1 && (
+              <select
+                aria-label="Filtrar por cuenta"
+                value={accountId}
+                onChange={(e) => setAccountId(e.target.value)}
+                className="w-full h-7 bg-base-200 border border-base-300/50 rounded-lg px-2 text-[11px] font-medium text-base-content/70 focus:outline-none cursor-pointer"
+              >
+                <option value="">Todas las cuentas de LinkedIn</option>
+                {accounts.map((acc) => (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.name} ({acc.email})
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Conversations Items List */}
+          <div className="flex-1 overflow-y-auto divide-y divide-base-300/40">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-20 text-base-content/40 gap-2">
+                <RiLoader4Line size={24} className="animate-spin text-primary" />
+                <span className="text-xs font-medium">Cargando mensajes...</span>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-base-content/40 px-6 text-center">
+                <RiInboxLine size={36} className="opacity-30 mb-2" />
+                <p className="text-xs font-semibold">No se encontraron conversaciones</p>
+                <p className="text-[11px] text-base-content/30 mt-0.5">
+                  {search ? "Prueba con otra búsqueda" : "Las respuestas se capturarán automáticamente."}
+                </p>
+              </div>
+            ) : (
+              filtered.map((reply) => {
+                const isSelected = selectedReply?.id === reply.id;
+                const vB = verdictBadge(reply, t);
+                const snippet =
+                  reply.linkedin_reply_body ||
+                  reply.reply_body ||
+                  reply.reply_summary ||
+                  "Nuevo mensaje recibido";
+
+                return (
+                  <div
+                    key={reply.id}
+                    onClick={() => setSelectedReply(reply)}
+                    className={`relative p-3.5 cursor-pointer transition-all flex items-start gap-3 hover:bg-base-200/60 ${
+                      isSelected
+                        ? "bg-primary/10 border-l-4 border-primary"
+                        : "border-l-4 border-transparent"
+                    }`}
+                  >
+                    {/* Avatar with status indicator */}
+                    <div className="relative shrink-0 mt-0.5">
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs border shadow-sm ${getAvatarColor(
+                          reply.full_name
+                        )}`}
+                      >
+                        {getInitials(reply.full_name ?? reply.email)}
+                      </div>
+                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-success ring-2 ring-base-100" />
+                    </div>
+
+                    {/* Content Body */}
+                    <div className="flex-1 min-w-0">
+                      {/* Name & Time */}
+                      <div className="flex items-center justify-between gap-1 mb-0.5">
+                        <span
+                          className={`text-xs truncate font-bold ${
+                            isSelected ? "text-primary" : "text-base-content"
+                          }`}
+                        >
+                          {reply.full_name ?? reply.email ?? t("inbox.unknown")}
+                        </span>
+                        <span className="text-[10px] text-base-content/40 shrink-0">
+                          {timeAgo(reply.replied_at, locale, t)}
+                        </span>
+                      </div>
+
+                      {/* Company / Headline */}
+                      {reply.company && (
+                        <p className="text-[11px] text-base-content/50 font-medium truncate mb-1">
+                          {reply.company}
+                        </p>
+                      )}
+
+                      {/* Snippet */}
+                      <p className="text-xs text-base-content/70 line-clamp-2 leading-snug mb-1.5">
+                        {snippet}
+                      </p>
+
+                      {/* Badges footer */}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {reply.channel === "linkedin" || reply.channel === "both" ? (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/15 text-primary">
+                            <RiLinkedinBoxLine size={11} /> LinkedIn
                           </span>
-                          {reply.linkedin_url && (
-                            <a
-                              href={reply.linkedin_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              aria-label={t("inbox.openInLinkedin")}
-                              className="text-base-content/25 hover:text-primary transition-colors"
-                              onClick={(event) => event.stopPropagation()}
-                            >
-                              <RiExternalLinkLine size={12} />
-                            </a>
-                          )}
-                        </div>
-                        <div className="text-xs text-base-content/40 mt-0.5">
-                          {reply.company ?? reply.email ?? ""}
-                        </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-info/15 text-info">
+                            <RiMailLine size={11} /> Email
+                          </span>
+                        )}
+
+                        {reply.sdr_autopilot === 1 && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-success/15 text-success">
+                            🤖 Autopilot
+                          </span>
+                        )}
+
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${vB.cls}`}>
+                          {vB.label}
+                        </span>
                       </div>
                     </div>
-                  </td>
-
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5">
-                      {(reply.channel === "email" || reply.channel === "both") && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-info/15 text-info">
-                          <RiMailLine size={11} /> {t("inbox.channels.email")}
-                        </span>
-                      )}
-                      {(reply.channel === "linkedin" || reply.channel === "both") && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-primary/15 text-primary">
-                          <RiLinkedinBoxLine size={11} /> LinkedIn
-                        </span>
-                      )}
-                    </div>
-                  </td>
-
-                  <td className="px-4 py-3">
-                    {(() => {
-                      const badge = verdictBadge(reply, t);
-                      return (
-                        <div className="flex items-center gap-1.5">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${badge.cls}`}>
-                            {badge.label}
-                          </span>
-                          {reply.reply_summary && (
-                            <span className="text-xs text-base-content/35 truncate max-w-[16rem]" title={reply.reply_summary}>
-                              {reply.reply_summary}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </td>
-
-                  <td className="px-4 py-3"><OriginBadges reply={reply} t={t} /></td>
-
-                  <td className="px-4 py-3">
-                    {reply.workflow_id ? (
-                      <Link
-                        href={`/workflows/${reply.workflow_id}`}
-                        className="text-xs text-base-content/60 hover:text-base-content transition-colors"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        {reply.workflow_name ?? reply.workflow_id}
-                      </Link>
-                    ) : (
-                      <span className="text-xs text-base-content/25">—</span>
-                    )}
-                  </td>
-
-                  <td className="px-4 py-3 text-right">
-                    <span className="text-xs text-base-content/40">{timeAgo(reply.replied_at, locale, t)}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
-      )}
+
+        {/* ── RIGHT COLUMN: Selected Conversation Chat / Empty State ── */}
+        <div className="flex-1 flex flex-col min-w-0 bg-base-100/50">
+          {selectedReply ? (
+            <ChatPanel
+              key={selectedReply.id}
+              reply={selectedReply}
+              onActionDone={load}
+              hasPremium={true}
+            />
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-base-200/10">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/25 flex items-center justify-center text-primary mb-4 shadow-sm animate-bounce">
+                <RiLinkedinBoxLine size={32} />
+              </div>
+              <h3 className="font-bold text-lg text-base-content mb-1">
+                Tus Mensajes y Conversaciones
+              </h3>
+              <p className="text-xs text-base-content/50 max-w-sm">
+                Selecciona un contacto de la lista a la izquierda para ver el historial completo, redactar
+                respuestas o activar el SDR IA en piloto automático.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
     </>
   );
 }
