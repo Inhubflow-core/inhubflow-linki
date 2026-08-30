@@ -171,11 +171,11 @@ function ActivityChart({
 }) {
   const { t } = useTranslation();
   const seriesConfig = [
-    { key: "visits" as const,      color: "#5aa2ff", label: t("leadFinder.title") ? "Visits" : "Visits" },
-    { key: "connections" as const, color: "#32d583", label: "Connects" },
-    { key: "messages" as const,    color: "#f4b740", label: "Messages" },
-    { key: "inmails" as const,     color: "#e879f9", label: "InMails" },
-    { key: "emails" as const,      color: "#fb923c", label: "Emails" },
+    { key: "visits" as const,      color: "#5aa2ff", label: t("dashboard.visits") },
+    { key: "connections" as const, color: "#32d583", label: t("dashboard.connections") },
+    { key: "messages" as const,    color: "#f4b740", label: t("dashboard.messages") },
+    { key: "inmails" as const,     color: "#e879f9", label: t("dashboard.inmails") },
+    { key: "emails" as const,      color: "#fb923c", label: t("dashboard.emails") },
   ];
   const [activeSeries, setActiveSeries] = useState<Set<string>>(new Set(seriesConfig.map(s => s.key)));
   const maxVal = Math.max(
@@ -318,9 +318,9 @@ function LinkedInCard({
   }
 
   const items = [
-    { label: "Connections", value: liStats?.connections ?? null, color: "#32d583" },
-    { label: "Pending sent", value: liStats?.pending ?? null, color: "#f4b740" },
-    { label: "Profile views", value: liStats?.profile_views ?? null, color: "#5aa2ff" },
+    { label: t("dashboard.connections"), value: liStats?.connections ?? null, color: "#32d583" },
+    { label: t("dashboard.pendingSent"), value: liStats?.pending ?? null, color: "#f4b740" },
+    { label: t("dashboard.profileViews"), value: liStats?.profile_views ?? null, color: "#5aa2ff" },
   ];
 
   return (
@@ -328,7 +328,7 @@ function LinkedInCard({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <RiLinkedinBoxLine size={16} className="text-gray-400" />
-          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">LinkedIn</span>
+          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t("dashboard.channelLinkedin")}</span>
         </div>
         <div className="flex items-center gap-2">
           {syncedAt && (
@@ -343,7 +343,7 @@ function LinkedInCard({
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-950/40 transition-colors disabled:opacity-40"
             >
               <FiRefreshCw size={11} className={syncing ? "animate-spin" : ""} />
-              {syncing ? "Syncing" : "Sync"}
+              {syncing ? t("dashboard.syncing") : t("dashboard.sync")}
             </button>
           )}
         </div>
@@ -658,7 +658,7 @@ export default function Dashboard() {
             <KpiCard
               label={t("dashboard.connectionRequests")}
               value={totals.connections_requested}
-              sub={acceptanceRate > 0 ? `${acceptanceRate}% accepted` : undefined}
+              sub={acceptanceRate > 0 ? `${acceptanceRate}% ${t("dashboard.accepted")}` : undefined}
               color="#32d583"
               icon={<FiUserPlus size={14} />}
               pulse={totals.active_runs > 0}
@@ -666,7 +666,7 @@ export default function Dashboard() {
             <KpiCard
               label={t("dashboard.messagesSent")}
               value={totals.messages_sent}
-              sub={replyRate > 0 ? `${replyRate}% replied` : undefined}
+              sub={replyRate > 0 ? `${replyRate}% ${t("dashboard.replied")}` : undefined}
               color="#f4b740"
               icon={<FiMessageSquare size={14} />}
             />
@@ -696,7 +696,7 @@ export default function Dashboard() {
             <KpiCard
               label={t("dashboard.emailsSent")}
               value={totals.emails_sent}
-              sub={emailReplyRate > 0 ? `${emailReplyRate}% replied` : undefined}
+              sub={emailReplyRate > 0 ? `${emailReplyRate}% ${t("dashboard.replied")}` : undefined}
               color="#fb923c"
               icon={<RiMailSendLine size={14} />}
             />
@@ -730,7 +730,7 @@ export default function Dashboard() {
           {/* Funnel */}
           <div className="rounded-2xl border border-gray-200 bg-white shadow-xs dark:border-gray-800 dark:bg-gray-900 overflow-hidden" data-tour="dashboard-funnel">
             <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Funnel</span>
+              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t("dashboard.funnel")}</span>
             </div>
             <div className="divide-y divide-gray-100 dark:divide-gray-800 py-1">
               <FunnelRow icon={<FiUsers size={12} />}        color="#808080" label={t("contacts.title")}        value={totals.total_targets}       max={maxFunnelValue} />
