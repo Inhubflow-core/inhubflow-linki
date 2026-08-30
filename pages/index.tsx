@@ -438,7 +438,7 @@ function FilterBar({
       <select
         value={listId}
         onChange={(e) => { onListChange(e.target.value); if (e.target.value) onWorkflowChange(""); }}
-        className={`h-8 px-3 rounded-xl text-xs font-medium border transition-all focus:outline-none cursor-pointer ${
+        className={`h-8 max-w-[150px] sm:max-w-[200px] truncate px-3 rounded-xl text-xs font-medium border transition-all focus:outline-none cursor-pointer ${
           listId
             ? "border-brand-500 bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-400"
             : "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300"
@@ -450,7 +450,7 @@ function FilterBar({
       <select
         value={workflowId}
         onChange={(e) => { onWorkflowChange(e.target.value); if (e.target.value) onListChange(""); }}
-        className={`h-8 px-3 rounded-xl text-xs font-medium border transition-all focus:outline-none cursor-pointer ${
+        className={`h-8 max-w-[150px] sm:max-w-[200px] truncate px-3 rounded-xl text-xs font-medium border transition-all focus:outline-none cursor-pointer ${
           workflowId
             ? "border-brand-500 bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-400"
             : "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300"
@@ -584,19 +584,17 @@ export default function Dashboard() {
     <div className="space-y-6">
 
       {/* ── Top Header Banner (Lead Finder Style) ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 border border-brand-500/20 dark:border-brand-500/10 p-5 md:p-6 rounded-2xl">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-              Dashboard
-            </h1>
-          </div>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 border border-brand-500/20 dark:border-brand-500/10 p-5 md:p-6 rounded-2xl">
+        <div className="space-y-1 shrink-0">
+          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+            Dashboard
+          </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Resumen en tiempo real de prospección, conversiones y actividad.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3" data-tour="dashboard-filters">
+        <div className="flex flex-wrap items-center gap-3 shrink-0" data-tour="dashboard-filters">
           {/* Filters */}
           <FilterBar
             lists={stats.lists}
@@ -608,7 +606,7 @@ export default function Dashboard() {
           />
 
           {/* Today pills */}
-          <div className="flex items-center gap-1.5 pl-3 border-l border-gray-200 dark:border-gray-700/60 flex-wrap">
+          <div className="flex items-center gap-1.5 sm:pl-3 sm:border-l border-gray-200 dark:border-gray-700/60 flex-wrap">
             <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 mr-0.5">Hoy</span>
             {[
               { label: `${today.visits_today} visitas`,       color: "#5aa2ff" },
