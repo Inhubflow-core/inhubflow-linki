@@ -14,7 +14,6 @@ import {
   RiContactsLine,
   RiInboxLine,
   RiMailCheckLine,
-  RiCheckboxCircleLine,
   RiQuestionLine,
   RiCompassLine,
   RiPlayCircleLine,
@@ -40,10 +39,6 @@ const mainNav = [
   { href: "/email-health", labelKey: "nav.emailHealth", icon: RiMailCheckLine, color: "#fb6514", tour: "nav-email-health" },
 ];
 
-const premiumNav = [
-  { href: "/todos", labelKey: "nav.todos", icon: RiCheckboxCircleLine, color: "#ee46bc", tour: "nav-todos" },
-];
-
 interface SidebarProps {
   onCollapse?: (collapsed: boolean) => void;
   isEmbedded?: boolean;
@@ -62,12 +57,11 @@ export default function Sidebar({
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
-  const [hasPremium, setHasPremium] = useState(true);
 
   const helpRef = useRef<HTMLDivElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
   const tourPage = pathToTourPage(router.pathname);
-  const nav = hasPremium ? [...mainNav, ...premiumNav] : mainNav;
+  const nav = mainNav;
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -82,14 +76,6 @@ export default function Sidebar({
     return () => document.removeEventListener("mousedown", onClick);
   }, [helpOpen, langOpen]);
 
-  useEffect(() => {
-    fetch("/api/premium-status")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (d) setHasPremium(!!d.hasPremium);
-      })
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     fetch("/api/system/update")
