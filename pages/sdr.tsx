@@ -288,34 +288,34 @@ export default function SdrPage() {
         <title>Agente SDR IA — Linki InHubFlow</title>
       </Head>
 
-      <div className="p-8 max-w-7xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-base-300/40 pb-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-violet-500/20">
-              <RiRobotLine size={28} />
+      <div className="space-y-6 pb-12">
+        {/* Top Header Banner (Lead Finder Style) */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 border border-brand-500/20 dark:border-brand-500/10 p-5 md:p-6 rounded-2xl">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500 !text-white shadow-xs">
+                <RiSparklingLine size={13} /> NATIVE SDR
+              </span>
+              <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                Agente SDR con IA
+              </h1>
+              <span
+                className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${getModeBadge(mode).color}`}
+              >
+                {getModeBadge(mode).label}
+              </span>
             </div>
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-base-content tracking-tight">Agente SDR con IA</h1>
-                <span
-                  className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${getModeBadge(mode).color}`}
-                >
-                  {getModeBadge(mode).label}
-                </span>
-              </div>
-              <p className="text-sm text-base-content/60 mt-0.5">
-                Calificación de prospectos, respuestas inteligentes y agendamiento automático para LinkedIn e Inbox.
-              </p>
-            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Calificación de prospectos, respuestas inteligentes y agendamiento automático para LinkedIn e Inbox.
+            </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={loadConfig}
               disabled={loading}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium bg-base-200 hover:bg-base-300 text-base-content/80 border border-base-300/60 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
             >
               <RiRefreshLine size={16} className={loading ? "animate-spin" : ""} />
               Actualizar
@@ -324,7 +324,7 @@ export default function SdrPage() {
               type="button"
               onClick={handleSaveConfig}
               disabled={saving}
-              className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-600/30 transition-all disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-all shadow-xs disabled:opacity-50"
             >
               <RiSaveLine size={16} />
               {saving ? "Guardando..." : "Guardar Cambios"}
