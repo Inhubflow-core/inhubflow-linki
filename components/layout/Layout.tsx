@@ -11,25 +11,38 @@ export default function Layout({ children }: { children: ReactNode }) {
   const isEmbed = router.query.embed === "true";
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // Auto-collapse sidebar on smaller screens
+  // Initialize and persist sidebar collapse preference
   useEffect(() => {
+    const saved = localStorage.getItem("inhubflow_sidebar_collapsed");
+    if (saved !== null) {
+      setIsCollapsed(saved === "1");
+    } else if (window.innerWidth < 1024) {
+      setIsCollapsed(true);
+    }
+
     function handleResize() {
-      if (window.innerWidth < 1024) {
+      if (window.innerWidth < 768) {
         setIsCollapsed(true);
       }
     }
-    handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  const handleCollapse = (collapsed: boolean) => {
+    setIsCollapsed(collapsed);
+    try {
+      localStorage.setItem("inhubflow_sidebar_collapsed", collapsed ? "1" : "0");
+    } catch {}
+  };
+
+  const toggleSidebar = () => {
+    handleCollapse(!isCollapsed);
+  };
+
   if (NO_LAYOUT_PATHS.includes(router.pathname)) {
     return <>{children}</>;
   }
-
-  const toggleSidebar = () => {
-    setIsCollapsed((prev) => !prev);
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-[#0c111d] dark:text-gray-100 flex font-sans transition-colors duration-200">
@@ -39,7 +52,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       {!isEmbed && (
         <Sidebar
           isCollapsed={isCollapsed}
-          onCollapse={setIsCollapsed}
+          onCollapse={handleCollapse}
           isEmbedded={isEmbed}
         />
       )}
@@ -58,7 +71,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           />
         )}
 
-        <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto max-w-[1600px] w-full mx-auto">
           {children}
         </main>
       </div>
