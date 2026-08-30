@@ -1374,38 +1374,24 @@ export default function InboxPage() {
             {syncingLinkedIn ? <RiLoader4Line size={13} className="animate-spin" /> : <RiLinkedinBoxLine size={14} />}
             {syncingLinkedIn ? "Sincronizando..." : "Sincronizar LinkedIn"}
           </button>
-          {hasPremium ? (
-            <>
-              <button
-                onClick={handleBackfill}
-                disabled={backfilling}
-                title={t("inbox.backfillTitle")}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-base-200 border border-base-300/50 text-base-content/70 hover:bg-base-300/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                {backfilling ? <RiLoader4Line size={13} className="animate-spin" /> : null}
-                {backfilling ? t("inbox.backfilling") : t("inbox.backfill")}
-              </button>
-              <button
-                onClick={handleReclassifyAll}
-                disabled={reclassifyingAll}
-                title={t("inbox.reclassifyAllTitle")}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-base-200 border border-base-300/50 text-base-content/70 hover:bg-base-300/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                {reclassifyingAll ? <RiLoader4Line size={13} className="animate-spin" /> : null}
-                {reclassifyingAll ? t("inbox.reclassifying") : t("inbox.reclassifyAll")}
-              </button>
-            </>
-          ) : (
-            <a
-              href="https://opsily.com?utm_source=linki&utm_medium=app&utm_campaign=reply-ai"
-              target="_blank"
-              rel="noopener noreferrer"
-              title={t("inbox.upgradeTitle")}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-colors"
-            >
-              {t("inbox.upgrade")}
-            </a>
-          )}
+          <button
+            onClick={handleBackfill}
+            disabled={backfilling}
+            title={t("inbox.backfillTitle")}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-base-200 border border-base-300/50 text-base-content/70 hover:bg-base-300/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {backfilling ? <RiLoader4Line size={13} className="animate-spin" /> : null}
+            {backfilling ? t("inbox.backfilling") : t("inbox.backfill")}
+          </button>
+          <button
+            onClick={handleReclassifyAll}
+            disabled={reclassifyingAll}
+            title={t("inbox.reclassifyAllTitle")}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-base-200 border border-base-300/50 text-base-content/70 hover:bg-base-300/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {reclassifyingAll ? <RiLoader4Line size={13} className="animate-spin" /> : null}
+            {reclassifyingAll ? t("inbox.reclassifying") : t("inbox.reclassifyAll")}
+          </button>
         </div>
       </div>
 

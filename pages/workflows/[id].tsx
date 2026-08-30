@@ -1896,7 +1896,6 @@ function Wizard({
                     {ws.type === "sales_inmail" && hasPremium && ws.aiEnabled && (
                       <p className="text-xs text-base-content/30 -mt-1">The AI writer generates both the subject and body for each InMail.</p>
                     )}
-                    {hasPremium ? (
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-base-300/40 border border-base-300/50">
                       <RiRobot2Line size={15} className="text-base-content/40 shrink-0" />
                       <div className="flex-1">
@@ -1911,18 +1910,7 @@ function Wizard({
                         <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${ws.aiEnabled ? "translate-x-5" : "translate-x-0"}`} />
                       </button>
                     </div>
-                    ) : (
-                      <a href="https://opsily.com?utm_source=linki&utm_medium=app&utm_campaign=ai-writer" target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20 hover:bg-primary/10 transition-colors">
-                        <RiRobot2Line size={15} className="text-primary/70 shrink-0" />
-                        <div className="flex-1">
-                          <p className="text-sm text-base-content/80">AI message writer <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/15 text-primary align-middle">Premium</span></p>
-                          <p className="text-xs text-base-content/40 mt-0.5">Auto-personalise every message from lead context. Upgrade to enable.</p>
-                        </div>
-                        <span className="text-xs font-medium text-primary shrink-0">Upgrade →</span>
-                      </a>
-                    )}
-                    {hasPremium && ws.aiEnabled ? (
+                    {ws.aiEnabled ? (
                       <div className="space-y-4">
                         <ModelPicker models={orModels} value={ws.aiModel} open={orModelOpen === idx} search={orModelSearch} collapsedProviders={collapsedProviders}
                           onOpen={() => { setOrModelOpen(orModelOpen === idx ? null : idx); setOrModelSearch(""); }}
@@ -1991,7 +1979,6 @@ function Wizard({
 
                 {ws.type === "email" && (
                   <div className="space-y-4">
-                    {hasPremium ? (
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-base-300/40 border border-base-300/50">
                       <RiRobot2Line size={15} className="text-base-content/40 shrink-0" />
                       <div className="flex-1">
@@ -2002,18 +1989,7 @@ function Wizard({
                         <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${ws.aiEnabled ? "translate-x-5" : "translate-x-0"}`} />
                       </button>
                     </div>
-                    ) : (
-                      <a href="https://opsily.com?utm_source=linki&utm_medium=app&utm_campaign=ai-writer" target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20 hover:bg-primary/10 transition-colors">
-                        <RiRobot2Line size={15} className="text-primary/70 shrink-0" />
-                        <div className="flex-1">
-                          <p className="text-sm text-base-content/80">AI email writer <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/15 text-primary align-middle">Premium</span></p>
-                          <p className="text-xs text-base-content/40 mt-0.5">Auto-generate subject + body from lead context. Upgrade to enable.</p>
-                        </div>
-                        <span className="text-xs font-medium text-primary shrink-0">Upgrade →</span>
-                      </a>
-                    )}
-                    {hasPremium && ws.aiEnabled ? (
+                    {ws.aiEnabled ? (
                       <div className="space-y-4">
                         <ModelPicker models={orModels} value={ws.aiModel} open={orModelOpen === idx} search={orModelSearch} collapsedProviders={collapsedProviders}
                           onOpen={() => { setOrModelOpen(orModelOpen === idx ? null : idx); setOrModelSearch(""); }}
