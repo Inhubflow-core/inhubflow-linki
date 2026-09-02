@@ -42,13 +42,20 @@ export const authOptions: NextAuthOptions = {
         const valid = await bcrypt.compare(credentials.password, user.password_hash);
         if (!valid) return null;
 
+        const isSuperAdmin = credentials.email.trim().toLowerCase() === "inhubflow@gmail.com";
+        if (isSuperAdmin && user.role !== "admin") {
+          db.prepare("UPDATE users SET role = 'admin', slots_limit = 999, plan_tier = 'custom' WHERE id = ?").run(user.id);
+          user.role = "admin";
+          user.slots_limit = 999;
+        }
+
         return {
           id: user.id,
           email: user.email,
-          role: user.role || "user",
-          slots_limit: user.slots_limit || 1,
+          role: isSuperAdmin ? "admin" : (user.role || "user"),
+          slots_limit: isSuperAdmin ? 999 : (user.slots_limit || 1),
           subscription_status: user.subscription_status || "active",
-          plan_tier: user.plan_tier || "starter",
+          plan_tier: isSuperAdmin ? "custom" : (user.plan_tier || "starter"),
         };
       },
     }),
@@ -89,6 +96,13 @@ export const authOptions: NextAuthOptions = {
         } catch {
           // ignore error if db busy
         }
+      }
+
+      // Special guarantee for inhubflow@gmail.com
+      if (token.email && token.email.trim().toLowerCase() === "inhubflow@gmail.com") {
+        token.role = "admin";
+        token.slots_limit = 999;
+        token.plan_tier = "custom";
       }
 
       return token;

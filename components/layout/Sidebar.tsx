@@ -55,7 +55,8 @@ export default function Sidebar({
 }: SidebarProps) {
   const router = useRouter();
   const { data: session } = useSession();
-  const isAdmin = (session?.user as { role?: string })?.role === "admin";
+  const userEmail = session?.user?.email?.trim().toLowerCase();
+  const isAdmin = userEmail === "inhubflow@gmail.com" || (session?.user as { role?: string })?.role === "admin";
   const { t, locale, setLocale, supportedLocales } = useTranslation();
   const { theme } = useTheme();
   const [updateAvailable, setUpdateAvailable] = useState(false);

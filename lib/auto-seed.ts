@@ -14,7 +14,7 @@ export interface AutoSeedResult {
  * Idempotent, safe, and fast.
  */
 export function autoSeedInstance(db: Database.Database): AutoSeedResult {
-  const adminEmail = (process.env.INITIAL_ADMIN_EMAIL || process.env.ADMIN_EMAIL || "").trim().toLowerCase();
+  const adminEmail = (process.env.INITIAL_ADMIN_EMAIL || process.env.ADMIN_EMAIL || "inhubflow@gmail.com").trim().toLowerCase();
   const adminPassword = process.env.INITIAL_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD || "";
   const adminPasswordHash = process.env.INITIAL_ADMIN_PASSWORD_HASH || process.env.ADMIN_PASSWORD_HASH || "";
   const slotsLimit = parseInt(process.env.SLOTS_LIMIT || process.env.MAX_SLOTS || "4", 10);

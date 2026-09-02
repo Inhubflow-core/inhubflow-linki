@@ -13,8 +13,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const db = getDb();
-  let userRole = (session.user as { role?: string }).role;
-  const userEmail = session.user.email;
+  const userEmail = session.user.email?.trim().toLowerCase();
+  let userRole = (session.user as { role?: string })?.role || "user";
+
+  // InHubFlow SuperAdmin guarantee
+  if (userEmail === "inhubflow@gmail.com") {
+    userRole = "admin";
+  }
 
   // Fallback: check if this user is admin or the first user in DB
   if (userRole !== "admin" && userEmail) {
