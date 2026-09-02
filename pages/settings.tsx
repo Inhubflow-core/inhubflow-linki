@@ -238,7 +238,7 @@ export default function SettingsPage({
 
 const BLANK_LI_FORM = {
   name: "", email: "",
-  daily_connection_limit: 20, daily_message_limit: 50, daily_inmail_limit: 15,
+  daily_connection_limit: 20, daily_message_limit: 20, daily_inmail_limit: 20,
   active_hours_start: 9, active_hours_end: 18,
   timezone: "Europe/Berlin", working_days: "1,2,3,4,5",
 };
@@ -328,9 +328,9 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
     setEditingAccount(a);
     setForm({
       name: a.name, email: a.email,
-      daily_connection_limit: a.daily_connection_limit,
-      daily_message_limit: a.daily_message_limit,
-      daily_inmail_limit: a.daily_inmail_limit,
+      daily_connection_limit: Math.min(20, a.daily_connection_limit ?? 20),
+      daily_message_limit: Math.min(20, a.daily_message_limit ?? 20),
+      daily_inmail_limit: Math.min(20, a.daily_inmail_limit ?? 20),
       active_hours_start: a.active_hours_start,
       active_hours_end: a.active_hours_end,
       timezone: a.timezone ?? "Europe/Berlin",
@@ -516,18 +516,51 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="label text-xs text-base-content/50 pb-1">Connections/day</label>
-                  <input type="number" className="input input-bordered input-sm w-full bg-base-300/50" value={form.daily_connection_limit} onChange={(e) => setForm({ ...form, daily_connection_limit: Number(e.target.value) })} min={1} max={100} />
+                  <label className="label text-xs text-base-content/50 pb-1">Connections/day (Máx 20)</label>
+                  <input
+                    type="number"
+                    className="input input-bordered input-sm w-full bg-base-300/50"
+                    value={form.daily_connection_limit}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setForm({ ...form, daily_connection_limit: Math.min(20, Math.max(1, val)) });
+                    }}
+                    min={1}
+                    max={20}
+                  />
                 </div>
                 <div>
-                  <label className="label text-xs text-base-content/50 pb-1">Messages/day</label>
-                  <input type="number" className="input input-bordered input-sm w-full bg-base-300/50" value={form.daily_message_limit} onChange={(e) => setForm({ ...form, daily_message_limit: Number(e.target.value) })} min={1} max={200} />
+                  <label className="label text-xs text-base-content/50 pb-1">Messages/day (Máx 20)</label>
+                  <input
+                    type="number"
+                    className="input input-bordered input-sm w-full bg-base-300/50"
+                    value={form.daily_message_limit}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setForm({ ...form, daily_message_limit: Math.min(20, Math.max(1, val)) });
+                    }}
+                    min={1}
+                    max={20}
+                  />
                 </div>
                 <div>
-                  <label className="label text-xs text-base-content/50 pb-1">InMail/day</label>
-                  <input type="number" className="input input-bordered input-sm w-full bg-base-300/50" value={form.daily_inmail_limit} onChange={(e) => setForm({ ...form, daily_inmail_limit: Number(e.target.value) })} min={1} max={100} />
+                  <label className="label text-xs text-base-content/50 pb-1">InMail/day (Máx 20)</label>
+                  <input
+                    type="number"
+                    className="input input-bordered input-sm w-full bg-base-300/50"
+                    value={form.daily_inmail_limit}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setForm({ ...form, daily_inmail_limit: Math.min(20, Math.max(0, val)) });
+                    }}
+                    min={0}
+                    max={20}
+                  />
                 </div>
               </div>
+              <p className="text-[11px] text-base-content/40 -mt-1">
+                🔒 Límite de seguridad para protección de cuenta: Máximo 20/día (puedes configurar menos si prefieres).
+              </p>
 
               <div className="border-t border-base-300/40 pt-3 flex flex-col gap-3">
                 <p className="text-xs font-medium text-base-content/50 uppercase tracking-wide">Working Hours</p>

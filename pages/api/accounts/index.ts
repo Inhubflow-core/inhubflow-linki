@@ -30,8 +30,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         name,
         email,
         daily_connection_limit = 20,
-        daily_message_limit = 50,
-        daily_inmail_limit = 15,
+        daily_message_limit = 20,
+        daily_inmail_limit = 20,
         active_hours_start = 9,
         active_hours_end = 18,
         timezone = "UTC",
@@ -39,6 +39,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } = req.body;
 
       if (!name || !email) return res.status(400).json({ error: "Nombre y correo son obligatorios" });
+
+      // Enforce safe account limits (Max 20/day)
+      const safeConnLimit = Math.min(20, Math.max(1, Number(daily_connection_limit) || 20));
+      const safeMsgLimit = Math.min(20, Math.max(1, Number(daily_message_limit) || 20));
+      const safeInmailLimit = Math.min(20, Math.max(0, Number(daily_inmail_limit) || 20));
 
       // Check slots limit
       try {
@@ -74,9 +79,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             id,
             name.trim(),
             email.trim().toLowerCase(),
-            daily_connection_limit,
-            daily_message_limit,
-            daily_inmail_limit,
+            safeConnLimit,
+            safeMsgLimit,
+            safeInmailLimit,
             active_hours_start,
             active_hours_end,
             timezone,

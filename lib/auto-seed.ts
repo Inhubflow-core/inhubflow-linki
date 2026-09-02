@@ -90,6 +90,20 @@ export function autoSeedInstance(db: Database.Database): AutoSeedResult {
     console.error("[InHubFlow AutoSeed] SDR seeding warning:", err);
   }
 
+  // 5. Enforce safe LinkedIn daily limits on all accounts (max 20)
+  try {
+    db.prepare(`
+      UPDATE accounts
+      SET
+        daily_connection_limit = MIN(20, COALESCE(daily_connection_limit, 20)),
+        daily_message_limit = MIN(20, COALESCE(daily_message_limit, 20)),
+        daily_inmail_limit = MIN(20, COALESCE(daily_inmail_limit, 20))
+      WHERE daily_connection_limit > 20 OR daily_message_limit > 20 OR daily_inmail_limit > 20
+    `).run();
+  } catch (err) {
+    console.warn("[InHubFlow AutoSeed] Accounts limits clamp warning:", err);
+  }
+
   console.log(`[InHubFlow AutoSeed] 🚀 Instance initialized with ${slotsLimit} slots limit${companyName ? ` for '${companyName}'` : ""}.`);
 
   return {

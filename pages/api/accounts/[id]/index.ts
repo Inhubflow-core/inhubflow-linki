@@ -20,6 +20,17 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 
   if (req.method === "PUT") {
     const { name, email, daily_connection_limit, daily_message_limit, daily_inmail_limit, active_hours_start, active_hours_end, timezone, working_days } = req.body;
+
+    const safeConn = daily_connection_limit !== undefined
+      ? Math.min(20, Math.max(1, Number(daily_connection_limit)))
+      : null;
+    const safeMsg = daily_message_limit !== undefined
+      ? Math.min(20, Math.max(1, Number(daily_message_limit)))
+      : null;
+    const safeInmail = daily_inmail_limit !== undefined
+      ? Math.min(20, Math.max(0, Number(daily_inmail_limit)))
+      : null;
+
     db.prepare(
       `UPDATE accounts SET
         name = COALESCE(?, name),
@@ -32,7 +43,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         timezone = COALESCE(?, timezone),
         working_days = COALESCE(?, working_days)
        WHERE id = ?`
-    ).run(name, email, daily_connection_limit, daily_message_limit, daily_inmail_limit, active_hours_start, active_hours_end, timezone, working_days, id);
+    ).run(name, email, safeConn, safeMsg, safeInmail, active_hours_start, active_hours_end, timezone, working_days, id);
     return res.json(db.prepare(`SELECT ${ACCOUNT_COLUMNS} FROM accounts WHERE id = ?`).get(id));
   }
 
