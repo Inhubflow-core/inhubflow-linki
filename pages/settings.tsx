@@ -346,6 +346,24 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
   async function submitAuth(e: React.FormEvent) {
     e.preventDefault();
     if (!authModal) return;
+
+    const cleanLiAt = authForm.li_at.trim();
+    if (!cleanLiAt) {
+      toast.error("Por favor ingresa el valor de la cookie li_at");
+      return;
+    }
+
+    if (
+      cleanLiAt.includes("copy(") ||
+      cleanLiAt.includes("document.cookie") ||
+      cleanLiAt.includes("javascript:") ||
+      cleanLiAt.includes(" ") ||
+      cleanLiAt.length < 20
+    ) {
+      toast.error("⚠️ Has pegado texto de script. La cookie real es una clave larga que empieza por AQED... que obtienes con Cookie-Editor o en DevTools.");
+      return;
+    }
+
     setAuthLoading(true);
     const res = await fetch(`/api/accounts/${authModal}/authenticate`, {
       method: "POST",
@@ -353,8 +371,8 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
       body: JSON.stringify(authForm),
     });
     setAuthLoading(false);
-    if (!res.ok) { toast.error((await res.json()).error ?? "Authentication failed"); return; }
-    toast.success("Account authenticated");
+    if (!res.ok) { toast.error((await res.json()).error ?? "Error al autenticar cuenta"); return; }
+    toast.success("¡Cuenta de LinkedIn conectada con éxito!");
     closeAuthModal();
     refresh();
   }
@@ -608,38 +626,46 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
               </div>
             </div>
 
-            {/* Tarjeta del Código Mágico de 1 Clic */}
+            {/* Tarjeta de instrucciones clara y sin enredos */}
             <div className="bg-brand-500/5 dark:bg-brand-500/10 border border-brand-500/20 rounded-xl p-3.5 mb-4 space-y-3">
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">⚡</span>
-                  <p className="font-bold text-xs text-gray-900 dark:text-white">
-                    Código Mágico de 1 Clic
+                <div>
+                  <p className="font-bold text-xs text-gray-900 dark:text-white flex items-center gap-1.5">
+                    <span>🧩</span> Opción más fácil: Extensión Cookie-Editor
+                  </p>
+                  <p className="text-[11px] text-base-content/60 mt-0.5">
+                    LinkedIn protege la cookie por seguridad. La forma más rápida de copiarla en 2 clics es:
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const code = "copy(document.cookie.match(/li_at=([^;]+)/)[1]); console.log('✅ Cookie li_at copiada al portapapeles!');";
-                    navigator.clipboard.writeText(code);
-                    toast.success("¡Código copiado! Pégalo en la consola de LinkedIn (F12) y presiona Enter");
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-brand-500 text-white hover:bg-brand-600 transition-colors shadow-sm shrink-0 cursor-pointer"
+                <a
+                  href="https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-brand-500 text-white hover:bg-brand-600 transition-colors shadow-sm shrink-0"
                 >
-                  <span>Copiar Código Mágico</span>
-                </button>
+                  <span>Instalar Extensión</span> <RiExternalLinkLine size={12} />
+                </a>
               </div>
 
-              <div className="bg-base-100 dark:bg-base-300/50 rounded-lg p-2.5 border border-base-300 text-[11.5px] space-y-1.5 text-base-content/80">
-                <p className="font-semibold text-gray-900 dark:text-white">Pasos rápidos para conectar:</p>
+              <div className="bg-base-100 dark:bg-base-300/50 rounded-lg p-2.5 border border-base-300 text-[11.5px] space-y-1 text-base-content/80">
+                <p className="font-semibold text-gray-900 dark:text-white">Solo 3 pasos sencillos:</p>
                 <ol className="list-decimal list-inside space-y-1 pl-0.5 text-base-content/75">
-                  <li>Haz clic arriba en <strong>&quot;Copiar Código Mágico&quot;</strong>.</li>
-                  <li>Ve a tu pestaña abierta de <strong>LinkedIn</strong>.</li>
-                  <li>Presiona <strong>F12</strong> en tu teclado (o Clic derecho → Inspeccionar) y haz clic en la pestaña <strong>Consola (Console)</strong>.</li>
-                  <li>Presiona <strong>Ctrl + V</strong> para pegar el código y pulsa <strong>Enter</strong> (¡tu cookie se copiará sola al portapapeles!).</li>
-                  <li>Vuelve a InHubFlow y haz clic en <strong>&quot;📋 Pegar portapapeles&quot;</strong> abajo.</li>
+                  <li>Abre tu pestaña de <strong>LinkedIn</strong> con tu sesión iniciada.</li>
+                  <li>Haz clic en el ícono de <strong>Cookie-Editor</strong> en tu barra de extensiones, busca la fila <strong>li_at</strong> y dale al botón de copiar.</li>
+                  <li>Vuelve aquí y haz clic en <strong>&quot;📋 Pegar portapapeles&quot;</strong> abajo.</li>
                 </ol>
               </div>
+
+              <details className="text-[11px] text-base-content/60 pt-0.5">
+                <summary className="cursor-pointer hover:text-base-content font-medium select-none">
+                  ¿Prefieres hacerlo sin instalar extensión? (Inspeccionar F12)
+                </summary>
+                <ol className="list-decimal list-inside pl-1 pt-1.5 space-y-1 text-base-content/75">
+                  <li>En tu pestaña de LinkedIn presiona <strong>F12</strong>.</li>
+                  <li>Ve a la pestaña superior <strong>Application (Aplicación)</strong> → en la izquierda abre <strong>Cookies</strong> → <strong>https://www.linkedin.com</strong>.</li>
+                  <li>Busca la fila <strong>li_at</strong>, haz doble clic en el campo Valor (empieza por AQED...) y cópialo.</li>
+                </ol>
+              </details>
             </div>
 
             <form onSubmit={submitAuth} className="flex flex-col gap-3">

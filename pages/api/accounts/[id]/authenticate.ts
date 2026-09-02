@@ -12,7 +12,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!account) return res.status(404).json({ error: "Account not found" });
 
   const { li_at, document_cookie } = req.body as { li_at?: string; document_cookie?: string };
-  if (!li_at) return res.status(400).json({ error: "li_at cookie is required" });
+  if (!li_at || typeof li_at !== "string") {
+    return res.status(400).json({ error: "La cookie li_at es obligatoria" });
+  }
+
+  const cleanLiAt = li_at.trim();
+  if (
+    cleanLiAt.includes("copy(") ||
+    cleanLiAt.includes("document.cookie") ||
+    cleanLiAt.includes("javascript:") ||
+    cleanLiAt.includes(" ") ||
+    cleanLiAt.length < 20
+  ) {
+    return res.status(400).json({
+      error: "El valor ingresado no es una cookie válida de LinkedIn. Debe ser el token de sesión (normalmente empieza con 'AQED...' o 'AQEE...'). No pegues el texto del script.",
+    });
+  }
 
   // Parse document.cookie string into cookie objects
   const extraCookies: { name: string; value: string; domain: string; path: string }[] = [];
