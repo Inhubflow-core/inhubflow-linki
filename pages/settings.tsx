@@ -592,39 +592,31 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                   Conexión directa y 100% segura mediante sesión verificada (sin contraseña).
                 </p>
               </div>
-              <span className="badge badge-success badge-sm gap-1 text-[11px] font-semibold py-2">
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-full shrink-0 whitespace-nowrap">
                 🔒 100% Seguro
               </span>
             </div>
 
-            {/* Ayuda fácil para obtener la cookie */}
-            <div className="bg-brand-500/5 dark:bg-brand-500/10 border border-brand-500/20 rounded-xl p-3.5 mb-4 space-y-2.5">
-              <div className="flex items-start gap-2">
-                <span className="text-base shrink-0">💡</span>
-                <div className="text-xs space-y-0.5">
-                  <p className="font-bold text-gray-900 dark:text-white">¿Cómo obtener tu cookie en 10 segundos?</p>
-                  <p className="text-base-content/70">
-                    LinkedIn genera esta clave en tu navegador para mantenerte conectado. Elige la opción que te sea más cómoda:
+            {/* Aviso indispensable de sesión activa en el mismo navegador */}
+            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-900 dark:text-amber-200 text-xs mb-3">
+              <span className="text-base shrink-0 mt-0.5">📌</span>
+              <div className="space-y-0.5">
+                <p className="font-bold">Requisito previo importante:</p>
+                <p className="text-amber-800/90 dark:text-amber-300/90">
+                  Debes tener tu sesión de <strong>LinkedIn abierta e iniciada</strong> en otra pestaña de <strong>este mismo navegador</strong> donde estás usando InHubFlow.
+                </p>
+              </div>
+            </div>
+
+            {/* Tarjeta del Código Mágico de 1 Clic */}
+            <div className="bg-brand-500/5 dark:bg-brand-500/10 border border-brand-500/20 rounded-xl p-3.5 mb-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">⚡</span>
+                  <p className="font-bold text-xs text-gray-900 dark:text-white">
+                    Código Mágico de 1 Clic
                   </p>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                <a
-                  href="https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-2 p-2.5 rounded-lg bg-base-100 dark:bg-base-300/60 border border-base-300 hover:border-brand-500/50 hover:bg-brand-500/5 transition-all text-xs group"
-                >
-                  <span className="text-lg">🧩</span>
-                  <div className="min-w-0">
-                    <p className="font-bold text-gray-900 dark:text-white group-hover:text-brand-500 flex items-center gap-1">
-                      Extensión de Chrome <RiExternalLinkLine size={12} />
-                    </p>
-                    <p className="text-[11px] text-base-content/50 truncate">Instala Cookie-Editor y copia en 1 clic</p>
-                  </div>
-                </a>
-
                 <button
                   type="button"
                   onClick={() => {
@@ -632,30 +624,22 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                     navigator.clipboard.writeText(code);
                     toast.success("¡Código copiado! Pégalo en la consola de LinkedIn (F12) y presiona Enter");
                   }}
-                  className="flex items-center gap-2 p-2.5 rounded-lg bg-base-100 dark:bg-base-300/60 border border-base-300 hover:border-brand-500/50 hover:bg-brand-500/5 transition-all text-xs text-left group cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-brand-500 text-white hover:bg-brand-600 transition-colors shadow-sm shrink-0 cursor-pointer"
                 >
-                  <span className="text-lg">⚡</span>
-                  <div className="min-w-0">
-                    <p className="font-bold text-gray-900 dark:text-white group-hover:text-brand-500">
-                      Código de 1 Clic
-                    </p>
-                    <p className="text-[11px] text-base-content/50 truncate">Copiar script rápido para la consola</p>
-                  </div>
+                  <span>Copiar Código Mágico</span>
                 </button>
               </div>
 
-              {/* Acordeón para método manual */}
-              <details className="text-[11px] text-base-content/60 pt-1">
-                <summary className="cursor-pointer hover:text-base-content font-medium select-none">
-                  Ver pasos manuales con Inspeccionar Elemento (F12)
-                </summary>
-                <ol className="list-decimal list-inside pl-1 pt-1.5 space-y-1 text-base-content/70">
-                  <li>Abre <strong>linkedin.com</strong> con tu sesión iniciada en Chrome.</li>
-                  <li>Presiona <strong>F12</strong> (o Clic derecho → Inspeccionar).</li>
-                  <li>Ve a <strong>Application</strong> → <strong>Cookies</strong> → <strong>https://www.linkedin.com</strong>.</li>
-                  <li>Busca la cookie llamada <strong>li_at</strong>, haz doble clic sobre su valor y cópialo.</li>
+              <div className="bg-base-100 dark:bg-base-300/50 rounded-lg p-2.5 border border-base-300 text-[11.5px] space-y-1.5 text-base-content/80">
+                <p className="font-semibold text-gray-900 dark:text-white">Pasos rápidos para conectar:</p>
+                <ol className="list-decimal list-inside space-y-1 pl-0.5 text-base-content/75">
+                  <li>Haz clic arriba en <strong>&quot;Copiar Código Mágico&quot;</strong>.</li>
+                  <li>Ve a tu pestaña abierta de <strong>LinkedIn</strong>.</li>
+                  <li>Presiona <strong>F12</strong> en tu teclado (o Clic derecho → Inspeccionar) y haz clic en la pestaña <strong>Consola (Console)</strong>.</li>
+                  <li>Presiona <strong>Ctrl + V</strong> para pegar el código y pulsa <strong>Enter</strong> (¡tu cookie se copiará sola al portapapeles!).</li>
+                  <li>Vuelve a InHubFlow y haz clic en <strong>&quot;📋 Pegar portapapeles&quot;</strong> abajo.</li>
                 </ol>
-              </details>
+              </div>
             </div>
 
             <form onSubmit={submitAuth} className="flex flex-col gap-3">
