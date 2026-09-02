@@ -1,7 +1,7 @@
 import type Database from "better-sqlite3";
 
 /**
- * Additive, module-owned schema. Linki core calls only applySdrSchema; all SDR
+ * Additive, module-owned schema. InHubFlow core calls only applySdrSchema; all SDR
  * behavior remains behind the module bridge. Every statement is idempotent.
  */
 export const SDR_SCHEMA_MIGRATIONS: readonly string[] = [

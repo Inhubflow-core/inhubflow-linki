@@ -802,7 +802,7 @@ export default function ListDetailPage({
                     <RiSearchLine size={18} className="text-primary mt-0.5" />
                     <span>
                       <span className="block text-sm font-medium">Sales Navigator search</span>
-                      <span className="block text-xs text-base-content/50 mt-0.5">Paste a Sales Nav list/search URL — Linki scrapes it using a connected LinkedIn account.</span>
+                      <span className="block text-xs text-base-content/50 mt-0.5">Paste a Sales Nav list/search URL — InHubFlow scrapes it using a connected LinkedIn account.</span>
                     </span>
                   </button>
                   <button

@@ -28,7 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const fullBody = buildEmailBody(body ?? "", account.signature);
 
   try {
-    await sendEmail({ ...account, password: decryptSecret(account.password)! }, to, subject ?? "Test email from Linki", fullBody);
+    await sendEmail({ ...account, password: decryptSecret(account.password)! }, to, subject ?? "Test email from InHubFlow", fullBody);
     return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });

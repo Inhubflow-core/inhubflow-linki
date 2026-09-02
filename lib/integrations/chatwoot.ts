@@ -53,7 +53,7 @@ export async function pushLeadToChatwoot({
           linkedin_url: lead.linkedinUrl || undefined,
           company: lead.companyName || undefined,
           job_title: lead.jobTitle || undefined,
-          source: `Linki Outreach (${channelType.toUpperCase()})`,
+          source: `InHubFlow Outreach (${channelType.toUpperCase()})`,
         },
       }),
     });

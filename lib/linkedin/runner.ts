@@ -1041,7 +1041,7 @@ async function executeStep(
 
 // ─── global loop ─────────────────────────────────────────────────────────────
 
-const g = global as typeof global & { __linkiGlobalRunnerStarted?: boolean };
+const g = global as typeof global & { __inhubflowGlobalRunnerStarted?: boolean; __linkiGlobalRunnerStarted?: boolean };
 let tickQueueTail: Promise<void> = Promise.resolve();
 
 function enqueueTick(db: ReturnType<typeof getDb>): Promise<void> {
@@ -1051,8 +1051,8 @@ function enqueueTick(db: ReturnType<typeof getDb>): Promise<void> {
 }
 
 export function ensureGlobalRunnerStarted(): void {
-  if (g.__linkiGlobalRunnerStarted) return;
-  g.__linkiGlobalRunnerStarted = true;
+  if (g.__inhubflowGlobalRunnerStarted || g.__linkiGlobalRunnerStarted) return;
+  g.__inhubflowGlobalRunnerStarted = true;
   globalLoop().catch(err => console.error("[runner] Global loop crashed:", err));
 }
 

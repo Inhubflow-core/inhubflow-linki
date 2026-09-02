@@ -59,7 +59,7 @@ RUN npm run build
 
 # Data directory — mount a volume here to persist the SQLite DB
 RUN mkdir -p /data && chown node:node /data
-ENV LINKI_DB_PATH=/data/linki.db
+ENV INHUBFLOW_DB_PATH=/data/inhubflow.db
 
 USER node
 

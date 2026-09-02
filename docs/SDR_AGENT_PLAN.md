@@ -1,28 +1,21 @@
 # Context
 
-Linki necesita un módulo SDR propio basado en Gemini que procese conversaciones de LinkedIn por cada slot, clasifique la intención, responda preguntas, maneje objeciones, proponga servicios, coordine reuniones en Google Calendar y entregue la conversación a una persona cuando no pueda actuar con seguridad. El usuario eligió **LinkedIn primero**, modo objetivo **automático total** y Google Calendar. El módulo comercial `ee/replies` no existe en este checkout, por lo que la solución será independiente y no copiará código propietario.
+> 📌 **Referencia Histórica de Origen:**
+> Este proyecto utilizó originalmente como base tecnológica el software open-source [Linki](https://github.com/moaljumaa/linki) creado por Mo Aljumaa. A partir de la independencia total de InHubFlow (septiembre 2026), **se eliminan formalmente todas las restricciones de "no tocar core" o "no hacer cambios intrusivos"** que existían para mantener compatibilidad con upstream. InHubFlow ahora evoluciona como plataforma propietaria e independiente, con libertad total para modificar, refactorizar o potenciar su núcleo directamente.
 
-La automatización total se habilitará únicamente después de shadow mode y pruebas con cuentas controladas. “Automático total” seguirá teniendo hard stops obligatorios: baja/no contactar, legal/contratos, descuentos no autorizados, información no fundamentada, baja confianza, solicitud explícita de humano, errores de herramientas o posible prompt injection. El modelo propone; el backend valida y ejecuta.
+InHubFlow cuenta con un módulo SDR propio basado en Gemini que procesa conversaciones de LinkedIn por cada slot, clasifica la intención, responde preguntas, maneja objeciones, propone servicios, coordina reuniones en Calendly/Google Calendar y entrega la conversación a una persona cuando no pueda actuar con seguridad.
 
-Los USD 20 indicados corresponden a Claude Code/API y financian desarrollo, **no las llamadas de Gemini**. Para ejecutar el SDR se necesitarán por separado una API key/facturación de Gemini o un proyecto Vertex AI y credenciales OAuth de Google Calendar. No se puede garantizar que USD 20 cubran toda la implementación, por lo que el trabajo se divide en checkpoints reanudables y commits pequeños.
-
-Antes de empezar el SDR debe cerrarse y guardarse el cambio de Inbox actualmente pendiente en el working tree (`lib/db.ts`, `lib/linkedin/runner.ts`, `pages/inbox.tsx`, API/i18n y `docs/UPSTREAM_UPDATE_PROTOCOL.md`). No se mezclará ese feature con los commits del SDR.
+---
 
 # Decisiones de arquitectura
 
-## Aislamiento obligatorio del módulo SDR
+## Evolución Libre y Modificación Directa del Core
 
-El SDR debe funcionar como un módulo acoplado mediante contratos estables, no como lógica distribuida dentro del core de Linki:
+Al haberse desvinculado de upstream, el desarrollo ya no está condicionado por la necesidad de recibir actualizaciones externas:
 
-- Todo el dominio SDR vivirá bajo `lib/sdr-agent/**`, `components/sdr-agent/**` y APIs propias.
-- Gemini, RAG, Calendar, herramientas, jobs y políticas se accederán mediante interfaces/adapters; ningún SDK externo se importará directamente desde runner, inbox o workflows.
-- El core sólo tendrá puntos de extensión mínimos: publicar un mensaje entrante normalizado, ejecutar un tick del worker y consultar estado. Un bridge único conectará esos eventos con el módulo.
-- Con feature flag `off` o si faltan dependencias/credenciales, el módulo será un no-op y Linki conservará exactamente su comportamiento actual.
-- Las migraciones serán exclusivamente aditivas; no reutilizarán ni cambiarán el significado de tablas/columnas core.
-- LinkedIn, email, Gemini y Calendar tendrán adapters reemplazables para absorber cambios upstream o de proveedor.
-- Las rutas/páginas del SDR serán propias; cambios visuales del Inbox se harán mediante componentes insertables, no reescribiendo lógica core innecesariamente.
-- Existirá un contract test que arranque Linki con el SDR desactivado y demuestre que build, runner, campañas, Inbox y envío tradicional siguen funcionando.
-- Cada actualización upstream deberá validar explícitamente el bridge y los contratos del SDR siguiendo `docs/UPSTREAM_UPDATE_PROTOCOL.md`.
+- **Libertad Total sobre el Core:** El equipo puede modificar directamente el runner (`lib/linkedin/runner.ts`), el inbox (`pages/inbox.tsx`), la base de datos (incluso para migraciones profundas o multi-tenancy) y las APIs sin capas artificiales de aislamiento pensadas para upstream.
+- **Integración Nativa y Directa:** El Agente SDR, el generador de contenidos y las herramientas de automatización se integran de forma natural y directa en el flujo de trabajo de InHubFlow.
+- **Código Limpio y Modular:** Se mantiene la organización de archivos bajo `lib/sdr-agent/**` y `components/sdr-agent/**` por buenas prácticas de ingeniería de software, pero sin la limitación de "no tocar core". InHubFlow evoluciona sin ataduras.
 
 ## Agente configurable, no “entrenado” sólo con un prompt
 
@@ -46,7 +39,7 @@ No llamar a Gemini dentro del callback de scraping/sync. Cada mensaje entrante c
 - Unique constraints en mensaje externo y acción evitan duplicados.
 - Reintentos con backoff y límite.
 - Un lock por conversación y otro por slot impiden respuestas concurrentes.
-- Reiniciar Linki no pierde ni duplica el trabajo.
+- Reiniciar InHubFlow no pierde ni duplica el trabajo.
 - El page queue existente de `lib/linkedin/session.ts` seguirá serializando el acceso Playwright.
 
 ## Estados de conversación
@@ -267,7 +260,7 @@ Si se corta la sesión, después de recargar crédito la instrucción de reanuda
 
 > Continúa el plan SDR de `docs/SDR_AGENT_PLAN.md` desde el checkpoint registrado en `docs/SDR_AGENT_PROGRESS.md`; primero verifica `git status`, el SHA y los tests, y no repitas fases completadas.
 
-El usuario debe vigilar el balance de Claude; el agente no puede consultar ni garantizar el saldo restante. Los gastos de Gemini se controlarán dentro de Linki mediante límites diarios por agente/slot y logs de tokens/coste.
+El usuario debe vigilar el balance de Claude; el agente no puede consultar ni garantizar el saldo restante. Los gastos de Gemini se controlarán dentro de InHubFlow mediante límites diarios por agente/slot y logs de tokens/coste.
 
 # Presupuesto orientativo de desarrollo
 

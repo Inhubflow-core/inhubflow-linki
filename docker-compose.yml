@@ -1,8 +1,8 @@
 services:
-  linki:
-    image: moaljumaa/linki:latest
-    # To build from source instead: comment out image above and uncomment below
-    # build: .
+  inhubflow:
+    # Build from local source
+    build: .
+    image: inhubflow:latest
     ports:
       - "127.0.0.1:${PORT:-3456}:3000"
     volumes:
@@ -13,7 +13,7 @@ services:
     environment:
       # Runtime — always set by compose, do not put in .env.local
       - NODE_ENV=production
-      - LINKI_DB_PATH=/data/linki.db
+      - INHUBFLOW_DB_PATH=/data/inhubflow.db
 
       # --- copy the block below into .env.local and fill in values ---
       #
@@ -24,14 +24,14 @@ services:
       # Generate with: openssl rand -base64 32
       # NEXTAUTH_SECRET=
       #
-      # Password to log in to the Linki UI
+      # Password to log in to the InHubFlow UI
       # AUTH_PASSWORD=
       #
       # Set to "false" to show the browser during automation (debug only)
       # HEADLESS=true
 
     restart: unless-stopped
-    # Caps Linki's CPU so a busy runner can't starve other containers on a
+    # Caps InHubFlow's CPU so a busy runner can't starve other containers on a
     # small box. Raise/remove this if you have cores to spare.
     deploy:
       resources:

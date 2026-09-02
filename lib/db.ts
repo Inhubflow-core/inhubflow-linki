@@ -1,12 +1,23 @@
 import Database from "better-sqlite3";
 import path from "path";
+import fs from "fs";
 import { randomUUID } from "crypto";
 import { scheduleUpdateCheck } from "@/lib/update-check";
 import { encryptSecret, isEncrypted } from "@/lib/crypto";
 import { autoSeedInstance } from "@/lib/auto-seed";
 import { applySdrSchema } from "@/lib/sdr-agent/schema";
 
-const DB_PATH = process.env.LINKI_DB_PATH || path.join(process.cwd(), "linki.db");
+function resolveDbPath(): string {
+  if (process.env.INHUBFLOW_DB_PATH) return process.env.INHUBFLOW_DB_PATH;
+  if (process.env.LINKI_DB_PATH) return process.env.LINKI_DB_PATH;
+  const inhubflowDb = path.join(process.cwd(), "inhubflow.db");
+  if (fs.existsSync(inhubflowDb)) return inhubflowDb;
+  const linkiDb = path.join(process.cwd(), "linki.db");
+  if (fs.existsSync(linkiDb)) return linkiDb;
+  return inhubflowDb;
+}
+
+const DB_PATH = resolveDbPath();
 
 let db: Database.Database;
 

@@ -984,7 +984,7 @@ export default function InboxPage() {
     if (Notification.permission === "granted") {
       playNotificationChime();
       triggerDesktopNotification({
-        title: "🔔 Notificaciones Linki Activas",
+        title: "🔔 Notificaciones InHubFlow Activas",
         body: "¡Listo! Sonará un timbre y recibirás una alerta cuando tu Agente SDR IA requiera tu ayuda.",
         onClick: () => {},
       });
@@ -996,7 +996,7 @@ export default function InboxPage() {
     if (perm === "granted") {
       playNotificationChime();
       triggerDesktopNotification({
-        title: "🔔 Notificaciones Linki Habilitadas",
+        title: "🔔 Notificaciones InHubFlow Habilitadas",
         body: "Te avisaremos de inmediato con sonido cuando un cliente responda o se requiera tu intervención.",
         onClick: () => {},
       });

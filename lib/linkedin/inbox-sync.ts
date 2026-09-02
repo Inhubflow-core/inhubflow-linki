@@ -15,14 +15,14 @@ interface SessionRuntime {
 
 function getDefaultDb(): Database.Database {
   // Keep database and browser initialization lazy so pure capture fixtures can
-  // run against an injected SQLite connection without Linki process startup.
+  // run against an injected SQLite connection without InHubFlow process startup.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   return require("../db").getDb() as Database.Database;
 }
 
 function getSessionRuntime(): SessionRuntime {
   // Keep the browser dependency lazy: pure normalization/capture tests must not
-  // initialize Playwright or a Linki session.
+  // initialize Playwright or an InHubFlow session.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   return require("./session") as SessionRuntime;
 }

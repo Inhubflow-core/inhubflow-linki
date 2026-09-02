@@ -6,7 +6,7 @@ This runbook starts with the safety and continuity rules needed before the SDR i
 
 The current contract is `UNVERIFIED`. Do not implement or enable a production LinkedIn inbox source until this procedure has been completed.
 
-1. Use only a LinkedIn account and conversations for which the team has explicit authorization and consent. Record the Linki SHA and a non-identifying account designation in `docs/LINKEDIN_INBOX_CONTRACT.md`.
+1. Use only a LinkedIn account and conversations for which the team has explicit authorization and consent. Record the InHubFlow commit SHA and a non-identifying account designation in `docs/LINKEDIN_INBOX_CONTRACT.md`.
 2. Use an observation-only browser session. Inspect the inbox request/response traffic without sending, marking read, archiving, reacting to, deleting, or otherwise mutating a conversation.
 3. Record the actual method, URL/query, content type, non-secret headers, request shape, response paths, direction discriminator, participant identity, body, timestamp, pagination, and auth-wall behavior. Never copy cookies, CSRF values, authorization headers, browser storage, or tokens into notes or fixtures.
 4. Replace all live names, profile URLs, URNs, IDs, timestamps, message text, emails, and account identifiers in the fixture. Retain only the relationships and types needed to test the mapping. Mark the fixture as observed only when it is fully sanitized.
@@ -18,7 +18,7 @@ The Phase 2A adapter accepts only injected, provider-neutral observations and is
 
 ## Rollback for a read-only capture
 
-If a discovery session behaves unexpectedly, close the page, stop the controlled account's test activity, mark it for reauthentication if a wall appeared, and discard any unredacted capture outside the repository. Do not attempt repeated inbox actions to compensate. Restore the last verified Linki SHA if the adapter or session lifecycle is found to have changed behavior.
+If a discovery session behaves unexpectedly, close the page, stop the controlled account's test activity, mark it for reauthentication if a wall appeared, and discard any unredacted capture outside the repository. Do not attempt repeated inbox actions to compensate. Restore the last verified InHubFlow commit SHA if the adapter or session lifecycle is found to have changed behavior.
 
 ## Global safety controls
 

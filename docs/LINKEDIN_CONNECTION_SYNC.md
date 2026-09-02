@@ -2,7 +2,7 @@
 
 ## Source of truth
 
-Linki treats presence in LinkedIn's authenticated connections API as the authoritative proof that a request was accepted. It never treats disappearance from the sent-invitations page as acceptance because an invitation can also expire, be withdrawn, or be rejected.
+InHubFlow treats presence in LinkedIn's authenticated connections API as the authoritative proof that a request was accepted. It never treats disappearance from the sent-invitations page as acceptance because an invitation can also expire, be withdrawn, or be rejected.
 
 The implementation lives in:
 

@@ -24,8 +24,8 @@ const TOURS: Record<TourPage, DriveStep[]> = {
     {
       element: '[data-tour="nav-dashboard"]',
       popover: {
-        title: "Welcome to Linki",
-        description: "This is your outreach dashboard. Everything in Linki runs on one background process at a human pace — nothing fires the instant you click a button, so don't expect instant numbers here either.",
+        title: "Welcome to InHubFlow",
+        description: "This is your outreach dashboard. Everything in InHubFlow runs on one background process at a human pace — nothing fires the instant you click a button, so don't expect instant numbers here either.",
       },
     },
     {
@@ -60,7 +60,7 @@ const TOURS: Record<TourPage, DriveStep[]> = {
       element: '[data-tour="nav-lists"]',
       popover: {
         title: "Then: import a list",
-        description: "Paste a Sales Navigator search URL — that's how leads get into Linki.",
+        description: "Paste a Sales Navigator search URL — that's how leads get into InHubFlow.",
       },
     },
     {
@@ -197,7 +197,7 @@ const TOURS: Record<TourPage, DriveStep[]> = {
       element: '[data-tour="settings-tab-linkedin"]',
       popover: {
         title: "Connect a LinkedIn account first",
-        description: "An account must be authenticated here before it can be used in any campaign — this is the single most important setup step in Linki.",
+        description: "An account must be authenticated here before it can be used in any campaign — this is the single most important setup step in InHubFlow.",
       },
     },
     {
@@ -218,7 +218,7 @@ const TOURS: Record<TourPage, DriveStep[]> = {
       element: '[data-tour="settings-tab-general"]',
       popover: {
         title: "Connect an AI agent",
-        description: "The General tab has a copyable MCP URL to hook up Claude Code, Cursor, or any MCP-compatible agent to manage Linki on your behalf — plus the daily import cap and this tour picker.",
+        description: "The General tab has a copyable MCP URL to hook up Claude Code, Cursor, or any MCP-compatible agent to manage InHubFlow on your behalf — plus the daily import cap and this tour picker.",
       },
     },
   ],
@@ -244,7 +244,7 @@ function buildAndRun(page: TourPage, persist: boolean) {
     stageRadius: 8,
     popoverOffset: 12,
     allowClose: true,
-    popoverClass: "linki-tour-popover",
+    popoverClass: "inhubflow-tour-popover",
     nextBtnText: "Next",
     prevBtnText: "Back",
     doneBtnText: "Done",

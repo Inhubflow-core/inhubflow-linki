@@ -126,7 +126,7 @@
   "leadFinder": {
     "title": "LinkedIn Lead Finder",
     "native": "NATIVE",
-    "subtitle": "Search profiles by Job Title, City, and Country, and automatically save them to a Linki List without paid external subscriptions.",
+    "subtitle": "Search profiles by Job Title, City, and Country, and automatically save them to an InHubFlow List without paid external subscriptions.",
     "viewLists": "View My Lists",
     "accounts": "Accounts",
     "noAuthTitle": "You do not have any authenticated LinkedIn accounts.",

@@ -1,6 +1,6 @@
 # SDR Agent module boundary
 
-Everything under this directory belongs to the optional SDR module. Linki core may interact with it only through the `SdrModuleBridge` exported by `index.ts`.
+Everything under this directory belongs to the optional SDR module. InHubFlow core may interact with it only through the `SdrModuleBridge` exported by `index.ts`.
 
 ## Phase 1A guarantees
 
@@ -10,7 +10,7 @@ Everything under this directory belongs to the optional SDR module. Linki core m
 - No inbound event is persisted or processed.
 - No outbound action can execute.
 - Invalid events return structured validation errors.
-- Missing configuration never prevents Linki from starting.
+- Missing configuration never prevents InHubFlow from starting.
 
 ## Boundary rules
 

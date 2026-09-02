@@ -1627,7 +1627,7 @@ function IntegrationsTab({ hasPremium }: { hasPremium: boolean }) {
 // ─── General Tab ──────────────────────────────────────────────────────────────
 
 // ─── MCP card ─────────────────────────────────────────────────────────────────
-// Lets the user grab the hosted MCP URL for this Linki instance (self-hosted, so
+// Lets the user grab the hosted MCP URL for this InHubFlow instance (self-hosted, so
 // it's built from the browser's own origin) and copy the one-liner to connect an
 // AI agent. Premium-only (ee/mcp) — hidden entirely when hasPremium is false.
 
@@ -1654,7 +1654,7 @@ function McpCard() {
 
   if (!mcpUrl) return null;
 
-  const cliCommand = `claude mcp add --transport http linki ${mcpUrl}`;
+  const cliCommand = `claude mcp add --transport http inhubflow ${mcpUrl}`;
 
   return (
     <div className="bg-base-200 border border-base-300/50 rounded-xl overflow-hidden">
@@ -1670,7 +1670,7 @@ function McpCard() {
       {expanded && (
         <div className="px-4 pb-4">
           <p className="text-xs text-base-content/50 mb-3 leading-relaxed">
-            Connect Claude Code, Claude.ai, Cursor, or any MCP-compatible AI agent to this Linki instance —
+            Connect Claude Code, Claude.ai, Cursor, or any MCP-compatible AI agent to this InHubFlow instance —
             it can read contacts, launch campaigns, and review replies on your behalf.
           </p>
 
@@ -1707,7 +1707,7 @@ function McpCard() {
             </div>
             <p>
               Other agents (Cursor, Claude desktop/web, etc.) — add it as an HTTP MCP server / connector
-              using the URL above. You&apos;ll be prompted to sign in to Linki in the browser on first use.
+              using the URL above. You&apos;ll be prompted to sign in to InHubFlow in the browser on first use.
             </p>
           </div>
         </div>

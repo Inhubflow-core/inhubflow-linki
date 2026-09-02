@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "crypto";
 
 // Encrypts secrets at rest (LinkedIn session cookies, email passwords, API keys) so a
-// leaked/copied linki.db doesn't hand those out in plaintext. Key is derived from
+// leaked/copied database doesn't hand those out in plaintext. Key is derived from
 // NEXTAUTH_SECRET (already a required, real secret) via HKDF — no new env var needed.
 //
 // Format: "v1:<iv-base64>:<authTag-base64>:<ciphertext-base64>". decryptSecret() passes
@@ -11,10 +11,10 @@ import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "crypto"
 const VERSION = "v1";
 const ALGORITHM = "aes-256-gcm";
 
-function deriveKey(): Buffer {
+function deriveKey(info: string = "inhubflow-secret-encryption"): Buffer {
   const secret = process.env.NEXTAUTH_SECRET;
   if (!secret) throw new Error("NEXTAUTH_SECRET must be set to encrypt/decrypt stored secrets");
-  return Buffer.from(hkdfSync("sha256", secret, "", "linki-secret-encryption", 32));
+  return Buffer.from(hkdfSync("sha256", secret, "", info, 32));
 }
 
 export function encryptSecret(plaintext: string): string {
@@ -31,11 +31,29 @@ export function decryptSecret(value: string | null): string | null {
   if (!isEncrypted(value)) return value; // not-yet-migrated plaintext — pass through
 
   const [, ivB64, authTagB64, dataB64] = value.split(":");
-  const key = deriveKey();
-  const decipher = createDecipheriv(ALGORITHM, key, Buffer.from(ivB64, "base64"));
-  decipher.setAuthTag(Buffer.from(authTagB64, "base64"));
-  const plaintext = Buffer.concat([decipher.update(Buffer.from(dataB64, "base64")), decipher.final()]);
-  return plaintext.toString("utf8");
+  const iv = Buffer.from(ivB64, "base64");
+  const authTag = Buffer.from(authTagB64, "base64");
+  const ciphertext = Buffer.from(dataB64, "base64");
+
+  // Try InHubFlow primary key first
+  try {
+    const key = deriveKey("inhubflow-secret-encryption");
+    const decipher = createDecipheriv(ALGORITHM, key, iv);
+    decipher.setAuthTag(authTag);
+    const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    return plaintext.toString("utf8");
+  } catch {
+    // Fallback for legacy secrets encrypted with the Linki key
+    try {
+      const legacyKey = deriveKey("linki-secret-encryption");
+      const decipher = createDecipheriv(ALGORITHM, legacyKey, iv);
+      decipher.setAuthTag(authTag);
+      const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+      return plaintext.toString("utf8");
+    } catch {
+      return null;
+    }
+  }
 }
 
 export function isEncrypted(value: string): boolean {

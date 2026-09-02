@@ -8,7 +8,7 @@ import { decryptSecret } from "@/lib/crypto";
 // Email conversation for one contact, account-resolved automatically so callers (incl. the MCP)
 // never need to know the email_account_id.
 //   GET  → the IMAP thread (sent + received) with this contact.
-//   POST → send an email to this contact as the Linki sending identity (subject optional → reply).
+//   POST → send an email to this contact as the InHubFlow sending identity (subject optional → reply).
 //
 // Account resolution order: explicit email_account_id → the contact's most recent run_profile
 // assignment → the single configured account if there's exactly one.

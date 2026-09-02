@@ -9,7 +9,7 @@ const INTERNAL_HEADER = "x-internal-secret";
  * Accepts either:
  *  - a NextAuth session cookie (browser app) — verified via getToken().
  *  - the internal service secret (server-to-server loopback calls, e.g. the MCP server's
- *    tool handlers calling Linki's own /api/* routes — see ee/mcp/server.ts). This secret
+ *    tool handlers calling InHubFlow's own /api/* routes). This secret
  *    never leaves the host: it's not sent to a browser and never crosses the public ngrok/
  *    reverse-proxy path, only Node processes on 127.0.0.1 exchange it.
  *

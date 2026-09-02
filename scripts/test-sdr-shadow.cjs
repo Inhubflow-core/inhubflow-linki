@@ -68,7 +68,7 @@ console.log("=======================================================\n");
 
 if (!apiKey) {
   console.error("❌ ERROR: GEMINI_API_KEY no encontrada.");
-  console.error("\nPor favor configura tu API key en `linki-main/.env.local`:");
+  console.error("\nPor favor configura tu API key en `.env.local`:");
   console.error("GEMINI_API_KEY=tu_api_key_aqui");
   console.error("GEMINI_MODEL=gemini-2.5-flash\n");
   process.exit(1);

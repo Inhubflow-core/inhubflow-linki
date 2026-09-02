@@ -285,7 +285,7 @@ export default function SdrPage() {
   return (
     <>
       <Head>
-        <title>{t("sdr.title")} — Linki InHubFlow</title>
+        <title>{t("sdr.title")} — InHubFlow</title>
       </Head>
 
       <div className="space-y-6 pb-12">

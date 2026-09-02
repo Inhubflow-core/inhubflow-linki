@@ -73,7 +73,7 @@ export interface SdrModuleStatus {
 }
 
 /**
- * The only contract Linki core is allowed to call. Provider, calendar, RAG,
+ * The only contract InHubFlow core is allowed to call. Provider, calendar, RAG,
  * policies, and channel-specific implementations stay behind this boundary.
  */
 export interface SdrModuleBridge {

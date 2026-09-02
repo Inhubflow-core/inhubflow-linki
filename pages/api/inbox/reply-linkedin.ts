@@ -69,7 +69,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const base64Data = match ? match[2] : attachment.dataUrl;
       const buffer = Buffer.from(base64Data, "base64");
       const safeName = attachment.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      tempFilePath = path.join(os.tmpdir(), `linki_${crypto.randomUUID()}_${safeName}`);
+      tempFilePath = path.join(os.tmpdir(), `inhubflow_${crypto.randomUUID()}_${safeName}`);
       fs.writeFileSync(tempFilePath, buffer);
     }
 

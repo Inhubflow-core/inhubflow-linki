@@ -9,8 +9,8 @@
 //   node scripts/force-next-step.js --list                                  (list active runs)
 //
 // Without --apply this only PRINTS what would change (dry run). Pass --apply
-// to actually update the DB. DB path follows the same LINKI_DB_PATH env var
-// (or ./linki.db) that the app itself uses.
+// to actually update the DB. DB path follows the same INHUBFLOW_DB_PATH env var
+// (or ./inhubflow.db) that the app itself uses.
 //
 // --target is required unless you pass --all-targets: forcing an entire real
 // campaign to fire at once means every eligible lead gets messaged/connected
@@ -26,10 +26,18 @@
 // hours — note the printed "was" values and set them back in Settings when
 // you're done testing.
 
+const fs = require("fs");
 const path = require("path");
 const Database = require("better-sqlite3");
 
-const DB_PATH = process.env.LINKI_DB_PATH || path.join(process.cwd(), "linki.db");
+const DB_PATH =
+  process.env.INHUBFLOW_DB_PATH ||
+  process.env.LINKI_DB_PATH ||
+  (fs.existsSync(path.join(process.cwd(), "inhubflow.db"))
+    ? path.join(process.cwd(), "inhubflow.db")
+    : fs.existsSync(path.join(process.cwd(), "linki.db"))
+    ? path.join(process.cwd(), "linki.db")
+    : path.join(process.cwd(), "inhubflow.db"));
 
 function parseArgs(argv) {
   const args = { apply: false, list: false, allTargets: false, skipSchedule: false, run: null, target: null };

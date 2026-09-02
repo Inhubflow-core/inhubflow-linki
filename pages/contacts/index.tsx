@@ -578,7 +578,7 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
           <div className="modal-box bg-base-200 border border-base-300/50 max-w-sm">
             <h3 className="font-semibold text-base mb-1">Delete {selected.size} contact{selected.size !== 1 ? "s" : ""}?</h3>
             <p className="text-xs text-base-content/50 mb-4 leading-relaxed">
-              This permanently deletes {selected.size === 1 ? "this contact" : "these contacts"} and their run history — not just from this list, but from Linki entirely. This can&apos;t be undone.
+              This permanently deletes {selected.size === 1 ? "this contact" : "these contacts"} and their run history — not just from this list, but from InHubFlow entirely. This can&apos;t be undone.
             </p>
             <div className="modal-action mt-2">
               <button type="button" className="btn btn-ghost btn-sm text-base-content/60" onClick={() => setShowDeleteConfirm(false)} disabled={deleteLoading}>

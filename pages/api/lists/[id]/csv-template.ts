@@ -9,6 +9,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 
   const csv = buildCsvTemplate();
   res.setHeader("Content-Type", "text/csv");
-  res.setHeader("Content-Disposition", `attachment; filename="linki-import-template.csv"`);
+  res.setHeader("Content-Disposition", `attachment; filename="inhubflow-import-template.csv"`);
   res.status(200).send(csv);
 }

@@ -6,7 +6,7 @@ This document gates the read-only LinkedIn campaign-inbox adapter. The source is
 
 ## Current implementation
 
-- The existing Linki Inbox UI/API remains the only Inbox.
+- The existing InHubFlow Inbox UI/API remains the only Inbox.
 - `lib/linkedin/campaign-inbox-source.ts` contains a **read-only GET-only candidate source** for the legacy normalized Voyager messaging contract.
 - `lib/linkedin/campaign-inbox.ts` admits only contacts for which the exact LinkedIn account/run has a persisted `Message sent` or `InMail sent` campaign log.
 - Personal/unmatched/ambiguous/cross-slot conversations are not persisted and message bodies are never logged.
