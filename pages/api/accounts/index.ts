@@ -2,8 +2,10 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getDb } from "@/lib/db";
 import { randomUUID } from "crypto";
 import { getInstanceSettings } from "@/lib/auto-seed";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const db = getDb();
 
@@ -40,13 +42,18 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 
       // Check slots limit
       try {
-        const { slotsLimit } = getInstanceSettings(db);
+        const session = await getServerSession(req, res, authOptions);
+        const { slotsLimit: instanceLimit } = getInstanceSettings(db);
+        const userSlots = (session?.user as { slots_limit?: number; role?: string })?.slots_limit;
+        const userRole = (session?.user as { role?: string })?.role;
+        const effectiveLimit = userRole === "admin" ? 999 : (userSlots || instanceLimit);
+
         const countRow = db.prepare("SELECT COUNT(*) as count FROM accounts").get() as { count: number };
 
-        if (countRow && countRow.count >= slotsLimit) {
+        if (countRow && countRow.count >= effectiveLimit) {
           return res.status(403).json({
-            error: `Has alcanzado el límite de ${slotsLimit} slots/cuentas de tu suscripción actual.`,
-            slotsLimit,
+            error: `Has alcanzado el límite de ${effectiveLimit} slots/cuentas de tu suscripción actual.`,
+            slotsLimit: effectiveLimit,
             currentCount: countRow.count,
           });
         }

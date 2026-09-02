@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/router";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
 import {
   RiLayoutGridLine,
@@ -22,6 +22,7 @@ import {
   RiRobotLine,
   RiMenuFoldLine,
   RiMenuUnfoldLine,
+  RiShieldCheckLine,
 } from "react-icons/ri";
 import { pathToTourPage, replayPageTour } from "@/lib/tour";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
@@ -53,6 +54,8 @@ export default function Sidebar({
   isCollapsed = false,
 }: SidebarProps) {
   const router = useRouter();
+  const { data: session } = useSession();
+  const isAdmin = (session?.user as { role?: string })?.role === "admin";
   const { t, locale, setLocale, supportedLocales } = useTranslation();
   const { theme } = useTheme();
   const [updateAvailable, setUpdateAvailable] = useState(false);
@@ -158,6 +161,35 @@ export default function Sidebar({
           <p className="px-3 text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1.5">
             {t("nav.navigation")}
           </p>
+        )}
+
+        {/* SuperAdmin Link for Admins */}
+        {isAdmin && (
+          <Link
+            href="/admin"
+            title={isCollapsed ? "SuperAdmin" : undefined}
+            className={`flex items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-normal transition-all mb-2 ${
+              isActive("/admin")
+                ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold"
+                : "text-amber-600/90 hover:bg-amber-500/10 dark:text-amber-400/90 hover:text-amber-600 dark:hover:text-amber-300"
+            } ${isCollapsed ? "justify-center px-0" : ""}`}
+          >
+            <div
+              className={`flex h-6.5 w-6.5 items-center justify-center rounded-lg transition-colors ${
+                isActive("/admin")
+                  ? "bg-amber-500 text-white shadow-xs"
+                  : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+              }`}
+            >
+              <RiShieldCheckLine size={17} />
+            </div>
+            {!isCollapsed && <span className="truncate font-semibold">SuperAdmin</span>}
+            {!isCollapsed && (
+              <span className="ml-auto text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300">
+                PRO
+              </span>
+            )}
+          </Link>
         )}
 
         {nav.map((item) => {

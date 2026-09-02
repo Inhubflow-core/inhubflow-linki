@@ -518,6 +518,26 @@ function runMigrations(db: Database.Database) {
     "ALTER TABLE accounts ADD COLUMN linkedin_inbox_sync_error TEXT",
     "ALTER TABLE accounts ADD COLUMN linkedin_inbox_contract_version TEXT",
     "ALTER TABLE targets ADD COLUMN sdr_autopilot INTEGER NOT NULL DEFAULT 0",
+    // SuperAdmin and Subscription Management
+    "ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'",
+    "ALTER TABLE users ADD COLUMN company_name TEXT",
+    "ALTER TABLE users ADD COLUMN slots_limit INTEGER DEFAULT 1",
+    "ALTER TABLE users ADD COLUMN subscription_status TEXT DEFAULT 'active'",
+    "ALTER TABLE users ADD COLUMN plan_tier TEXT DEFAULT 'starter'",
+    "ALTER TABLE users ADD COLUMN paddle_customer_id TEXT",
+    "ALTER TABLE users ADD COLUMN paddle_subscription_id TEXT",
+    "ALTER TABLE users ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))",
+    `CREATE TABLE IF NOT EXISTS subscription_logs (
+      id TEXT PRIMARY KEY,
+      user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      customer_email TEXT,
+      event_type TEXT NOT NULL,
+      plan_tier TEXT,
+      slots INTEGER,
+      payload_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    "CREATE INDEX IF NOT EXISTS idx_subscription_logs_user ON subscription_logs(user_id, created_at DESC)",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
@@ -948,6 +968,25 @@ function initDb(db: Database.Database) {
       id TEXT PRIMARY KEY,
       email TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
+      role TEXT DEFAULT 'user' CHECK(role IN ('admin', 'user')),
+      company_name TEXT,
+      slots_limit INTEGER DEFAULT 1,
+      subscription_status TEXT DEFAULT 'active' CHECK(subscription_status IN ('active', 'trial', 'past_due', 'canceled')),
+      plan_tier TEXT DEFAULT 'starter' CHECK(plan_tier IN ('starter', 'growth', 'scale', 'custom')),
+      paddle_customer_id TEXT,
+      paddle_subscription_id TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS subscription_logs (
+      id TEXT PRIMARY KEY,
+      user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      customer_email TEXT,
+      event_type TEXT NOT NULL,
+      plan_tier TEXT,
+      slots INTEGER,
+      payload_json TEXT NOT NULL DEFAULT '{}',
       created_at TEXT DEFAULT (datetime('now'))
     );
 

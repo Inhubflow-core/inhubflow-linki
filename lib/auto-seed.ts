@@ -45,7 +45,7 @@ export function autoSeedInstance(db: Database.Database): AutoSeedResult {
 
   // 3. Seed initial admin user if configured
   if (adminEmail) {
-    const existingUser = db.prepare("SELECT id FROM users WHERE email = ?").get(adminEmail) as { id: string } | undefined;
+    const existingUser = db.prepare("SELECT id, role FROM users WHERE email = ?").get(adminEmail) as { id: string; role?: string } | undefined;
 
     if (!existingUser) {
       let finalHash = adminPasswordHash;
@@ -56,16 +56,29 @@ export function autoSeedInstance(db: Database.Database): AutoSeedResult {
       }
 
       const userId = randomUUID();
-      db.prepare("INSERT INTO users (id, email, password_hash) VALUES (?, ?, ?)").run(
+      db.prepare(`
+        INSERT INTO users (id, email, password_hash, role, company_name, slots_limit, subscription_status, plan_tier)
+        VALUES (?, ?, ?, 'admin', ?, 999, 'active', 'custom')
+      `).run(
         userId,
         adminEmail,
-        finalHash
+        finalHash,
+        companyName || "InHubFlow SuperAdmin"
       );
 
       adminSeeded = true;
       console.log(`[InHubFlow AutoSeed] ✅ Initial admin user seeded successfully: ${adminEmail}`);
     } else {
-      console.log(`[InHubFlow AutoSeed] ℹ️ Admin user already exists: ${adminEmail}`);
+      // Ensure existing admin user has admin role and full slots
+      db.prepare("UPDATE users SET role = 'admin', slots_limit = 999 WHERE id = ?").run(existingUser.id);
+      console.log(`[InHubFlow AutoSeed] ℹ️ Admin user verified and updated to role 'admin': ${adminEmail}`);
+    }
+  } else {
+    // If no adminEmail was set in env, ensure at least the first user in DB is marked as admin
+    const firstUser = db.prepare("SELECT id, email, role FROM users ORDER BY created_at ASC LIMIT 1").get() as { id: string; email: string; role?: string } | undefined;
+    if (firstUser && firstUser.role !== "admin") {
+      db.prepare("UPDATE users SET role = 'admin', slots_limit = 999 WHERE id = ?").run(firstUser.id);
+      console.log(`[InHubFlow AutoSeed] 👑 Promoted first user to SuperAdmin: ${firstUser.email}`);
     }
   }
 

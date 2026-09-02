@@ -4,7 +4,15 @@ import bcrypt from "bcryptjs";
 import { getDb } from "@/lib/db";
 import { isRateLimited } from "@/lib/rate-limit";
 
-type UserRow = { id: string; email: string; password_hash: string };
+type UserRow = {
+  id: string;
+  email: string;
+  password_hash: string;
+  role?: string;
+  slots_limit?: number;
+  subscription_status?: string;
+  plan_tier?: string;
+};
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -24,7 +32,9 @@ export const authOptions: NextAuthOptions = {
 
         const db = getDb();
         const user = db
-          .prepare("SELECT id, email, password_hash FROM users WHERE email = ?")
+          .prepare(
+            "SELECT id, email, password_hash, role, slots_limit, subscription_status, plan_tier FROM users WHERE email = ?"
+          )
           .get(credentials.email) as UserRow | undefined;
 
         if (!user) return null;
@@ -32,10 +42,40 @@ export const authOptions: NextAuthOptions = {
         const valid = await bcrypt.compare(credentials.password, user.password_hash);
         if (!valid) return null;
 
-        return { id: user.id, email: user.email };
+        return {
+          id: user.id,
+          email: user.email,
+          role: user.role || "user",
+          slots_limit: user.slots_limit || 1,
+          subscription_status: user.subscription_status || "active",
+          plan_tier: user.plan_tier || "starter",
+        };
       },
     }),
   ],
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.role = (user as { role?: string }).role || "user";
+        token.slots_limit = (user as { slots_limit?: number }).slots_limit || 1;
+        token.subscription_status = (user as { subscription_status?: string }).subscription_status || "active";
+        token.plan_tier = (user as { plan_tier?: string }).plan_tier || "starter";
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        const u = session.user as Record<string, unknown>;
+        u.id = token.id as string;
+        u.role = (token.role as string) || "user";
+        u.slots_limit = (token.slots_limit as number) || 1;
+        u.subscription_status = (token.subscription_status as string) || "active";
+        u.plan_tier = (token.plan_tier as string) || "starter";
+      }
+      return session;
+    },
+  },
   pages: {
     signIn: "/login",
   },
