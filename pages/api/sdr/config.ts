@@ -1,67 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getDb } from "@/lib/db";
 import { randomUUID } from "node:crypto";
+import { ensureSdrAgent } from "@/lib/sdr-agent/seed";
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const db = getDb();
 
   if (req.method === "GET") {
     try {
-      let agent = db.prepare("SELECT * FROM sdr_agents ORDER BY created_at ASC LIMIT 1").get() as any;
-
-      if (!agent) {
-        // Seed default agent if none exists
-        const agentId = randomUUID();
-        const versionId = randomUUID();
-        const defaultPrompt = `Eres un Agente SDR de Inteligencia Artificial para InHubFlow, experto en prospección y ventas B2B en LinkedIn y Cold Email.
-Tu objetivo es analizar el mensaje entrante del prospecto, clasificar su intención, responder con empatía y valor, y proponer una breve llamada de 15 minutos para una demo.
-
-Tono y Estilo:
-- Profesional, cercano, empático y orientado a la acción.
-- Respuestas breves y al grano (máximo 2 a 3 párrafos cortos).
-- Si el prospecto tiene dudas o objeciones, valida su perspectiva y explica cómo InHubFlow le ahorra tiempo y multiplica sus oportunidades comerciales.`;
-
-        const defaultCompanyContext = `InHubFlow es una suite empresarial de prospección comercial omnicanal B2B:
-- Automatización inteligente de LinkedIn (visitas, solicitudes de conexión personalizadas, secuencias inteligentes).
-- Cold Email secuenciado de alta entregabilidad con rotación multicuenta.
-- Enriquecimiento de leads con Apollo.io y LinkedIn Sales Navigator.
-- Agente SDR con Inteligencia Artificial que califica prospectos, responde dudas y agenda reuniones comerciales.`;
-
-        db.prepare(`
-          INSERT INTO sdr_agents (
-            id, name, status, mode, default_language, model, active_version_id, confidence_threshold, max_auto_turns
-          ) VALUES (?, ?, 'active', 'shadow', 'es', 'gemini-3.6-flash', ?, 0.85, 3)
-        `).run(agentId, "Agente SDR InHubFlow", versionId);
-
-        db.prepare(`
-          INSERT INTO sdr_agent_versions (
-            id, agent_id, version_number, model, system_prompt, policy_json, config_json
-          ) VALUES (?, ?, 1, 'gemini-3.6-flash', ?, ?, ?)
-        `).run(
-          versionId,
-          agentId,
-          defaultPrompt,
-          JSON.stringify({ company_context: defaultCompanyContext, handoff_rules: "Derivar si piden hablar con un humano o solicitan descuentos especiales fuera de catálogo." }),
-          JSON.stringify({ custom_instructions: "" })
-        );
-
-        // Seed initial knowledge source
-        db.prepare(`
-          INSERT INTO sdr_knowledge_sources (
-            id, agent_id, status, title, source_type, metadata_json
-          ) VALUES (?, ?, 'approved', 'Catálogo de Servicios InHubFlow', 'catalog', ?)
-        `).run(randomUUID(), agentId, JSON.stringify({ content: defaultCompanyContext }));
-
-        agent = db.prepare("SELECT * FROM sdr_agents WHERE id = ?").get(agentId) as any;
-      }
-
-      // Fetch active version
-      let activeVersion: any = null;
-      if (agent.active_version_id) {
-        activeVersion = db.prepare("SELECT * FROM sdr_agent_versions WHERE id = ?").get(agent.active_version_id);
-      } else {
-        activeVersion = db.prepare("SELECT * FROM sdr_agent_versions WHERE agent_id = ? ORDER BY version_number DESC LIMIT 1").get(agent.id);
-      }
+      const { agent, activeVersion } = ensureSdrAgent(db);
 
       let policy = { company_context: "", handoff_rules: "" };
       let config = { custom_instructions: "" };
@@ -121,10 +68,7 @@ Tono y Estilo:
         handoff_rules,
       } = req.body;
 
-      let agent = db.prepare("SELECT * FROM sdr_agents ORDER BY created_at ASC LIMIT 1").get() as any;
-      if (!agent) {
-        return res.status(404).json({ error: "No se encontró el agente SDR." });
-      }
+      const { agent } = ensureSdrAgent(db);
 
       db.transaction(() => {
         // Update agent record

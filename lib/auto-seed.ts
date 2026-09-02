@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
+import { ensureSdrAgent } from "@/lib/sdr-agent/seed";
 
 export interface AutoSeedResult {
   adminSeeded: boolean;
@@ -80,6 +81,13 @@ export function autoSeedInstance(db: Database.Database): AutoSeedResult {
       db.prepare("UPDATE users SET role = 'admin', slots_limit = 999 WHERE id = ?").run(firstUser.id);
       console.log(`[InHubFlow AutoSeed] 👑 Promoted first user to SuperAdmin: ${firstUser.email}`);
     }
+  }
+
+  // 4. Ensure SDR Agent is seeded and ready
+  try {
+    ensureSdrAgent(db);
+  } catch (err) {
+    console.error("[InHubFlow AutoSeed] SDR seeding warning:", err);
   }
 
   console.log(`[InHubFlow AutoSeed] 🚀 Instance initialized with ${slotsLimit} slots limit${companyName ? ` for '${companyName}'` : ""}.`);
