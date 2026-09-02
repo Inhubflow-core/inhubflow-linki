@@ -11,6 +11,7 @@ import {
   RiLockPasswordLine, RiPlugLine,
   RiLinkedinBoxLine, RiMessage2Line, RiSettings3Line, RiFileCopyLine,
   RiLockLine, RiLockUnlockLine, RiFlashlightLine, RiArrowDownSLine, RiCompassLine, RiGlobalLine,
+  RiExternalLinkLine,
 } from "react-icons/ri";
 import { ALL_TOUR_PAGES, TOUR_PAGE_LABELS, replayPageTour, type TourPage } from "@/lib/tour";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
@@ -250,68 +251,19 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
   const [form, setForm] = useState(BLANK_LI_FORM);
   const [loading, setLoading] = useState(false);
   const [authModal, setAuthModal] = useState<string | null>(null);
-  const [authMode, setAuthMode] = useState<"login" | "cookies">("cookies");
   const [authForm, setAuthForm] = useState({ li_at: "", document_cookie: "" });
-  const [loginForm, setLoginForm] = useState({ email: "", password: "", code: "" });
-  const [loginStage, setLoginStage] = useState<"creds" | "code" | "approve">("creds");
-  const [challengeMsg, setChallengeMsg] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
 
   function openAuthModal(account: LiAccount) {
     setAuthModal(account.id);
-    setAuthMode("cookies");
-    setLoginStage("creds");
-    setChallengeMsg("");
-    setLoginForm({ email: account.email ?? "", password: "", code: "" });
     setAuthForm({ li_at: "", document_cookie: "" });
   }
 
   function closeAuthModal() {
     setAuthModal(null);
-    setLoginStage("creds");
-    setChallengeMsg("");
-    setLoginForm({ email: "", password: "", code: "" });
     setAuthForm({ li_at: "", document_cookie: "" });
   }
 
-  async function submitLogin(e: React.FormEvent) {
-    e.preventDefault();
-    if (!authModal) return;
-    setAuthLoading(true);
-    const body =
-      loginStage === "creds"
-        ? { step: "start", email: loginForm.email, password: loginForm.password }
-        : loginStage === "approve"
-          ? { step: "await" }
-          : { step: "verify", code: loginForm.code };
-    const res = await fetch(`/api/accounts/${authModal}/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    setAuthLoading(false);
-    if (!res.ok) { toast.error(data.error ?? "Login failed"); return; }
-    if (data.status === "authenticated") {
-      toast.success("Logged in successfully");
-      closeAuthModal();
-      refresh();
-    } else if (data.status === "challenge" && data.kind === "captcha") {
-      toast.error(data.message);
-      setAuthMode("cookies");
-    } else if (data.status === "challenge") {
-      setChallengeMsg(data.message ?? "");
-      if (data.kind === "app") {
-        if (loginStage === "approve") toast.error("Still waiting — approve the request in your LinkedIn app, then click Continue.");
-        setLoginStage("approve");
-      } else {
-        setLoginStage("code");
-        setLoginForm((f) => ({ ...f, code: "" }));
-      }
-    } else {
-      toast.error(data.message ?? "Login failed");
-    }
-  }
 
   async function refresh() {
     const res = await fetch("/api/accounts");
@@ -633,88 +585,133 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
       {authModal && (
         <div className="modal modal-open">
           <div className="modal-box bg-base-200 border border-base-300/50 max-w-lg">
-            <h3 className="font-semibold text-base mb-1">Authenticate LinkedIn Account</h3>
-
-            {/* Mode toggle */}
-            <div className="inline-flex rounded-lg bg-base-300/50 p-0.5 mb-4 mt-2">
-              <button
-                type="button"
-                onClick={() => setAuthMode("cookies")}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${authMode === "cookies" ? "bg-primary text-primary-content font-bold" : "text-base-content/60 hover:text-base-content"}`}
-              >
-                Conectar con Cookies (Recomendado ⚡)
-              </button>
-              <button
-                type="button"
-                onClick={() => { setAuthMode("login"); setLoginStage("creds"); }}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${authMode === "login" ? "bg-primary text-primary-content font-bold" : "text-base-content/60 hover:text-base-content"}`}
-              >
-                Login con Contraseña
-              </button>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="font-bold text-base text-gray-900 dark:text-white">Conectar Cuenta de LinkedIn</h3>
+                <p className="text-xs text-base-content/60">
+                  Conexión directa y 100% segura mediante sesión verificada (sin contraseña).
+                </p>
+              </div>
+              <span className="badge badge-success badge-sm gap-1 text-[11px] font-semibold py-2">
+                🔒 100% Seguro
+              </span>
             </div>
 
-            {authMode === "login" ? (
-              <form onSubmit={submitLogin} className="flex flex-col gap-3">
-                <p className="text-xs text-base-content/50 -mt-1">
-                  Logs in on the server under the runner&apos;s exact browser fingerprint and captures all cookies. LinkedIn may ask for a code or a device approval.
-                </p>
-                {loginStage === "creds" ? (
-                  <>
-                    <div>
-                      <label className="label text-xs text-base-content/50 pb-1">Email <span className="text-error">*</span></label>
-                      <input type="email" autoComplete="off" className="input input-bordered input-sm w-full bg-base-300/50" placeholder="you@example.com" value={loginForm.email} onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })} required />
-                    </div>
-                    <div>
-                      <label className="label text-xs text-base-content/50 pb-1">Password <span className="text-error">*</span></label>
-                      <input type="password" autoComplete="off" className="input input-bordered input-sm w-full bg-base-300/50" placeholder="••••••••" value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} required />
-                    </div>
-                  </>
-                ) : loginStage === "approve" ? (
-                  <div className="bg-info/10 text-info text-xs rounded-lg p-3 flex items-start gap-2">
-                    <RiSmartphoneLine size={16} className="shrink-0 mt-0.5" />
-                    <span>{challengeMsg || "Approve the sign-in request in your LinkedIn mobile app, then click Continue."}</span>
+            {/* Ayuda fácil para obtener la cookie */}
+            <div className="bg-brand-500/5 dark:bg-brand-500/10 border border-brand-500/20 rounded-xl p-3.5 mb-4 space-y-2.5">
+              <div className="flex items-start gap-2">
+                <span className="text-base shrink-0">💡</span>
+                <div className="text-xs space-y-0.5">
+                  <p className="font-bold text-gray-900 dark:text-white">¿Cómo obtener tu cookie en 10 segundos?</p>
+                  <p className="text-base-content/70">
+                    LinkedIn genera esta clave en tu navegador para mantenerte conectado. Elige la opción que te sea más cómoda:
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                <a
+                  href="https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-2 p-2.5 rounded-lg bg-base-100 dark:bg-base-300/60 border border-base-300 hover:border-brand-500/50 hover:bg-brand-500/5 transition-all text-xs group"
+                >
+                  <span className="text-lg">🧩</span>
+                  <div className="min-w-0">
+                    <p className="font-bold text-gray-900 dark:text-white group-hover:text-brand-500 flex items-center gap-1">
+                      Extensión de Chrome <RiExternalLinkLine size={12} />
+                    </p>
+                    <p className="text-[11px] text-base-content/50 truncate">Instala Cookie-Editor y copia en 1 clic</p>
                   </div>
-                ) : (
-                  <div>
-                    <div className="bg-info/10 text-info text-xs rounded-lg p-3 mb-2">{challengeMsg}</div>
-                    <label className="label text-xs text-base-content/50 pb-1">Verification code <span className="text-error">*</span></label>
-                    <input inputMode="numeric" autoComplete="one-time-code" className="input input-bordered input-sm w-full bg-base-300/50 font-mono tracking-widest" placeholder="123456" value={loginForm.code} onChange={(e) => setLoginForm({ ...loginForm, code: e.target.value })} required />
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const code = "copy(document.cookie.match(/li_at=([^;]+)/)[1]); console.log('✅ Cookie li_at copiada al portapapeles!');";
+                    navigator.clipboard.writeText(code);
+                    toast.success("¡Código copiado! Pégalo en la consola de LinkedIn (F12) y presiona Enter");
+                  }}
+                  className="flex items-center gap-2 p-2.5 rounded-lg bg-base-100 dark:bg-base-300/60 border border-base-300 hover:border-brand-500/50 hover:bg-brand-500/5 transition-all text-xs text-left group cursor-pointer"
+                >
+                  <span className="text-lg">⚡</span>
+                  <div className="min-w-0">
+                    <p className="font-bold text-gray-900 dark:text-white group-hover:text-brand-500">
+                      Código de 1 Clic
+                    </p>
+                    <p className="text-[11px] text-base-content/50 truncate">Copiar script rápido para la consola</p>
                   </div>
-                )}
-                <div className="modal-action mt-1">
-                  <button type="button" className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors" onClick={closeAuthModal}>Cancel</button>
-                  <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-50" disabled={authLoading}>
-                    {authLoading ? <span className="loading loading-spinner loading-xs" /> : loginStage === "creds" ? "Log in" : loginStage === "approve" ? "I approved — Continue" : "Verify code"}
+                </button>
+              </div>
+
+              {/* Acordeón para método manual */}
+              <details className="text-[11px] text-base-content/60 pt-1">
+                <summary className="cursor-pointer hover:text-base-content font-medium select-none">
+                  Ver pasos manuales con Inspeccionar Elemento (F12)
+                </summary>
+                <ol className="list-decimal list-inside pl-1 pt-1.5 space-y-1 text-base-content/70">
+                  <li>Abre <strong>linkedin.com</strong> con tu sesión iniciada en Chrome.</li>
+                  <li>Presiona <strong>F12</strong> (o Clic derecho → Inspeccionar).</li>
+                  <li>Ve a <strong>Application</strong> → <strong>Cookies</strong> → <strong>https://www.linkedin.com</strong>.</li>
+                  <li>Busca la cookie llamada <strong>li_at</strong>, haz doble clic sobre su valor y cópialo.</li>
+                </ol>
+              </details>
+            </div>
+
+            <form onSubmit={submitAuth} className="flex flex-col gap-3">
+              <div>
+                <div className="flex items-center justify-between pb-1">
+                  <label className="label text-xs text-base-content/70 font-semibold p-0">
+                    Valor de la Cookie <code className="text-primary font-bold">li_at</code> <span className="text-error">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const text = await navigator.clipboard.readText();
+                        if (text) {
+                          setAuthForm({ ...authForm, li_at: text.trim() });
+                          toast.success("¡Cookie pegada desde el portapapeles!");
+                        }
+                      } catch {
+                        toast.error("Por favor presiona Ctrl + V en el campo");
+                      }
+                    }}
+                    className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer font-medium"
+                  >
+                    📋 Pegar portapapeles
                   </button>
                 </div>
-              </form>
-            ) : (
-              <>
-                <div className="bg-base-300/50 rounded-lg p-3 text-xs text-base-content/60 mb-4 space-y-1.5">
-                  <p className="font-medium text-base-content/80">How to get your cookies:</p>
-                  <p>1. Open <strong>linkedin.com</strong> in Chrome and make sure you are logged in</p>
-                  <p>2. Open DevTools → <strong>Application</strong> → <strong>Cookies</strong> → <strong>https://www.linkedin.com</strong></p>
-                  <p>3. Find <strong>li_at</strong> → double-click the Value cell → copy it → paste below</p>
-                  <p>4. Open the DevTools <strong>Console</strong> tab → run <code className="bg-base-300 px-1 rounded">document.cookie</code> → copy the output → paste below</p>
-                </div>
-                <form onSubmit={submitAuth} className="flex flex-col gap-3">
-                  <div>
-                    <label className="label text-xs text-base-content/50 pb-1">li_at cookie value <span className="text-error">*</span></label>
-                    <input className="input input-bordered input-sm w-full bg-base-300/50 font-mono text-xs" placeholder="AQEDATxxxxxx..." value={authForm.li_at} onChange={(e) => setAuthForm({ ...authForm, li_at: e.target.value })} required />
-                  </div>
-                  <div>
-                    <label className="label text-xs text-base-content/50 pb-1">document.cookie output (optional)</label>
-                    <textarea className="textarea textarea-bordered w-full bg-base-300/50 font-mono text-xs h-24 resize-none" placeholder={'bcookie="v=2&..."; JSESSIONID="ajax:..."; ...'} value={authForm.document_cookie} onChange={(e) => setAuthForm({ ...authForm, document_cookie: e.target.value })} />
-                  </div>
-                  <div className="modal-action mt-1">
-                    <button type="button" className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors" onClick={closeAuthModal}>Cancel</button>
-                    <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-50" disabled={authLoading}>
-                      {authLoading ? <span className="loading loading-spinner loading-xs" /> : "Save Cookies"}
-                    </button>
-                  </div>
-                </form>
-              </>
-            )}
+                <input
+                  className="input input-bordered input-sm w-full bg-base-300/50 font-mono text-xs"
+                  placeholder="AQEDATxxxxxx..."
+                  value={authForm.li_at}
+                  onChange={(e) => setAuthForm({ ...authForm, li_at: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="label text-xs text-base-content/50 pb-1">
+                  Cookies completas (opcional para máxima fidelidad)
+                </label>
+                <textarea
+                  className="textarea textarea-bordered w-full bg-base-300/50 font-mono text-xs h-16 resize-none"
+                  placeholder={'bcookie="v=2&..."; JSESSIONID="ajax:..."; ...'}
+                  value={authForm.document_cookie}
+                  onChange={(e) => setAuthForm({ ...authForm, document_cookie: e.target.value })}
+                />
+              </div>
+
+              <div className="modal-action mt-2">
+                <button type="button" className="inline-flex items-center px-4 py-2 rounded-xl text-xs font-semibold text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors cursor-pointer" onClick={closeAuthModal}>
+                  Cancelar
+                </button>
+                <button type="submit" className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold bg-brand-500 text-white hover:bg-brand-600 transition-colors shadow-sm disabled:opacity-50 cursor-pointer" disabled={authLoading}>
+                  {authLoading ? <span className="loading loading-spinner loading-xs" /> : "Conectar LinkedIn"}
+                </button>
+              </div>
+            </form>
           </div>
           <div className="modal-backdrop" onClick={closeAuthModal} />
         </div>
