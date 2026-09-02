@@ -705,17 +705,6 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                 />
               </div>
 
-              <div>
-                <label className="label text-xs text-base-content/50 pb-1">
-                  Cookies completas (opcional para máxima fidelidad)
-                </label>
-                <textarea
-                  className="textarea textarea-bordered w-full bg-base-300/50 font-mono text-xs h-16 resize-none"
-                  placeholder={'bcookie="v=2&..."; JSESSIONID="ajax:..."; ...'}
-                  value={authForm.document_cookie}
-                  onChange={(e) => setAuthForm({ ...authForm, document_cookie: e.target.value })}
-                />
-              </div>
 
               <div className="modal-action mt-2">
                 <button type="button" className="inline-flex items-center px-4 py-2 rounded-xl text-xs font-semibold text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors cursor-pointer" onClick={closeAuthModal}>
