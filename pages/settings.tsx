@@ -626,45 +626,49 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
               </div>
             </div>
 
-            {/* Tarjeta de instrucciones clara y sin enredos */}
+            {/* Tarjeta InHubFlow Connect */}
             <div className="bg-brand-500/5 dark:bg-brand-500/10 border border-brand-500/20 rounded-xl p-3.5 mb-4 space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <div>
                   <p className="font-bold text-xs text-gray-900 dark:text-white flex items-center gap-1.5">
-                    <span>🧩</span> Opción más fácil: Extensión Cookie-Editor
+                    <span>🚀</span> Extensión Oficial: InHubFlow Connect
                   </p>
                   <p className="text-[11px] text-base-content/60 mt-0.5">
-                    LinkedIn protege la cookie por seguridad. La forma más rápida de copiarla en 2 clics es:
+                    Sincroniza tu sesión profesional en 1 solo clic de forma 100% segura.
                   </p>
                 </div>
                 <a
-                  href="https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-brand-500 text-white hover:bg-brand-600 transition-colors shadow-sm shrink-0"
+                  href="/extension/inhubflow-connect.zip"
+                  download="inhubflow-connect.zip"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-brand-500 text-white hover:bg-brand-600 transition-colors shadow-sm shrink-0 cursor-pointer"
                 >
-                  <span>Instalar Extensión</span> <RiExternalLinkLine size={12} />
+                  <RiDownloadLine size={13} />
+                  <span>Descargar Extensión</span>
                 </a>
               </div>
 
               <div className="bg-base-100 dark:bg-base-300/50 rounded-lg p-2.5 border border-base-300 text-[11.5px] space-y-1 text-base-content/80">
-                <p className="font-semibold text-gray-900 dark:text-white">Solo 3 pasos sencillos:</p>
+                <p className="font-semibold text-gray-900 dark:text-white">Pasos en 1 clic:</p>
                 <ol className="list-decimal list-inside space-y-1 pl-0.5 text-base-content/75">
                   <li>Abre tu pestaña de <strong>LinkedIn</strong> con tu sesión iniciada.</li>
-                  <li>Haz clic en el ícono de <strong>Cookie-Editor</strong> en tu barra de extensiones, busca la fila <strong>li_at</strong> y dale al botón de copiar.</li>
+                  <li>Haz clic en el ícono de <strong>InHubFlow Connect</strong> en la barra de extensiones de tu navegador.</li>
+                  <li>Pulsa el botón <strong>&quot;Copiar Código de Conexión&quot;</strong>.</li>
                   <li>Vuelve aquí y haz clic en <strong>&quot;📋 Pegar portapapeles&quot;</strong> abajo.</li>
                 </ol>
               </div>
 
               <details className="text-[11px] text-base-content/60 pt-0.5">
                 <summary className="cursor-pointer hover:text-base-content font-medium select-none">
-                  ¿Prefieres hacerlo sin instalar extensión? (Inspeccionar F12)
+                  Otras opciones (Cookie-Editor o Inspeccionar F12)
                 </summary>
-                <ol className="list-decimal list-inside pl-1 pt-1.5 space-y-1 text-base-content/75">
-                  <li>En tu pestaña de LinkedIn presiona <strong>F12</strong>.</li>
-                  <li>Ve a la pestaña superior <strong>Application (Aplicación)</strong> → en la izquierda abre <strong>Cookies</strong> → <strong>https://www.linkedin.com</strong>.</li>
-                  <li>Busca la fila <strong>li_at</strong>, haz doble clic en el campo Valor (empieza por AQED...) y cópialo.</li>
-                </ol>
+                <div className="pt-2 space-y-1.5 pl-0.5 text-base-content/75">
+                  <p>
+                    • También puedes usar la extensión <a href="https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm" target="_blank" rel="noreferrer" className="text-primary underline">Cookie-Editor</a> y copiar la cookie <code>li_at</code>.
+                  </p>
+                  <p>
+                    • O con <strong>F12</strong>: Ve a <strong>Application</strong> → <strong>Cookies</strong> → copia el valor de <code>li_at</code>.
+                  </p>
+                </div>
               </details>
             </div>
 

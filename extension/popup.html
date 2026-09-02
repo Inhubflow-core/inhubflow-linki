@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InHubFlow Connect</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo-wrap">
+        <img src="icons/icon48.png" alt="InHubFlow" class="logo-img" id="header-logo">
+        <div class="logo-text">
+          <h1>InHubFlow <span class="badge-connect">Connect</span></h1>
+          <p class="subtitle">Sincronizador Seguro de Sesión B2B</p>
+        </div>
+      </div>
+    </header>
+
+    <!-- Content State: Loading -->
+    <div id="state-loading" class="state-panel">
+      <div class="spinner"></div>
+      <p class="status-text">Verificando sesión activa...</p>
+    </div>
+
+    <!-- Content State: Authenticated (Session Found) -->
+    <div id="state-success" class="state-panel hidden">
+      <div class="alert-success">
+        <span class="dot-live"></span>
+        <span>Sesión profesional activa detectada</span>
+      </div>
+
+      <div class="code-box">
+        <div class="code-header">
+          <span class="label">Código de Conexión</span>
+          <button id="btn-toggle-view" class="btn-text" title="Mostrar/Ocultar código">👁️ Ver</button>
+        </div>
+        <div class="token-display" id="token-preview">AQED•••••••••••••••••••••••••••</div>
+        <input type="hidden" id="full-token-val">
+      </div>
+
+      <button id="btn-copy" class="btn-primary">
+        <span class="btn-icon">⚡</span>
+        <span id="btn-copy-text">Copiar Código de Conexión</span>
+      </button>
+
+      <p class="help-text">
+        Pega este código en la ventana de conexión de <strong>InHubFlow</strong> para activar tu prospección en 1 clic.
+      </p>
+    </div>
+
+    <!-- Content State: Not Found (Not logged in) -->
+    <div id="state-error" class="state-panel hidden">
+      <div class="alert-warning">
+        <span>⚠️ No se detectó sesión activa</span>
+      </div>
+      <p class="error-desc">
+        Abre tu cuenta profesional en otra pestaña de este navegador e inicia sesión para generar tu código de conexión.
+      </p>
+      <button id="btn-open-login" class="btn-secondary">
+        <span>🔗 Abrir LinkedIn</span>
+      </button>
+      <button id="btn-retry" class="btn-link">
+        🔄 Ya inicié sesión, reintentar
+      </button>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>🔒 Encriptación 100% segura y privada</span>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
