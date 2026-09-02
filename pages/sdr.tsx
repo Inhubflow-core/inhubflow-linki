@@ -212,7 +212,10 @@ export default function SdrPage() {
         }),
       });
 
-      if (!res.ok) throw new Error("Error al agregar fuente de conocimiento");
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || "Error al agregar fuente de conocimiento");
+      }
       toast.success("Documento añadido a la base de conocimiento");
       setNewSourceTitle("");
       setNewSourceContent("");

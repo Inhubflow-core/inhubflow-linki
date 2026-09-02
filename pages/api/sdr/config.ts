@@ -77,7 +77,7 @@ Tono y Estilo:
       const activeThreads = (db.prepare("SELECT COUNT(*) as c FROM sdr_threads WHERE state = 'AI_ACTIVE'").get() as any)?.c || 0;
 
       const recentDecisions = db.prepare(`
-        SELECT d.*, t.full_name as target_name, t.company_name as target_company
+        SELECT d.*, t.full_name as target_name, t.company as target_company
         FROM sdr_decisions d
         LEFT JOIN sdr_threads th ON d.thread_id = th.id
         LEFT JOIN targets t ON th.target_id = t.id
