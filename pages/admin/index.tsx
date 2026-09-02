@@ -2,7 +2,7 @@ import { useState, useEffect, useId } from "react";
 import Head from "next/head";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
-import Layout from "@/components/layout/Layout";
+
 import {
   RiShieldCheckLine,
   RiUserFollowLine,
@@ -198,17 +198,18 @@ export default function AdminSubscribersPage() {
   });
 
   return (
-    <Layout>
+    <>
       <Head>
         <title>Panel SuperAdmin — InHubFlow</title>
+        <meta name="robots" content="noindex, nofollow" />
       </Head>
 
-      <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
-        {/* Header Title & Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="space-y-6">
+        {/* ── Top Header Banner (Matching Dashboard / Lead Finder Style) ── */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 border border-brand-500/20 dark:border-brand-500/10 p-5 md:p-6 rounded-2xl">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="p-1.5 rounded-lg bg-brand-500/10 text-brand-600 dark:text-brand-400">
+            <div className="flex items-center gap-2.5">
+              <span className="p-2 rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400">
                 <RiShieldCheckLine size={24} />
               </span>
               <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
@@ -224,7 +225,7 @@ export default function AdminSubscribersPage() {
             <button
               onClick={loadData}
               title="Refrescar datos"
-              className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors"
+              className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors shadow-xs"
             >
               <RiRefreshLine className={loading ? "animate-spin" : ""} size={18} />
             </button>
@@ -719,6 +720,6 @@ export default function AdminSubscribersPage() {
           </div>
         </div>
       )}
-    </Layout>
+    </>
   );
 }
