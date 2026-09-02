@@ -62,6 +62,35 @@ export const authOptions: NextAuthOptions = {
         token.subscription_status = (user as { subscription_status?: string }).subscription_status || "active";
         token.plan_tier = (user as { plan_tier?: string }).plan_tier || "starter";
       }
+
+      // Auto-heal existing sessions: query DB to ensure role and slots are always up to date
+      if (token.email) {
+        try {
+          const db = getDb();
+          const userRow = db
+            .prepare("SELECT id, role, slots_limit, subscription_status, plan_tier FROM users WHERE email = ?")
+            .get(token.email) as { id: string; role?: string; slots_limit?: number; subscription_status?: string; plan_tier?: string } | undefined;
+
+          if (userRow) {
+            // If user is first in DB, ensure they are promoted to admin
+            const firstUser = db.prepare("SELECT id FROM users ORDER BY created_at ASC LIMIT 1").get() as { id: string } | undefined;
+            if (firstUser && firstUser.id === userRow.id && userRow.role !== "admin") {
+              db.prepare("UPDATE users SET role = 'admin', slots_limit = 999, plan_tier = 'custom' WHERE id = ?").run(userRow.id);
+              userRow.role = "admin";
+              userRow.slots_limit = 999;
+            }
+
+            token.id = userRow.id;
+            token.role = userRow.role || "user";
+            token.slots_limit = userRow.slots_limit || 1;
+            token.subscription_status = userRow.subscription_status || "active";
+            token.plan_tier = userRow.plan_tier || "starter";
+          }
+        } catch {
+          // ignore error if db busy
+        }
+      }
+
       return token;
     },
     async session({ session, token }) {

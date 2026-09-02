@@ -88,14 +88,9 @@ export default function AdminSubscribersPage() {
     if (status === "unauthenticated") {
       router.push("/login");
     } else if (status === "authenticated") {
-      const role = (session?.user as { role?: string })?.role;
-      if (role !== "admin") {
-        router.push("/");
-      } else {
-        loadData();
-      }
+      loadData();
     }
-  }, [status, session]);
+  }, [status]);
 
   async function loadData() {
     setLoading(true);
@@ -105,6 +100,10 @@ export default function AdminSubscribersPage() {
         const data = await res.json();
         setSubscribers(data.subscribers || []);
         if (data.stats) setStats(data.stats);
+      } else if (res.status === 401) {
+        router.push("/login");
+      } else if (res.status === 403) {
+        router.push("/");
       }
     } catch (err) {
       console.error("Error loading subscribers:", err);

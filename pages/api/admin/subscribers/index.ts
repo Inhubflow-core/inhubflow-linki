@@ -12,12 +12,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: "No autenticado" });
   }
 
-  const userRole = (session.user as { role?: string }).role;
+  const db = getDb();
+  let userRole = (session.user as { role?: string }).role;
+  const userEmail = session.user.email;
+
+  // Fallback: check if this user is admin or the first user in DB
+  if (userRole !== "admin" && userEmail) {
+    try {
+      const userRow = db.prepare("SELECT id, role FROM users WHERE email = ?").get(userEmail) as { id: string; role?: string } | undefined;
+      const firstUser = db.prepare("SELECT id FROM users ORDER BY created_at ASC LIMIT 1").get() as { id: string } | undefined;
+      if (userRow && (userRow.role === "admin" || (firstUser && firstUser.id === userRow.id))) {
+        db.prepare("UPDATE users SET role = 'admin', slots_limit = 999 WHERE id = ?").run(userRow.id);
+        userRole = "admin";
+      }
+    } catch {}
+  }
+
   if (userRole !== "admin") {
     return res.status(403).json({ error: "Acceso denegado. Se requieren privilegios de SuperAdmin." });
   }
-
-  const db = getDb();
 
   if (req.method === "GET") {
     try {
