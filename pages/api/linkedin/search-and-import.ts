@@ -88,33 +88,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         );
       } catch (xrayErr) {
-        console.warn("[search-and-import] Google X-Ray notice, falling back to LinkedIn session:", xrayErr);
+        console.warn("[search-and-import] Google X-Ray notice:", xrayErr);
       }
 
-      // ─── TIER 2: Fallback to LinkedIn Stealth Session if X-Ray yielded 0 ───
-      if (profiles.length === 0 && accountId) {
-        sendEvent("progress", {
-          phase: "navigating",
-          page: 1,
-          totalPages: Math.ceil(numericLimit / 10),
-          totalFound: 0,
-          message: "Consultando motor nativo de LinkedIn con sesión Stealth...",
-        });
-
-        profiles = await searchLinkedInProfiles(
-          {
-            accountId,
-            filters: { title, location, company, keywords },
-            limit: numericLimit,
-          },
-          (progress: SearchProgressEvent) => {
-            sendEvent("progress", progress);
-            if (progress.currentLead) {
-              sendEvent("lead", progress.currentLead);
-            }
-          }
-        );
-      }
+      // Note: We deliberately DO NOT fallback to internal LinkedIn search session
+      // to 100% protect the user's LinkedIn profile from search rate limits and "Commercial Use Limit" warnings.
 
       sendEvent("saving", {
         message: `Guardando ${profiles.length} prospectos en la lista "${cleanListName}"...`,
