@@ -340,42 +340,52 @@ async function classifyLoginState(page: Page): Promise<LoginResult> {
       return { status: "authenticated" };
     }
 
+    // Check for CAPTCHA (Arkose / FunCaptcha) anywhere on page
+    const cap = page.locator("iframe[src*='arkoselabs'], iframe[title*='captcha'], #captcha-internal, div[data-litms-control-urn*='captcha']");
+    if ((await cap.count().catch(() => 0)) > 0) {
+      return {
+        status: "challenge",
+        kind: "captcha",
+        message: "LinkedIn requiere verificación de seguridad (CAPTCHA) al iniciar sesión desde el servidor. Usa la pestaña 'Paste cookies' para conectar tu cuenta de forma 100% segura.",
+      };
+    }
+
     // Email/SMS PIN entry
     const pin = page.locator(PIN_SELECTOR).first();
     if ((await pin.count()) > 0 && (await pin.isVisible().catch(() => false))) {
       return {
         status: "challenge",
         kind: "otp",
-        message: "LinkedIn sent you a verification code (email or SMS). Enter it below.",
+        message: "LinkedIn envió un código de verificación (a tu correo o SMS). Ingrésalo a continuación.",
       };
     }
 
     if (/checkpoint\/challenge/.test(url)) {
-      // CAPTCHA (Arkose / FunCaptcha) — cannot be solved headlessly
-      const cap = page.locator("iframe[src*='arkoselabs'], iframe[title*='captcha'], #captcha-internal");
-      if ((await cap.count().catch(() => 0)) > 0) {
-        return {
-          status: "challenge",
-          kind: "captcha",
-          message: "LinkedIn requires a CAPTCHA, which can't be solved on the server. Use cookie paste instead.",
-        };
-      }
       // Device/app approval: a settled checkpoint with no code input and no captcha
       if (Date.now() - start > 4_000) {
         return {
           status: "challenge",
           kind: "app",
-          message: "LinkedIn sent a sign-in request to your LinkedIn mobile app. Approve it there, then click Continue.",
+          message: "LinkedIn envió una notificación de inicio de sesión a tu app móvil de LinkedIn. Apruébala en tu teléfono y haz clic en Continuar.",
         };
       }
     }
 
-    // Wrong credentials
+    // Check for visible inline error messages (wrong password, account not found, etc.)
+    const errorEl = page.locator("#error-for-username, #error-for-password, .alert-content, div[role='alert'], .form__label--error, p.alert, .input-error").first();
+    if ((await errorEl.count().catch(() => 0)) > 0 && (await errorEl.isVisible().catch(() => false))) {
+      const errTxt = await errorEl.textContent().catch(() => "");
+      if (errTxt && errTxt.trim().length > 3) {
+        return { status: "error", message: errTxt.trim() };
+      }
+    }
+
+    // Multilingual wrong credentials check
     const wrongPw = await page
-      .getByText(/that.?s not the right password|please enter a valid|couldn.?t find a linkedin account/i)
+      .getByText(/that.?s not the right password|please enter a valid|couldn.?t find a linkedin account|contraseña incorrecta|no es la contraseña correcta|no hemos podido encontrar|senha incorreta|não está correta/i)
       .count()
       .catch(() => 0);
-    if (wrongPw > 0) return { status: "error", message: "Wrong email or password." };
+    if (wrongPw > 0) return { status: "error", message: "Correo o contraseña incorrectos en LinkedIn." };
 
     await page.waitForTimeout(800);
   }
@@ -384,10 +394,18 @@ async function classifyLoginState(page: Page): Promise<LoginResult> {
     return {
       status: "challenge",
       kind: "unknown",
-      message: "LinkedIn presented a security checkpoint. If you got a code enter it; if it's an app request, approve it and click Continue.",
+      message: "LinkedIn solicitó una verificación de seguridad. Si recibiste un código ingrésalo; si es aprobación en tu móvil, confírmalo y haz clic en Continuar.",
     };
   }
-  return { status: "error", message: `Login did not complete. Current page: ${page.url()}` };
+
+  if (/linkedin\.com\/login/i.test(page.url())) {
+    return {
+      status: "error",
+      message: "LinkedIn bloqueó el inicio de sesión directo por seguridad (IP de servidor detectada). Usa la pestaña 'Paste cookies' para conectar tu cuenta de inmediato sin bloqueos.",
+    };
+  }
+
+  return { status: "error", message: `No se completó el inicio de sesión. Página actual: ${page.url()}` };
 }
 
 export async function startHeadlessLogin(
@@ -403,17 +421,25 @@ export async function startHeadlessLogin(
   const page = await ctx.newPage();
   try {
     await page.goto("https://www.linkedin.com/login", { waitUntil: "domcontentloaded", timeout: 30_000 });
-    // LinkedIn's React login page uses dynamic ids — target by type+visibility
-    // (old #username/#password kept as a fallback for the legacy layout).
+
     const emailInput = page.locator("input#username, input[type='email']:visible").first();
     await emailInput.waitFor({ state: "visible", timeout: 20_000 });
     await emailInput.fill(email);
+
     const passwordInput = page.locator("input#password, input[type='password']:visible").first();
     await passwordInput.fill(password);
-    await Promise.all([
-      page.waitForLoadState("domcontentloaded").catch(() => {}),
-      passwordInput.press("Enter"),
-    ]);
+
+    await page.waitForTimeout(500);
+
+    // Locate and click the explicit Submit button (crucial for modern LinkedIn SPA)
+    const submitBtn = page.locator("button[type='submit'], button[data-litms-control-urn='login-submit'], button:has-text('Sign in'), button:has-text('Iniciar sesión'), button:has-text('Entrar')").first();
+    if ((await submitBtn.count().catch(() => 0)) > 0 && (await submitBtn.isVisible().catch(() => false))) {
+      await submitBtn.click().catch(() => {});
+    } else {
+      await passwordInput.press("Enter").catch(() => {});
+    }
+
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     const result = await classifyLoginState(page);
     console.log(`[login] start account=${accountId} -> ${result.status}${"kind" in result ? "/" + result.kind : ""} url=${page.url()}`);

@@ -250,7 +250,7 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
   const [form, setForm] = useState(BLANK_LI_FORM);
   const [loading, setLoading] = useState(false);
   const [authModal, setAuthModal] = useState<string | null>(null);
-  const [authMode, setAuthMode] = useState<"login" | "cookies">("login");
+  const [authMode, setAuthMode] = useState<"login" | "cookies">("cookies");
   const [authForm, setAuthForm] = useState({ li_at: "", document_cookie: "" });
   const [loginForm, setLoginForm] = useState({ email: "", password: "", code: "" });
   const [loginStage, setLoginStage] = useState<"creds" | "code" | "approve">("creds");
@@ -259,7 +259,7 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
 
   function openAuthModal(account: LiAccount) {
     setAuthModal(account.id);
-    setAuthMode("login");
+    setAuthMode("cookies");
     setLoginStage("creds");
     setChallengeMsg("");
     setLoginForm({ email: account.email ?? "", password: "", code: "" });
@@ -639,17 +639,17 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
             <div className="inline-flex rounded-lg bg-base-300/50 p-0.5 mb-4 mt-2">
               <button
                 type="button"
-                onClick={() => { setAuthMode("login"); setLoginStage("creds"); }}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${authMode === "login" ? "bg-primary text-primary-content" : "text-base-content/60 hover:text-base-content"}`}
+                onClick={() => setAuthMode("cookies")}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${authMode === "cookies" ? "bg-primary text-primary-content font-bold" : "text-base-content/60 hover:text-base-content"}`}
               >
-                Server login
+                Conectar con Cookies (Recomendado ⚡)
               </button>
               <button
                 type="button"
-                onClick={() => setAuthMode("cookies")}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${authMode === "cookies" ? "bg-primary text-primary-content" : "text-base-content/60 hover:text-base-content"}`}
+                onClick={() => { setAuthMode("login"); setLoginStage("creds"); }}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${authMode === "login" ? "bg-primary text-primary-content font-bold" : "text-base-content/60 hover:text-base-content"}`}
               >
-                Paste cookies
+                Login con Contraseña
               </button>
             </div>
 
