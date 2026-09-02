@@ -25,7 +25,7 @@ interface Subscriber {
   company_name?: string;
   slots_limit: number;
   subscription_status: "active" | "trial" | "past_due" | "canceled";
-  plan_tier: "starter" | "growth" | "scale" | "custom";
+  plan_tier: "starter" | "growth" | "business" | "scale" | "custom";
   paddle_customer_id?: string;
   paddle_subscription_id?: string;
   created_at: string;
@@ -60,7 +60,7 @@ export default function AdminSubscribersPage() {
 
   // Edit Form State
   const [editSlots, setEditSlots] = useState(1);
-  const [editPlan, setEditPlan] = useState<"starter" | "growth" | "scale" | "custom">("starter");
+  const [editPlan, setEditPlan] = useState<"starter" | "growth" | "business" | "scale" | "custom">("starter");
   const [editStatus, setEditStatus] = useState<"active" | "trial" | "past_due" | "canceled">("active");
   const [editCompany, setEditCompany] = useState("");
   const [saving, setSaving] = useState(false);
@@ -70,7 +70,7 @@ export default function AdminSubscribersPage() {
   const [newPassword, setNewPassword] = useState("");
   const [newCompany, setNewCompany] = useState("");
   const [newSlots, setNewSlots] = useState(1);
-  const [newPlan, setNewPlan] = useState<"starter" | "growth" | "scale" | "custom">("starter");
+  const [newPlan, setNewPlan] = useState<"starter" | "growth" | "business" | "scale" | "custom">("starter");
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -382,7 +382,7 @@ export default function AdminSubscribersPage() {
                         <td className="px-6 py-4">
                           <span
                             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold uppercase ${
-                              sub.plan_tier === "scale"
+                              sub.plan_tier === "business"
                                 ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
                                 : sub.plan_tier === "growth"
                                 ? "bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20"
@@ -391,7 +391,7 @@ export default function AdminSubscribersPage() {
                                 : "bg-gray-500/10 text-gray-600 dark:text-gray-400 border border-gray-500/20"
                             }`}
                           >
-                            {sub.plan_tier === "scale" && "🚀 Scale (10)"}
+                            {(sub.plan_tier === "business" || sub.plan_tier === "scale") && "🚀 Business (10)"}
                             {sub.plan_tier === "growth" && "⭐ Growth (5)"}
                             {sub.plan_tier === "starter" && "⚡ Starter (1)"}
                             {sub.plan_tier === "custom" && "🛠️ Custom"}
@@ -533,12 +533,12 @@ export default function AdminSubscribersPage() {
                 <select
                   id={editPlanSelectId}
                   value={editPlan}
-                  onChange={(e) => setEditPlan(e.target.value as "starter" | "growth" | "scale" | "custom")}
+                  onChange={(e) => setEditPlan(e.target.value as "starter" | "growth" | "business" | "scale" | "custom")}
                   className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm"
                 >
                   <option value="starter">Starter (1 cuenta - $49/mes)</option>
                   <option value="growth">Growth (5 cuentas - $199/mes)</option>
-                  <option value="scale">Scale (10 cuentas - $349/mes)</option>
+                  <option value="business">Business (10 cuentas - $349/mes)</option>
                   <option value="custom">Personalizado / Cortesía</option>
                 </select>
               </div>
@@ -687,12 +687,12 @@ export default function AdminSubscribersPage() {
                   <select
                     id={newPlanSelectId}
                     value={newPlan}
-                    onChange={(e) => setNewPlan(e.target.value as "starter" | "growth" | "scale" | "custom")}
+                    onChange={(e) => setNewPlan(e.target.value as "starter" | "growth" | "business" | "scale" | "custom")}
                     className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm"
                   >
                     <option value="starter">Starter (1)</option>
                     <option value="growth">Growth (5)</option>
-                    <option value="scale">Scale (10)</option>
+                    <option value="business">Business (10)</option>
                     <option value="custom">Custom</option>
                   </select>
                 </div>

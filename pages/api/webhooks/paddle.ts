@@ -37,48 +37,70 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const status = (data?.status || "active").toLowerCase();
 
     // Determine plan tier and slots from items/prices or custom data
-    let planTier: "starter" | "growth" | "scale" | "custom" = "starter";
+    let planTier: "starter" | "growth" | "business" | "custom" = "starter";
     let slots = 1;
 
-    // Check custom_data first
-    if (data?.custom_data?.slots) {
-      slots = parseInt(data.custom_data.slots, 10) || 1;
-    } else if (data?.custom_data?.plan) {
-      const p = String(data.custom_data.plan).toLowerCase();
-      if (p.includes("scale") || p.includes("10")) { planTier = "scale"; slots = 10; }
-      else if (p.includes("growth") || p.includes("5")) { planTier = "growth"; slots = 5; }
-      else { planTier = "starter"; slots = 1; }
-    } else {
-      // Check items array
-      const items = data?.items || [];
-      for (const item of items) {
-        const desc = (
-          (item?.price?.description || "") +
-          " " +
-          (item?.price?.name || "") +
-          " " +
-          (item?.product?.name || "")
-        ).toLowerCase();
+    // Exact mapping for InHubFlow Paddle Price IDs
+    const OFFICIAL_PRICE_MAP: Record<string, { planTier: "starter" | "growth" | "business"; slots: number }> = {
+      "pri_01m1h9gkcyvsdsknad7nyz7pv1": { planTier: "starter", slots: 1 },
+      "pri_01m1h9my3vbqcsp9t2hgqqkkxv": { planTier: "growth", slots: 5 },
+      "pri_01m1h9sy759c7p0kg76309we3h": { planTier: "business", slots: 10 },
+    };
 
-        if (desc.includes("10") || desc.includes("scale")) {
-          planTier = "scale";
-          slots = 10;
-          break;
-        } else if (desc.includes("5") || desc.includes("growth")) {
-          planTier = "growth";
-          slots = 5;
-          break;
-        } else if (desc.includes("1") || desc.includes("starter")) {
-          planTier = "starter";
-          slots = 1;
-        }
+    // Check items for exact price ID match first
+    const items = data?.items || [];
+    let matchedByPriceId = false;
+
+    for (const item of items) {
+      const priceId = item?.price?.id || item?.price_id || "";
+      if (OFFICIAL_PRICE_MAP[priceId]) {
+        planTier = OFFICIAL_PRICE_MAP[priceId].planTier;
+        slots = OFFICIAL_PRICE_MAP[priceId].slots;
+        matchedByPriceId = true;
+        break;
       }
     }
 
-    if (slots === 10) planTier = "scale";
-    else if (slots === 5) planTier = "growth";
-    else if (slots === 1) planTier = "starter";
-    else planTier = "custom";
+    if (!matchedByPriceId) {
+      // Check custom_data
+      if (data?.custom_data?.slots) {
+        slots = parseInt(data.custom_data.slots, 10) || 1;
+      } else if (data?.custom_data?.plan) {
+        const p = String(data.custom_data.plan).toLowerCase();
+        if (p.includes("business") || p.includes("scale") || p.includes("10")) { planTier = "business"; slots = 10; }
+        else if (p.includes("growth") || p.includes("5")) { planTier = "growth"; slots = 5; }
+        else { planTier = "starter"; slots = 1; }
+      } else {
+        // Fallback: Check items array descriptions
+        for (const item of items) {
+          const desc = (
+            (item?.price?.description || "") +
+            " " +
+            (item?.price?.name || "") +
+            " " +
+            (item?.product?.name || "")
+          ).toLowerCase();
+
+          if (desc.includes("10") || desc.includes("business") || desc.includes("scale")) {
+            planTier = "business";
+            slots = 10;
+            break;
+          } else if (desc.includes("5") || desc.includes("growth")) {
+            planTier = "growth";
+            slots = 5;
+            break;
+          } else if (desc.includes("1") || desc.includes("starter")) {
+            planTier = "starter";
+            slots = 1;
+          }
+        }
+      }
+
+      if (slots === 10) planTier = "business";
+      else if (slots === 5) planTier = "growth";
+      else if (slots === 1) planTier = "starter";
+      else planTier = "custom";
+    }
 
     // Find existing user by subscriptionId, customerId, or email
     let user = null;
