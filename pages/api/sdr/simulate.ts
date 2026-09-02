@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getDb } from "@/lib/db";
 import { GeminiSdrProvider } from "@/lib/sdr-agent/gemini";
+import { ensureSdrAgent } from "@/lib/sdr-agent/seed";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -16,12 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const db = getDb();
-    const agent = db.prepare("SELECT * FROM sdr_agents ORDER BY created_at ASC LIMIT 1").get() as any;
-
-    let activeVersion: any = null;
-    if (agent?.active_version_id) {
-      activeVersion = db.prepare("SELECT * FROM sdr_agent_versions WHERE id = ?").get(agent.active_version_id);
-    }
+    const { agent, activeVersion } = ensureSdrAgent(db);
 
     let policy = { company_context: "", handoff_rules: "" };
     let config = { custom_instructions: "" };
