@@ -550,7 +550,7 @@ function runMigrations(db: Database.Database) {
       phone TEXT,
       payout_method TEXT DEFAULT 'PayPal',
       payout_account TEXT,
-      commission_pct REAL DEFAULT 25.0,
+      commission_pct REAL DEFAULT 50.0,
       balance REAL DEFAULT 0.0,
       total_paid REAL DEFAULT 0.0,
       status TEXT DEFAULT 'active' CHECK(status IN ('active', 'paused', 'archived')),

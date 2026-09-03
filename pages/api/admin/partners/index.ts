@@ -81,7 +81,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const formattedPartners = partners.map(p => ({
         ...p,
-        discount_link: `https://inhubflow.online?25-OFF=${p.code}`,
+        discount_link: `https://inhubflow.online?20-OFF=${p.code}`,
       }));
 
       return res.status(200).json({ partners: formattedPartners, summary });
@@ -123,7 +123,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       const partnerId = randomUUID();
-      const pct = typeof commission_pct === 'number' ? commission_pct : 25.0;
+      const pct = typeof commission_pct === 'number' ? commission_pct : 50.0;
 
       db.prepare(`
         INSERT INTO partners (
@@ -147,7 +147,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         success: true,
         partner: {
           ...created,
-          discount_link: `https://inhubflow.online?25-OFF=${created.code}`,
+          discount_link: `https://inhubflow.online?20-OFF=${created.code}`,
         },
       });
     } catch (err: any) {

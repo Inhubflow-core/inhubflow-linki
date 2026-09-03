@@ -123,8 +123,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (targetPartnerId) {
           const partner = db.prepare("SELECT * FROM partners WHERE id = ?").get(targetPartnerId) as any;
           if (partner) {
-            const billAmount = totalAmount > 0 ? totalAmount : (slots === 10 ? 149.90 : slots === 5 ? 99.90 : 24.90);
-            const commissionPct = partner.commission_pct || 25.0;
+            const billAmount = totalAmount > 0 ? totalAmount : (slots === 10 ? 192 : slots === 5 ? 128 : 32);
+            const commissionPct = partner.commission_pct || 50.0;
             const commissionAmount = parseFloat(((billAmount * commissionPct) / 100).toFixed(2));
 
             // Record referral
@@ -151,7 +151,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               WHERE id = ?
             `).run(commissionAmount, partner.id);
 
-            console.log(`[InHubFlow Partner] 💰 Credited $${commissionAmount} USD (25%) to partner ${partner.name} (${partner.code})`);
+            console.log(`[InHubFlow Partner] 💰 Credited $${commissionAmount} USD (50%) to partner ${partner.name} (${partner.code})`);
           }
         }
 
@@ -166,8 +166,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (user && user.partner_id) {
           const partner = db.prepare("SELECT * FROM partners WHERE id = ?").get(user.partner_id) as any;
           if (partner) {
-            const billAmount = totalAmount > 0 ? totalAmount : (user.slots_limit === 10 ? 149.90 : user.slots_limit === 5 ? 99.90 : 24.90);
-            const commissionPct = partner.commission_pct || 25.0;
+            const billAmount = totalAmount > 0 ? totalAmount : (user.slots_limit === 10 ? 192 : user.slots_limit === 5 ? 128 : 32);
+            const commissionPct = partner.commission_pct || 50.0;
             const commissionAmount = parseFloat(((billAmount * commissionPct) / 100).toFixed(2));
 
             db.prepare(`

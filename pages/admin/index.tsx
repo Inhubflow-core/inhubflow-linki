@@ -150,7 +150,7 @@ export default function AdminSubscribersPage() {
   const [newPartnerPhone, setNewPartnerPhone] = useState("");
   const [newPartnerPayoutMethod, setNewPartnerPayoutMethod] = useState("PayPal");
   const [newPartnerPayoutAccount, setNewPartnerPayoutAccount] = useState("");
-  const [newPartnerCommission, setNewPartnerCommission] = useState(25);
+  const [newPartnerCommission, setNewPartnerCommission] = useState(50);
   const [newPartnerCustomCode, setNewPartnerCustomCode] = useState("");
   const [newPartnerNotes, setNewPartnerNotes] = useState("");
   const [partnerCreating, setPartnerCreating] = useState(false);
@@ -395,13 +395,13 @@ export default function AdminSubscribersPage() {
                 <RiShieldCheckLine size={24} />
               </span>
               <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                {adminSection === "subscribers" ? "SuperAdmin: Suscripciones y Clientes" : "SuperAdmin: Partners Oficiales (25% Recurrente)"}
+                {adminSection === "subscribers" ? "SuperAdmin: Suscripciones y Clientes" : "SuperAdmin: Partners Oficiales (50% Recurrente)"}
               </h1>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               {adminSection === "subscribers"
                 ? "Gestiona límites de slots, planes de clientes y sincronización automática con Lemon Squeezy by Stripe."
-                : "Programa de Embajadores & Agencias B2B con Links de Descuento exclusivos (?25-OFF=CODIGO)."}
+                : "Programa de Embajadores & Agencias B2B con Links de Descuento exclusivos (?20-OFF=CODIGO)."}
             </p>
           </div>
 
@@ -462,7 +462,7 @@ export default function AdminSubscribersPage() {
             }`}
           >
             <RiHandHeartLine size={18} />
-            <span>Partners Oficiales (25% Recurrente)</span>
+            <span>Partners Oficiales (50% Recurrente)</span>
             <span className="px-2 py-0.5 text-xs rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold">
               {partners.length}
             </span>
