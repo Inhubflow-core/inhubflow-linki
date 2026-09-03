@@ -526,6 +526,9 @@ function runMigrations(db: Database.Database) {
     "ALTER TABLE users ADD COLUMN plan_tier TEXT DEFAULT 'starter'",
     "ALTER TABLE users ADD COLUMN paddle_customer_id TEXT",
     "ALTER TABLE users ADD COLUMN paddle_subscription_id TEXT",
+    "ALTER TABLE users ADD COLUMN lemon_customer_id TEXT",
+    "ALTER TABLE users ADD COLUMN lemon_subscription_id TEXT",
+    "ALTER TABLE users ADD COLUMN partner_id TEXT",
     "ALTER TABLE users ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))",
     `CREATE TABLE IF NOT EXISTS subscription_logs (
       id TEXT PRIMARY KEY,
@@ -538,6 +541,46 @@ function runMigrations(db: Database.Database) {
       created_at TEXT DEFAULT (datetime('now'))
     )`,
     "CREATE INDEX IF NOT EXISTS idx_subscription_logs_user ON subscription_logs(user_id, created_at DESC)",
+    // InHubFlow Official Partners Program
+    `CREATE TABLE IF NOT EXISTS partners (
+      id TEXT PRIMARY KEY,
+      code TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      phone TEXT,
+      payout_method TEXT DEFAULT 'PayPal',
+      payout_account TEXT,
+      commission_pct REAL DEFAULT 25.0,
+      balance REAL DEFAULT 0.0,
+      total_paid REAL DEFAULT 0.0,
+      status TEXT DEFAULT 'active' CHECK(status IN ('active', 'paused', 'archived')),
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )`,
+    "CREATE INDEX IF NOT EXISTS idx_partners_code ON partners(code)",
+    `CREATE TABLE IF NOT EXISTS partner_referrals (
+      id TEXT PRIMARY KEY,
+      partner_id TEXT NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+      customer_email TEXT NOT NULL,
+      company_name TEXT,
+      plan_id TEXT,
+      subscription_id TEXT,
+      amount REAL DEFAULT 0.0,
+      commission_amount REAL DEFAULT 0.0,
+      status TEXT DEFAULT 'active',
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    "CREATE INDEX IF NOT EXISTS idx_partner_referrals_partner ON partner_referrals(partner_id, created_at DESC)",
+    `CREATE TABLE IF NOT EXISTS partner_payouts (
+      id TEXT PRIMARY KEY,
+      partner_id TEXT NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+      amount REAL NOT NULL,
+      reference TEXT,
+      notes TEXT,
+      paid_at TEXT DEFAULT (datetime('now'))
+    )`,
+    "CREATE INDEX IF NOT EXISTS idx_partner_payouts_partner ON partner_payouts(partner_id, paid_at DESC)",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
