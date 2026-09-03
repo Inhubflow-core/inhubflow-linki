@@ -6,12 +6,15 @@ import { isRateLimited } from "@/lib/rate-limit";
 
 type UserRow = {
   id: string;
+  name?: string;
   email: string;
   password_hash: string;
   role?: string;
   slots_limit?: number;
   subscription_status?: string;
   plan_tier?: string;
+  owner_id?: string;
+  assigned_account_id?: string;
 };
 
 export const authOptions: NextAuthOptions = {
@@ -33,7 +36,7 @@ export const authOptions: NextAuthOptions = {
         const db = getDb();
         const user = db
           .prepare(
-            "SELECT id, email, password_hash, role, slots_limit, subscription_status, plan_tier FROM users WHERE email = ?"
+            "SELECT id, name, email, password_hash, role, slots_limit, subscription_status, plan_tier, owner_id, assigned_account_id FROM users WHERE email = ?"
           )
           .get(credentials.email) as UserRow | undefined;
 
@@ -51,12 +54,15 @@ export const authOptions: NextAuthOptions = {
 
         return {
           id: user.id,
+          name: user.name || user.email.split("@")[0],
           email: user.email,
           role: isSuperAdmin ? "admin" : (user.role || "user"),
           slots_limit: isSuperAdmin ? 999 : (user.slots_limit || 1),
           subscription_status: user.subscription_status || "active",
           plan_tier: isSuperAdmin ? "custom" : (user.plan_tier || "starter"),
-        };
+          owner_id: user.owner_id || null,
+          assigned_account_id: user.assigned_account_id || null,
+        } as any;
       },
     }),
   ],
@@ -64,10 +70,13 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.name = (user as any).name || null;
         token.role = (user as { role?: string }).role || "user";
         token.slots_limit = (user as { slots_limit?: number }).slots_limit || 1;
         token.subscription_status = (user as { subscription_status?: string }).subscription_status || "active";
         token.plan_tier = (user as { plan_tier?: string }).plan_tier || "starter";
+        token.owner_id = (user as any).owner_id || null;
+        token.assigned_account_id = (user as any).assigned_account_id || null;
       }
 
       // Auto-heal existing sessions: query DB to ensure role and slots are always up to date
@@ -75,8 +84,8 @@ export const authOptions: NextAuthOptions = {
         try {
           const db = getDb();
           const userRow = db
-            .prepare("SELECT id, role, slots_limit, subscription_status, plan_tier FROM users WHERE email = ?")
-            .get(token.email) as { id: string; role?: string; slots_limit?: number; subscription_status?: string; plan_tier?: string } | undefined;
+            .prepare("SELECT id, name, role, slots_limit, subscription_status, plan_tier, owner_id, assigned_account_id FROM users WHERE email = ?")
+            .get(token.email) as UserRow | undefined;
 
           if (userRow) {
             // If user is first in DB, ensure they are promoted to admin
@@ -88,10 +97,13 @@ export const authOptions: NextAuthOptions = {
             }
 
             token.id = userRow.id;
+            token.name = userRow.name || (token.name as string) || null;
             token.role = userRow.role || "user";
             token.slots_limit = userRow.slots_limit || 1;
             token.subscription_status = userRow.subscription_status || "active";
             token.plan_tier = userRow.plan_tier || "starter";
+            token.owner_id = userRow.owner_id || null;
+            token.assigned_account_id = userRow.assigned_account_id || null;
           }
         } catch {
           // ignore error if db busy
@@ -111,10 +123,13 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         const u = session.user as Record<string, unknown>;
         u.id = token.id as string;
+        u.name = token.name as string;
         u.role = (token.role as string) || "user";
         u.slots_limit = (token.slots_limit as number) || 1;
         u.subscription_status = (token.subscription_status as string) || "active";
         u.plan_tier = (token.plan_tier as string) || "starter";
+        u.owner_id = token.owner_id || null;
+        u.assigned_account_id = token.assigned_account_id || null;
       }
       return session;
     },

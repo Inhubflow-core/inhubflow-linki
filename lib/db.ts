@@ -581,6 +581,26 @@ function runMigrations(db: Database.Database) {
       paid_at TEXT DEFAULT (datetime('now'))
     )`,
     "CREATE INDEX IF NOT EXISTS idx_partner_payouts_partner ON partner_payouts(partner_id, paid_at DESC)",
+    // Multi-Seat Team Management
+    "ALTER TABLE users ADD COLUMN name TEXT",
+    "ALTER TABLE users ADD COLUMN owner_id TEXT REFERENCES users(id) ON DELETE CASCADE",
+    "ALTER TABLE users ADD COLUMN assigned_account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL",
+    "ALTER TABLE accounts ADD COLUMN owner_id TEXT REFERENCES users(id) ON DELETE SET NULL",
+    "ALTER TABLE accounts ADD COLUMN assigned_user_id TEXT REFERENCES users(id) ON DELETE SET NULL",
+    `CREATE TABLE IF NOT EXISTS team_invitations (
+      id TEXT PRIMARY KEY,
+      owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      email TEXT NOT NULL,
+      role TEXT DEFAULT 'member' CHECK(role IN ('admin', 'member')),
+      assigned_account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+      invite_code TEXT UNIQUE NOT NULL,
+      status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'accepted', 'revoked')),
+      expires_at TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    "CREATE INDEX IF NOT EXISTS idx_team_invitations_code ON team_invitations(invite_code)",
+    "CREATE INDEX IF NOT EXISTS idx_team_invitations_owner ON team_invitations(owner_id, status)",
+    "CREATE INDEX IF NOT EXISTS idx_users_owner ON users(owner_id)",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }

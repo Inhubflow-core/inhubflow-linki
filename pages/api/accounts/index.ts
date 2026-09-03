@@ -8,15 +8,42 @@ import { authOptions } from "@/pages/api/auth/[...nextauth]";
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const db = getDb();
+    const session = await getServerSession(req, res, authOptions);
+    const currentUser = session?.user as any;
 
     // Excludes cookies_json — the frontend never uses the raw session blob, only
     // is_authenticated, so there's no reason to ship it (even encrypted) to the client.
     const ACCOUNT_COLUMNS = `a.id, a.name, a.email, a.is_authenticated, a.daily_connection_limit, a.daily_message_limit, a.daily_inmail_limit,
       a.active_hours_start, a.active_hours_end, a.timezone, a.working_days, a.created_at,
       a.inbox_synced_at, a.accepted_sync_at, a.li_connections, a.li_pending, a.li_profile_views,
-      a.li_stats_synced_at, a.connections_synced_through_ms`;
+      a.li_stats_synced_at, a.connections_synced_through_ms, a.owner_id, a.assigned_user_id`;
 
     if (req.method === "GET") {
+      // 1. If user is a team member with an explicitly assigned account:
+      if (currentUser?.owner_id && currentUser?.assigned_account_id) {
+        const accounts = db.prepare(`
+          SELECT ${ACCOUNT_COLUMNS},
+            (SELECT COUNT(*) FROM runs r WHERE r.account_id = a.id AND r.status IN ('running', 'paused')) AS active_run_count
+          FROM accounts a 
+          WHERE a.id = ?
+          ORDER BY a.created_at DESC
+        `).all(currentUser.assigned_account_id);
+        return res.json(accounts);
+      }
+
+      // 2. If user is a team member, filter by assigned_user_id
+      if (currentUser?.owner_id) {
+        const accounts = db.prepare(`
+          SELECT ${ACCOUNT_COLUMNS},
+            (SELECT COUNT(*) FROM runs r WHERE r.account_id = a.id AND r.status IN ('running', 'paused')) AS active_run_count
+          FROM accounts a 
+          WHERE a.assigned_user_id = ?
+          ORDER BY a.created_at DESC
+        `).all(currentUser.id);
+        return res.json(accounts);
+      }
+
+      // 3. Admin / Workspace Owner: Sees all accounts
       const accounts = db.prepare(`
         SELECT ${ACCOUNT_COLUMNS},
           (SELECT COUNT(*) FROM runs r WHERE r.account_id = a.id AND r.status IN ('running', 'paused')) AS active_run_count
@@ -47,20 +74,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Check slots limit
       try {
-        const session = await getServerSession(req, res, authOptions);
         const { slotsLimit: instanceLimit } = getInstanceSettings(db);
         const userSlots = (session?.user as { slots_limit?: number; role?: string })?.slots_limit;
         const userRole = (session?.user as { role?: string })?.role;
         const effectiveLimit = userRole === "admin" ? 999 : (userSlots || instanceLimit);
 
-        const countRow = db.prepare("SELECT COUNT(*) as count FROM accounts").get() as { count: number };
-
-        if (countRow && countRow.count >= effectiveLimit) {
-          return res.status(403).json({
-            error: `Has alcanzado el límite de ${effectiveLimit} slots/cuentas de tu suscripción actual.`,
-            slotsLimit: effectiveLimit,
-            currentCount: countRow.count,
-          });
+        if (!currentUser?.owner_id) {
+          const countRow = db.prepare("SELECT COUNT(*) as count FROM accounts").get() as { count: number };
+          if (countRow && countRow.count >= effectiveLimit) {
+            return res.status(403).json({
+              error: `Has alcanzado el límite de ${effectiveLimit} slots/cuentas de tu suscripción actual.`,
+              slotsLimit: effectiveLimit,
+              currentCount: countRow.count,
+            });
+          }
         }
       } catch (e) {
         console.log("Slot check notice:", e);
@@ -68,12 +95,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       try {
         const id = randomUUID();
+        const ownerId = currentUser?.owner_id || currentUser?.id || null;
+        const assignedUserId = currentUser?.owner_id ? currentUser.id : null;
+
         db
           .prepare(
             `INSERT INTO accounts (
               id, name, email, daily_connection_limit, daily_message_limit, daily_inmail_limit,
-              active_hours_start, active_hours_end, timezone, working_days
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+              active_hours_start, active_hours_end, timezone, working_days, owner_id, assigned_user_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
           )
           .run(
             id,
@@ -85,21 +115,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             active_hours_start,
             active_hours_end,
             timezone,
-            working_days
+            working_days,
+            ownerId,
+            assignedUserId
           );
+
+        // If a team member connected this account, bind it to their user profile
+        if (currentUser?.owner_id) {
+          db.prepare("UPDATE users SET assigned_account_id = ? WHERE id = ?").run(id, currentUser.id);
+        }
+
         const account = db.prepare(`SELECT ${ACCOUNT_COLUMNS} FROM accounts a WHERE a.id = ?`).get(id);
         return res.status(201).json(account);
-      } catch (dbErr: any) {
-        if (dbErr?.message?.includes("UNIQUE constraint failed")) {
-          return res.status(409).json({ error: "Este correo de LinkedIn ya está registrado en tus cuentas" });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Error desconocido";
+        if (msg.includes("UNIQUE")) {
+          return res.status(409).json({ error: "Ya existe una cuenta con este correo" });
         }
-        return res.status(500).json({ error: dbErr?.message || "Error al insertar cuenta en la base de datos" });
+        return res.status(500).json({ error: msg });
       }
     }
 
-    res.setHeader("Allow", ["GET", "POST"]);
-    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
-  } catch (err: any) {
-    return res.status(500).json({ error: err?.message || "Error interno del servidor" });
+    return res.status(405).json({ error: "Método no permitido" });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Error desconocido";
+    return res.status(500).json({ error: msg });
   }
 }

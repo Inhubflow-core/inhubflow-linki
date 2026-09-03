@@ -23,6 +23,7 @@ import {
   RiMenuFoldLine,
   RiMenuUnfoldLine,
   RiShieldCheckLine,
+  RiTeamLine,
 } from "react-icons/ri";
 import { pathToTourPage, replayPageTour } from "@/lib/tour";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
@@ -188,6 +189,35 @@ export default function Sidebar({
             {!isCollapsed && (
               <span className="ml-auto text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300">
                 PRO
+              </span>
+            )}
+          </Link>
+        )}
+
+        {/* Team Link for Workspace Owners */}
+        {!((session?.user as any)?.owner_id) && (
+          <Link
+            href="/team"
+            title={isCollapsed ? "Mi Equipo" : undefined}
+            className={`flex items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-normal transition-all mb-2 ${
+              isActive("/team")
+                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-semibold"
+                : "text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/60 dark:hover:text-white"
+            } ${isCollapsed ? "justify-center px-0" : ""}`}
+          >
+            <div
+              className={`flex h-6.5 w-6.5 items-center justify-center rounded-lg transition-colors ${
+                isActive("/team")
+                  ? "bg-emerald-500 text-white shadow-xs"
+                  : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+              }`}
+            >
+              <RiTeamLine size={16} />
+            </div>
+            {!isCollapsed && <span className="truncate font-semibold">Mi Equipo</span>}
+            {!isCollapsed && (
+              <span className="ml-auto text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                TEAM
               </span>
             )}
           </Link>
