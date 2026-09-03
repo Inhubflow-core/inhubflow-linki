@@ -217,7 +217,7 @@ export default function AdminSubscribersPage() {
               </h1>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Gestiona límites de slots, planes de clientes y sincronización automática con Paddle.
+              Gestiona límites de slots, planes de clientes y sincronización automática con Lemon Squeezy by Stripe.
             </p>
           </div>
 
@@ -465,11 +465,11 @@ export default function AdminSubscribersPage() {
           <RiInformationLine className="text-brand-500 shrink-0 mt-0.5" size={20} />
           <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
             <div className="font-semibold text-gray-900 dark:text-white">
-              Sincronización Automática con Paddle (Merchant of Record)
+              Sincronización Automática con Lemon Squeezy by Stripe (Merchant of Record)
             </div>
             <div>
-              Tu endpoint de webhook activo es: <code className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 font-mono text-brand-600 dark:text-brand-400">/api/webhooks/paddle</code>.
-              Cuando un cliente compra en tu landing page, Paddle envía la confirmación y los slots se asignan al instante.
+              Tu endpoint de webhook activo es: <code className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 font-mono text-brand-600 dark:text-brand-400">/api/webhooks/lemonsqueezy</code>.
+              Cuando un cliente compra en tu landing page, Lemon Squeezy by Stripe envía la confirmación y los slots se asignan al instante.
             </div>
           </div>
         </div>
