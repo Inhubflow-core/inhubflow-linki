@@ -12,6 +12,7 @@ import {
   RiSendPlaneLine,
   RiCheckLine,
 } from "react-icons/ri";
+import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useTheme } from "@/lib/context/ThemeContext";
 
@@ -68,6 +69,7 @@ export default function LoginPage() {
     }
 
     // Auto sign in after signup
+    toast.success("¡Cuenta creada con éxito! Revisa tu correo (si llegó a Spam, márcalo como 'No es Spam').", { duration: 6000 });
     const signInRes = await signIn("credentials", { email, password, redirect: false });
     setLoading(false);
 
@@ -248,6 +250,19 @@ export default function LoginPage() {
                       onChange={(e) => setInviteCode(e.target.value)}
                       required
                     />
+                  </div>
+                </div>
+              )}
+
+              {/* Spam notice during signup */}
+              {mode === "signup" && (
+                <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2.5">
+                  <span className="text-base shrink-0 mt-0.5">📬</span>
+                  <div className="space-y-0.5 leading-relaxed">
+                    <strong className="block font-semibold">Tus accesos llegarán a tu correo:</strong>
+                    <span>
+                      Al registrarte te enviaremos la confirmación. Si no la ves en tu bandeja principal, revisa tu carpeta de <strong>Spam</strong> o <strong>Correo no deseado</strong> y márcalo como <strong>&quot;No es Spam&quot;</strong>.
+                    </span>
                   </div>
                 </div>
               )}

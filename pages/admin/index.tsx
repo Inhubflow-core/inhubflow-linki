@@ -247,10 +247,12 @@ export default function AdminSubscribersPage() {
 
       if (res.ok) {
         setIsCreateModalOpen(false);
+        const createdEmail = newEmail;
         setNewEmail("");
         setNewPassword("");
         setNewCompany("");
         setNewSlots(1);
+        toast.success(`¡Cliente creado y accesos enviados a ${createdEmail}! Recuérdale revisar su carpeta de Spam y marcarlo como "No es Spam".`, { duration: 7000 });
         loadData();
       } else {
         const err = await res.json();
@@ -1038,7 +1040,7 @@ export default function AdminSubscribersPage() {
                       });
                       const data = await res.json();
                       if (res.ok) {
-                        toast.success(`¡Email con credenciales enviado a ${selectedSub.email}!`);
+                        toast.success(`¡Email con credenciales enviado a ${selectedSub.email}! Recuérdale revisar su carpeta de Spam y marcarlo como "No es Spam".`, { duration: 7000 });
                       } else {
                         toast.error(data.error || "No se pudo enviar el correo");
                       }
@@ -1103,9 +1105,12 @@ export default function AdminSubscribersPage() {
 
             <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-300 text-xs flex items-start gap-2.5">
               <RiMailSendLine size={16} className="shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
-              <div>
+              <div className="space-y-1">
                 <strong className="block font-semibold">Envío de credenciales automático:</strong>
                 <span>Al crear el cliente, recibirá de inmediato un correo oficial de bienvenida desde <strong>info@inhubflow.online</strong> con su link de login y contraseña.</span>
+                <span className="block text-[11px] text-amber-700 dark:text-amber-300 font-medium pt-1 border-t border-blue-500/20">
+                  💡 Sugerencia: Indícale al cliente que si no ve el correo en su bandeja de entrada, revise su carpeta de <strong>Spam</strong> y haga clic en <strong>&quot;No es Spam&quot;</strong>.
+                </span>
               </div>
             </div>
 

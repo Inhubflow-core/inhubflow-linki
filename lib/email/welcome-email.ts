@@ -54,17 +54,21 @@ export async function sendWelcomeEmail(params: WelcomeEmailParams): Promise<{ su
         <!-- Main Card Container -->
         <table role="presentation" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.06); border: 1px solid #e5e7eb;">
           
-          <!-- Brand Header -->
+          <!-- Brand Header (Matching Platform Dark Footer) -->
           <tr>
-            <td style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #4f46e5 100%); padding: 36px 30px; text-align: center;">
+            <td style="background-color: #060814; background: linear-gradient(180deg, #050814 0%, #080d22 100%); padding: 36px 30px; text-align: center; border-bottom: 1px solid #1e293b;">
               <table role="presentation" width="100%">
                 <tr>
                   <td align="center">
-                    <div style="display: inline-block; background-color: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 9999px; padding: 4px 14px; margin-bottom: 12px;">
-                      <span style="color: #ffffff; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;">B2B Outreach Engine</span>
+                    <div style="display: inline-block; background-color: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.3); border-radius: 9999px; padding: 4px 14px; margin-bottom: 16px;">
+                      <span style="color: #60a5fa; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;">B2B Outreach Engine</span>
                     </div>
-                    <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">inhubflow</h1>
-                    <p style="margin: 6px 0 0 0; color: rgba(255,255,255,0.85); font-size: 13px;">Plataforma de Prospección Comercial & Asistente SDR IA</p>
+                    <div style="margin: 0 auto; text-align: center;">
+                      <a href="${loginUrl}" target="_blank" style="text-decoration: none; display: inline-block;">
+                        <img src="https://b2b.inhubflow.online/logo-master-dark.png" alt="inhubflow" width="180" style="display: block; margin: 0 auto; max-width: 180px; height: auto; border: 0;" />
+                      </a>
+                    </div>
+                    <p style="margin: 12px 0 0 0; color: #94a3b8; font-size: 13px;">Plataforma de Prospección Comercial &amp; Asistente SDR IA</p>
                   </td>
                 </tr>
               </table>
@@ -77,9 +81,20 @@ export async function sendWelcomeEmail(params: WelcomeEmailParams): Promise<{ su
               <h2 style="margin: 0 0 12px 0; color: #111827; font-size: 20px; font-weight: 700;">
                 ¡Hola, ${displayName}! 👋
               </h2>
-              <p style="margin: 0 0 20px 0; color: #4b5563; font-size: 14px; line-height: 1.6;">
+              <p style="margin: 0 0 18px 0; color: #4b5563; font-size: 14px; line-height: 1.6;">
                 Tu espacio de trabajo en <strong>InHubFlow B2B Suite</strong> ha sido activado con éxito. Ya puedes comenzar a automatizar tus campañas de LinkedIn, prospección multicanal y agendamiento comercial con Inteligencia Artificial.
               </p>
+
+              <!-- Spam Notice Alert -->
+              <table role="presentation" width="100%" style="background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; margin-bottom: 24px;">
+                <tr>
+                  <td style="padding: 13px 16px;">
+                    <p style="margin: 0; font-size: 12px; color: #0369a1; line-height: 1.5;">
+                      📬 <strong>Aviso importante:</strong> Si este correo llegó a tu carpeta de <em>Spam</em> o <em>Promociones</em>, por favor haz clic en <strong>&quot;No es spam&quot;</strong> o muévelo a tu <em>Bandeja Principal</em>. Esto garantizará que recibas los reportes y notificaciones de tus campañas sin demoras.
+                    </p>
+                  </td>
+                </tr>
+              </table>
 
               <!-- Credentials Box -->
               <table role="presentation" width="100%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 24px;">
@@ -184,6 +199,8 @@ export async function sendWelcomeEmail(params: WelcomeEmailParams): Promise<{ su
 Hola ${displayName},
 
 Tu espacio de trabajo en InHubFlow B2B Suite ha sido activado con éxito. Ya puedes comenzar a automatizar tus campañas de LinkedIn, prospección multicanal y agendamiento comercial con Inteligencia Artificial.
+
+IMPORTANTE: Si este mensaje llegó a tu carpeta de Spam o Correo no deseado, por favor márcalo como "No es Spam" para recibir las alertas y reportes de tus campañas en tu bandeja principal.
 
 DATOS DE ACCESO A TU PLATAFORMA:
 - Plataforma: ${loginUrl}

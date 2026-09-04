@@ -242,6 +242,11 @@ export default function AcceptInvitePage() {
                   <span>Tu espacio es 100% privado y exclusivo para tu perfil.</span>
                 </div>
 
+                <div className="p-3 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 rounded-xl flex items-start gap-2 text-xs text-blue-700 dark:text-blue-300">
+                  <span className="shrink-0 mt-0.5">📬</span>
+                  <span>Recibirás alertas de tus campañas en tu correo. Si algún email llega a <strong>Spam</strong>, márcalo como <strong>&quot;No es Spam&quot;</strong>.</span>
+                </div>
+
                 <button
                   type="submit"
                   disabled={submitting}
