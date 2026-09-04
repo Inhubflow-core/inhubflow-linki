@@ -765,6 +765,44 @@ function runMigrations(db: Database.Database) {
     }
   } catch { /* migration already done */ }
 
+  // Rebuild users table if plan_tier CHECK constraint is missing 'business' or contains 'scale'
+  try {
+    const ti = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get() as { sql: string } | undefined;
+    if (ti && (!ti.sql.includes("'business'") || ti.sql.includes("'scale'"))) {
+      const cols = (db.prepare("PRAGMA table_info(users)").all() as Array<{ name: string; type: string; notnull: number; dflt_value: string | null }>);
+      const colDefs = cols.map((c) => {
+        if (c.name === "id") return "id TEXT PRIMARY KEY";
+        if (c.name === "email") return "email TEXT NOT NULL UNIQUE";
+        if (c.name === "plan_tier") return "plan_tier TEXT DEFAULT 'starter' CHECK(plan_tier IN ('starter', 'growth', 'business', 'custom'))";
+        const notnull = c.notnull ? " NOT NULL" : "";
+        const isLiteral = c.dflt_value === null || /^-?\d+(\.\d+)?$/.test(c.dflt_value) || /^'.*'$/.test(c.dflt_value);
+        const dflt = c.dflt_value !== null ? ` DEFAULT ${isLiteral ? c.dflt_value : `(${c.dflt_value})`}` : "";
+        return `${c.name} ${c.type}${notnull}${dflt}`;
+      });
+      const colList = cols.map((c) => c.name).join(", ");
+      const selectList = cols.map((c) => c.name === "plan_tier" ? "CASE WHEN plan_tier = 'scale' THEN 'business' ELSE plan_tier END AS plan_tier" : c.name).join(", ");
+      db.exec(`
+        PRAGMA foreign_keys = OFF;
+        CREATE TABLE users_new (
+          ${colDefs.join(",\n          ")}
+        );
+        INSERT INTO users_new (${colList}) SELECT ${selectList} FROM users;
+        DROP TABLE users;
+        ALTER TABLE users_new RENAME TO users;
+        CREATE INDEX IF NOT EXISTS idx_users_owner ON users(owner_id);
+        PRAGMA foreign_keys = ON;
+      `);
+    }
+  } catch (e) {
+    console.error("Users table schema rebuild notice:", e);
+  }
+
+  // Ensure all existing scale references in users and subscription_logs are upgraded to business
+  try {
+    db.prepare("UPDATE users SET plan_tier = 'business' WHERE plan_tier = 'scale'").run();
+    db.prepare("UPDATE subscription_logs SET plan_tier = 'business' WHERE plan_tier = 'scale'").run();
+  } catch { /* ignore */ }
+
   // Backfill: move company_description and company_size from targets into companies
   try {
     db.exec(`
@@ -1037,7 +1075,7 @@ function initDb(db: Database.Database) {
       company_name TEXT,
       slots_limit INTEGER DEFAULT 1,
       subscription_status TEXT DEFAULT 'active' CHECK(subscription_status IN ('active', 'trial', 'past_due', 'canceled')),
-      plan_tier TEXT DEFAULT 'starter' CHECK(plan_tier IN ('starter', 'growth', 'business', 'scale', 'custom')),
+      plan_tier TEXT DEFAULT 'starter' CHECK(plan_tier IN ('starter', 'growth', 'business', 'custom')),
       paddle_customer_id TEXT,
       paddle_subscription_id TEXT,
       created_at TEXT DEFAULT (datetime('now')),

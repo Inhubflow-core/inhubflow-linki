@@ -73,8 +73,8 @@ export const authOptions: NextAuthOptions = {
         token.name = (user as any).name || null;
         token.role = (user as { role?: string }).role || "user";
         token.slots_limit = (user as { slots_limit?: number }).slots_limit || 1;
-        token.subscription_status = (user as { subscription_status?: string }).subscription_status || "active";
-        token.plan_tier = (user as { plan_tier?: string }).plan_tier || "starter";
+        const rawPlan = (user as { plan_tier?: string }).plan_tier;
+        token.plan_tier = rawPlan === "scale" ? "business" : (rawPlan || "starter");
         token.owner_id = (user as any).owner_id || null;
         token.assigned_account_id = (user as any).assigned_account_id || null;
       }
@@ -96,12 +96,20 @@ export const authOptions: NextAuthOptions = {
               userRow.slots_limit = 999;
             }
 
+            // Auto-heal scale to business in database
+            if (userRow.plan_tier === "scale") {
+              try {
+                db.prepare("UPDATE users SET plan_tier = 'business' WHERE id = ?").run(userRow.id);
+                userRow.plan_tier = "business";
+              } catch {}
+            }
+
             token.id = userRow.id;
             token.name = userRow.name || (token.name as string) || null;
             token.role = userRow.role || "user";
             token.slots_limit = userRow.slots_limit || 1;
             token.subscription_status = userRow.subscription_status || "active";
-            token.plan_tier = userRow.plan_tier || "starter";
+            token.plan_tier = userRow.plan_tier === "scale" ? "business" : (userRow.plan_tier || "starter");
             token.owner_id = userRow.owner_id || null;
             token.assigned_account_id = userRow.assigned_account_id || null;
           }

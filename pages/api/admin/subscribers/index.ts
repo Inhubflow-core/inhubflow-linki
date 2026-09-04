@@ -39,7 +39,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === "GET") {
     try {
-      const users = db
+      try {
+        db.prepare("UPDATE users SET plan_tier = 'business' WHERE plan_tier = 'scale'").run();
+        db.prepare("UPDATE subscription_logs SET plan_tier = 'business' WHERE plan_tier = 'scale'").run();
+      } catch { /* ignore */ }
+
+      const rawUsers = db
         .prepare(
           `SELECT 
             id, 
@@ -56,7 +61,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           FROM users 
           ORDER BY created_at DESC`
         )
-        .all();
+        .all() as any[];
+
+      const users = rawUsers.map((u) => ({
+        ...u,
+        plan_tier: u.plan_tier === "scale" ? "business" : (u.plan_tier || "starter"),
+      }));
 
       const totalAccountsRow = db.prepare("SELECT COUNT(*) as count FROM accounts").get() as { count: number };
       const totalAccounts = totalAccountsRow?.count || 0;
@@ -75,12 +85,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           totalSubscribers: users.length,
           activeSubscriptions,
           totalSlotsAllocated,
-          totalConnectedAccounts: totalAccounts,
+          totalAccountsConnected: totalAccounts,
         },
       });
-    } catch (err: unknown) {
+    } catch (err: any) {
       console.error("[admin/subscribers] GET Error:", err);
-      return res.status(500).json({ error: "Error al obtener lista de suscriptores" });
+      return res.status(500).json({ error: err?.message || "Error al listar suscriptores" });
     }
   }
 
@@ -106,27 +116,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const newSlots = typeof slots_limit === "number" ? Math.max(1, slots_limit) : 1;
       const validStatuses = ["active", "trial", "past_due", "canceled"];
       const newStatus = validStatuses.includes(subscription_status || "") ? subscription_status : "active";
-      const validPlans = ["starter", "growth", "business", "scale", "custom"];
-      let newPlan = validPlans.includes(plan_tier || "") ? plan_tier : "starter";
+      const validPlans = ["starter", "growth", "business", "custom"];
+      const rawPlan = plan_tier === "scale" ? "business" : plan_tier;
+      const newPlan = validPlans.includes(rawPlan || "") ? rawPlan : "starter";
 
-      try {
-        db.prepare(
-          `UPDATE users 
-           SET slots_limit = ?, subscription_status = ?, plan_tier = ?, company_name = ?, updated_at = datetime('now')
-           WHERE id = ?`
-        ).run(newSlots, newStatus, newPlan, company_name || null, id);
-      } catch (updateErr: any) {
-        if (updateErr?.message?.includes("CHECK constraint") && newPlan === "business") {
-          newPlan = "scale";
-          db.prepare(
-            `UPDATE users 
-             SET slots_limit = ?, subscription_status = ?, plan_tier = ?, company_name = ?, updated_at = datetime('now')
-             WHERE id = ?`
-          ).run(newSlots, newStatus, newPlan, company_name || null, id);
-        } else {
-          throw updateErr;
-        }
-      }
+      db.prepare(
+        `UPDATE users 
+         SET slots_limit = ?, subscription_status = ?, plan_tier = ?, company_name = ?, updated_at = datetime('now')
+         WHERE id = ?`
+      ).run(newSlots, newStatus, newPlan, company_name || null, id);
 
       // Log manual adjustment
       try {
@@ -138,23 +136,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           id,
           newPlan,
           newSlots,
-          JSON.stringify({
-            updated_by: session?.user?.email || "admin",
-            new_slots: newSlots,
-            new_status: newStatus,
-            new_plan: newPlan,
-          })
+          JSON.stringify({ plan_tier: newPlan, slots_limit: newSlots, subscription_status: newStatus })
         );
-      } catch (logErr) {
-        console.warn("[admin/subscribers] Warning: Failed to insert update log:", logErr);
+      } catch {
+        // non-blocking
       }
 
-      const updated = db.prepare("SELECT id, email, role, company_name, slots_limit, subscription_status, plan_tier, updated_at FROM users WHERE id = ?").get(id);
-
-      return res.status(200).json({ ok: true, user: updated });
-    } catch (err: unknown) {
+      const updated = db.prepare("SELECT id, email, role, company_name, slots_limit, subscription_status, plan_tier, updated_at FROM users WHERE id = ?").get(id) as any;
+      if (updated && updated.plan_tier === "scale") updated.plan_tier = "business";
+      return res.status(200).json({ success: true, user: updated });
+    } catch (err: any) {
       console.error("[admin/subscribers] PUT Error:", err);
-      return res.status(500).json({ error: (err as Error)?.message || "Error al actualizar suscriptor" });
+      return res.status(500).json({ error: err?.message || "Error al actualizar suscriptor" });
     }
   }
 
@@ -169,7 +162,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       };
 
       if (!email || !password) {
-        return res.status(400).json({ error: "Email y contraseña son obligatorios" });
+        return res.status(400).json({ error: "Correo y contraseña son requeridos" });
       }
 
       const cleanEmail = email.trim().toLowerCase();
@@ -181,24 +174,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const hash = bcrypt.hashSync(password, 10);
       const newId = randomUUID();
       const initialSlots = typeof slots_limit === "number" ? Math.max(1, slots_limit) : 1;
-      let initialPlan = plan_tier || (initialSlots === 1 ? "starter" : initialSlots === 5 ? "growth" : initialSlots === 10 ? "business" : "custom");
+      const rawPlan = plan_tier === "scale" ? "business" : plan_tier;
+      const initialPlan = rawPlan || (initialSlots === 1 ? "starter" : initialSlots === 5 ? "growth" : initialSlots === 10 ? "business" : "custom");
 
-      try {
-        db.prepare(
-          `INSERT INTO users (id, email, password_hash, role, company_name, slots_limit, subscription_status, plan_tier)
-           VALUES (?, ?, ?, 'user', ?, ?, 'active', ?)`
-        ).run(newId, cleanEmail, hash, company_name || null, initialSlots, initialPlan);
-      } catch (insertErr: any) {
-        if (insertErr?.message?.includes("CHECK constraint") && initialPlan === "business") {
-          initialPlan = "scale";
-          db.prepare(
-            `INSERT INTO users (id, email, password_hash, role, company_name, slots_limit, subscription_status, plan_tier)
-             VALUES (?, ?, ?, 'user', ?, ?, 'active', ?)`
-          ).run(newId, cleanEmail, hash, company_name || null, initialSlots, initialPlan);
-        } else {
-          throw insertErr;
-        }
-      }
+      db.prepare(
+        `INSERT INTO users (id, email, password_hash, role, company_name, slots_limit, subscription_status, plan_tier)
+         VALUES (?, ?, ?, 'user', ?, ?, 'active', ?)`
+      ).run(newId, cleanEmail, hash, company_name || null, initialSlots, initialPlan);
 
       // Log creation
       try {

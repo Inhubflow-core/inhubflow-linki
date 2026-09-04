@@ -30,7 +30,7 @@ interface Subscriber {
   company_name?: string;
   slots_limit: number;
   subscription_status: "active" | "trial" | "past_due" | "canceled";
-  plan_tier: "starter" | "growth" | "business" | "scale" | "custom";
+  plan_tier: "starter" | "growth" | "business" | "custom";
   paddle_customer_id?: string;
   paddle_subscription_id?: string;
   lemon_customer_id?: string;
@@ -97,7 +97,7 @@ export default function AdminSubscribersPage() {
 
   // Edit Form State
   const [editSlots, setEditSlots] = useState(1);
-  const [editPlan, setEditPlan] = useState<"starter" | "growth" | "business" | "scale" | "custom">("starter");
+  const [editPlan, setEditPlan] = useState<"starter" | "growth" | "business" | "custom">("starter");
   const [editStatus, setEditStatus] = useState<"active" | "trial" | "past_due" | "canceled">("active");
   const [editCompany, setEditCompany] = useState("");
   const [saving, setSaving] = useState(false);
@@ -107,7 +107,7 @@ export default function AdminSubscribersPage() {
   const [newPassword, setNewPassword] = useState("");
   const [newCompany, setNewCompany] = useState("");
   const [newSlots, setNewSlots] = useState(1);
-  const [newPlan, setNewPlan] = useState<"starter" | "growth" | "business" | "scale" | "custom">("starter");
+  const [newPlan, setNewPlan] = useState<"starter" | "growth" | "business" | "custom">("starter");
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -188,7 +188,7 @@ export default function AdminSubscribersPage() {
   function openEditModal(sub: Subscriber) {
     setSelectedSub(sub);
     setEditSlots(sub.slots_limit || 1);
-    setEditPlan(sub.plan_tier || "starter");
+    setEditPlan(((sub.plan_tier as string) === "scale" ? "business" : sub.plan_tier) || "starter");
     setEditStatus(sub.subscription_status || "active");
     setEditCompany(sub.company_name || "");
     setIsEditModalOpen(true);
@@ -609,7 +609,7 @@ export default function AdminSubscribersPage() {
 
                             <td className="px-6 py-4">
                               <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-brand-50 dark:bg-brand-500/10 text-brand-700 dark:text-brand-400 border border-brand-200 dark:border-brand-800 uppercase">
-                                {sub.plan_tier || "starter"}
+                                {(sub.plan_tier as string) === "scale" ? "business" : (sub.plan_tier || "starter")}
                               </span>
                             </td>
 
@@ -975,7 +975,7 @@ export default function AdminSubscribersPage() {
                 <select
                   id={editPlanSelectId}
                   value={editPlan}
-                  onChange={(e) => setEditPlan(e.target.value as "starter" | "growth" | "business" | "scale" | "custom")}
+                  onChange={(e) => setEditPlan(e.target.value as "starter" | "growth" | "business" | "custom")}
                   className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm"
                 >
                   <option value="starter">Starter (1 cuenta - $49/mes)</option>
@@ -1130,7 +1130,7 @@ export default function AdminSubscribersPage() {
                     id={newPlanSelectId}
                     value={newPlan}
                     onChange={(e) => {
-                      const val = e.target.value as "starter" | "growth" | "business" | "scale" | "custom";
+                      const val = e.target.value as "starter" | "growth" | "business" | "custom";
                       setNewPlan(val);
                       if (val === "starter") setNewSlots(1);
                       else if (val === "growth") setNewSlots(5);
