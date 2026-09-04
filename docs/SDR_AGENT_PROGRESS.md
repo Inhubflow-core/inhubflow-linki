@@ -1,128 +1,105 @@
 # SDR Agent — Progress
 
-Updated: 2026-08-27
+Updated: 2026-09-04
 
 ## Current checkpoint
 
-- Phase: **2A — Read-only LinkedIn inbox adapter contract**
-- Status: **complete and pushed to `origin/main`**
-- Stable upstream base before Inbox work: `2b33d90`
-- Inbox baseline commit: `81e8256` (`feat(inbox): add unified slot attribution and filters`)
-- Phase 0 documentation commit: `7e3d413` (`docs(sdr): add phased implementation and continuity plan`)
-- Published Phase 0 checkpoint: `72020c6`
-- Phase 1A implementation commit: `334fa0d` (`feat(sdr): add isolated phase one foundation`)
-- Published Phase 1A checkpoint: `d89e10f`
-- Phase 1B implementation commit: `1095e5d` (`feat(sdr): add inbound repository and durable job queue`)
-- Published Phase 1B checkpoint: `1095e5d`
-- SDR implementation started: **foundation plus read-only adapter contract**
-- Phase 2A implementation commit: **pending (current changes)**
-- Live LinkedIn contract: **UNVERIFIED** (`docs/LINKEDIN_INBOX_CONTRACT.md`)
-- Gemini calls enabled: **no**
-- LinkedIn SDR sends enabled: **no**
+- Phase: **operational non-calendar runtime through durable handoff; outbound execution still disabled**
+- Status: **implemented, locally verified, and committed; not pushed or deployed**
+- Runtime checkpoint commit: `09e8123` (`feat(sdr): add grounded runtime and human handoff`)
+- Provider: Gemini behind the provider-neutral `SdrProvider` adapter.
+- LinkedIn inbox contract: `CANDIDATE_CANARY`; automatic scheduler remains gated off until the controlled canary passes.
+- SDR worker/provider: fail-closed environment and database gates; checked-in example defaults are off.
+- Autonomous LinkedIn/email sending: **not implemented/enabled in this checkpoint**.
+- Calendar: **not implemented**; the product decision is an InHubFlow-native enterprise calendar after the non-calendar SDR is complete, not Google Calendar or Calendly.
 
 ## Decisions locked
 
-- Provider: Gemini behind an adapter; verify the current stable model before implementation.
-- First channel: LinkedIn.
-- Target mode: automatic, gated by shadow/approval and mandatory hard stops.
-- Calendar: Google Calendar via OAuth.
-- Architecture: isolated module with one minimal core bridge and no-op disabled mode.
-- Languages: English, Spanish, Portuguese (BR).
-- Commercial `ee/replies`: absent; do not copy or depend on proprietary code.
+- Keep SDR domain logic under `lib/sdr-agent/**` with stable provider/channel boundaries and reviewed integration points in Inbox, email, LinkedIn, notifications, and startup.
+- Treat inbound messages, history, and retrieved documents as untrusted data.
+- Answer factual/commercial questions only from approved, retrieved knowledge with valid citations.
+- Missing/partial grounding, unsupported claims, custom proposals/terms, legal/compliance risk, prompt injection, explicit human requests, unavailable tools, or low confidence require durable human handoff.
+- Handoff hard-locks AI via thread state plus control epoch; human control continues until explicit authorized release.
+- Assignment order is account assignee, workspace owner, then authorized workspace admin.
+- Notifications are durable in-app plus optional real Web Push; an active page may beep, and every alert deep-links to the exact Inbox thread.
+- Promote only `off -> shadow -> approval -> auto`; no stored mode or UI switch may bypass environment, agent, account, publication, knowledge, circuit, quota, or promotion gates.
+- Build the native calendar only after Shadow/approval/auto safety and non-calendar operation are complete.
 
-## Phase 0 deliverables
+## Completed foundations and ingestion
 
-- [x] Unified Inbox with filtering/account attribution implemented.
-- [x] Inbox TypeScript check passed.
-- [x] Inbox-focused ESLint passed.
-- [x] Production build passed; expected warning remains because `ee/` is absent.
-- [x] Inbox SQL parsed/executed against the local SQLite schema in read-only validation mode.
-- [x] EN/ES/PT-BR Inbox translation keys match.
-- [x] Upstream update protocol versioned at `docs/UPSTREAM_UPDATE_PROTOCOL.md`.
-- [x] SDR plan versioned at `docs/SDR_AGENT_PLAN.md`.
-- [x] Continuation log created.
-- [x] Initial runbook created.
-- [x] Push Phase 0 commits to `origin/main` after explicit approval.
+- [x] Additive SDR schema for agents, immutable versions, knowledge, threads/messages, durable jobs, decisions, actions, handoffs, notifications, usage, circuits, quotas, outbox, audit, and promotion gates.
+- [x] Idempotent account-scoped inbound capture and durable lease/retry/recovery queue.
+- [x] LinkedIn campaign-only source against an explicit candidate Voyager contract with auth-wall handling and bounded pagination.
+- [x] Exact target identity matching by messaging URN/canonical vanity and slot ownership; names are never identity.
+- [x] Campaign attribution now requires the exact campaign run and an observed outbound at/after the campaign timestamp tolerance; only later inbound events are captured.
+- [x] Duplicate external messages are harmless while distinct repeated message bodies remain valid events.
+- [x] Email inbound metadata includes account/thread/message identity required by the canonical SDR capture path.
 
-## Phase 1A deliverables
+## Completed runtime and guardrails
 
-- [x] Isolated `lib/sdr-agent/**` module boundary documented.
-- [x] Stable contracts for status, inbound events, and worker ticks.
-- [x] Channel-specific inbound validation for LinkedIn/email ownership.
-- [x] Fail-closed bridge: `off` stays disabled and requested `shadow/approval/auto` remains unavailable.
-- [x] No-op bridge performs no persistence, model calls, tool execution, or outbound sends.
-- [x] Additive module-owned schema with 13 tables and 29 idempotent statements.
-- [x] Atomic `applySdrSchema` integration through one core import/call in `lib/db.ts`.
-- [x] Authenticated `GET /api/sdr/status` route with no secrets/prompts in its response.
-- [x] Dependency-free foundation test script added (`npm run test:sdr-foundation`).
-- [x] Fresh-start and restart integration test performed against an isolated temporary database.
-- [x] Runtime test with `SDR_AGENT_MODE=auto` confirmed `effectiveMode=off` and `outboundEnabled=false`.
-- [x] No Gemini/Calendar SDK installed and no runner/inbox/workflow behavior changed.
-- [x] Push Phase 1A commits `334fa0d` and `0322273` to `origin/main` after explicit approval.
+- [x] Operational bridge and startup worker behind `SDR_RUNTIME_ENABLED`.
+- [x] Active agent/version loading, effective-mode caps, provider credentials/publication/knowledge checks, circuit breaker, and daily provider budget.
+- [x] Gemini structured output validated with Zod and bounded history/knowledge input.
+- [x] Approved-knowledge retrieval with workspace/agent/revision isolation and citation IDs.
+- [x] Deterministic pre-provider rules for DNC/unsubscribe, human request, prompt injection, legal/hostile content, proposals/custom terms, missing native calendar, disabled automation, and max AI turns.
+- [x] Deterministic post-provider rules for grounding/citations, unsupported URLs/numbers/commercial claims, risk/confidence, action eligibility, and missing drafts.
+- [x] Provider errors retry when safe, otherwise fail closed to handoff; usage and provider circuit state are persisted.
+- [x] Control epoch is checked after provider work and again while persisting the decision, preventing stale work from surviving a human takeover.
+- [x] Shadow persists decisions/proposed actions without outbox insertion or external send.
 
-## Phase 1B deliverables
+## Completed human handoff and notifications
 
-- [x] Transactional inbound repository validates channel ownership and JSON-safe metadata.
-- [x] Inbound thread identity is scoped to the originating LinkedIn/email account.
-- [x] External message ids and classification jobs are idempotent.
-- [x] Duplicate sync events return the original message/job without overwriting data.
-- [x] Queue helpers cover enqueue, due ordering, lease ownership, renewal, completion, cancellation, retry, and expired-lease recovery.
-- [x] Retry attempts are bounded and terminal failures are persisted.
-- [x] Repository and queue helpers remain inside `lib/sdr-agent/**`; no core runner bridge was enabled.
-- [x] Automated fixtures verify duplicates, wrong lease tokens, backoff, terminal failure, restart recovery, and invalid channel ownership.
-- [x] Gemini/Calendar remain absent and all outbound behavior remains disabled.
+- [x] Idempotent durable handoff with AI lock, pending job/action cancellation, assignment, and audit.
+- [x] Explicit authorized takeover and release APIs with workspace/thread authorization.
+- [x] DNC transition cancels queued work/actions and records audit evidence.
+- [x] Persistent in-app notification center, unread state, exact Inbox deep links, foreground beep, service worker, Push subscriptions, and queued Web Push delivery.
+- [x] Inbox surfaces canonical thread/action/handoff state and provides takeover/release controls.
+- [x] Manual Inbox replies acquire human control server-side before sending.
+- [x] Every Inbox read/mutation route now requires an authenticated actor and validates target-to-thread/account ownership before reading IMAP/LinkedIn data, suggesting, toggling, cancelling, or sending.
+- [x] LinkedIn sync/live-diagnostic routes enforce slot access; the diagnostic screenshot contract is aligned between API and UI.
+- [x] IMAP certificate verification is secure by default with an explicit development-only compatibility flag.
 
-## Phase 2A deliverables
+## Safety boundary still intentionally incomplete
 
-- [x] Provider-neutral `LinkedInInboxObservation` and injected observation-source contract.
-- [x] Deterministic normalization of identifiers, body, ISO timestamps, and bounded event IDs.
-- [x] Fail-closed target matching by explicit slot ownership, `messaging_urn`, and canonical profile vanity.
-- [x] Outbound/system/unknown records and ambiguous or cross-slot identities are skipped without SDR writes.
-- [x] Transactional capture reuses `captureSdrInboundMessage`; no legacy target/inbox fields are mutated.
-- [x] Explicit session wrapper closes pages in `finally`, saves only after a valid observation, and marks auth walls for reauthentication.
-- [x] Synthetic provider-neutral fixtures and dependency-free tests cover idempotency, isolation, normalization, and session safety.
-- [x] Live contract gate documented as `UNVERIFIED`; no endpoint or parser was guessed.
+- There is no autonomous `sdr_outbox` dispatcher or action approval/rejection API/UI yet.
+- `evaluatePreSendGuardrails` exists, but no automatic send path is wired to it; therefore all SDR outbound environment flags must remain false.
+- Approval/auto promotion gates have not been populated with controlled production evidence.
+- The LinkedIn candidate contract has not yet passed the authorized live canary recorded in `docs/LINKEDIN_INBOX_CONTRACT.md`.
+- Web Push requires production VAPID credentials and an end-to-end browser test.
+- No native calendar work should begin yet.
 
-## Phase 3 deliverables (Gemini Structured Classification & SDR Agent UI)
-
-- [x] Gemini structured provider (`lib/sdr-agent/gemini.ts`) using `@google/genai` and model `gemini-3.6-flash`.
-- [x] Resilient retry and backoff mechanism for transient 503/429 LLM provider spikes.
-- [x] Complete Shadow pipeline (`lib/sdr-agent/pipeline.ts`) with durable leasing and 0 outbound sends guarantee.
-- [x] End-to-end simulation test suite (`npm run test:sdr-shadow`) passing 5/5 commercial scenarios in ES, EN, PT-BR.
-- [x] Full-featured SDR control panel (`pages/sdr.tsx`) with modes, prompt configuration, knowledge base manager, live simulator, and decision history.
-- [x] Backend API endpoints (`pages/api/sdr/config.ts`, `pages/api/sdr/knowledge.ts`, `pages/api/sdr/simulate.ts`).
-- [x] Sidebar navigation entry and i18n localization keys across ES, EN, PT-BR.
-
-## Known environment constraints
-
-- Local `linki.db` currently has no LinkedIn accounts/replies for four-slot end-to-end testing.
-- `ee/` is not present, so the build logs an expected `@/ee` module warning and premium reply sync is inactive.
-- Claude development credit and Gemini runtime billing are separate.
-- Gemini API/Vertex credentials and Google Calendar OAuth credentials are not configured yet.
-
-## Verification record
+## Verification record — 2026-09-04
 
 ```text
-npm run test:sdr-foundation                       PASS (13 tables, queues, leasing, read-only adapter)
-npm run test:sdr-shadow                           PASS (5/5 scenarios: questions, objections, PT-BR demo, unsubscribe, handoff)
-npx tsc --noEmit                                  PASS (0 errors)
+npm run test:sdr-foundation                       PASS
+npm run test:sdr-runtime                          PASS
+npm run test:sdr-authorization                    PASS
+npm run test:linkedin-campaign-inbox              PASS
+npx tsc --noEmit --incremental false              PASS
+focused ESLint (SDR/Inbox changes)                PASS (0 errors; legacy UI warnings remain)
+npm run build                                     PASS
+                                                    expected public-build warning: optional @/ee absent
+git diff --check                                  PASS (line-ending notices only)
 ```
 
-## Review follow-up — 2026-08-28
+Repository-wide ESLint still reports pre-existing issues outside this SDR checkpoint; focused changed-file lint has no errors. The real Gemini shadow suite is not rerun automatically because it makes external billable calls.
 
-La revisión posterior a la integración de Gemini determinó que la implementación actual es una fundación de Shadow Mode y un playground, no todavía un Agente SDR operativo. El bridge sigue desactivado, no existe un worker conectado y varias configuraciones visibles aún no se aplican al runtime.
+## Environment/deployment blockers
 
-El diagnóstico, los riesgos y el orden recomendado para terminarlo quedaron registrados en [`docs/SDR_AGENT_REVIEW_BACKLOG.md`](./SDR_AGENT_REVIEW_BACKLOG.md).
+- Configure production Gemini credentials and cost rates without committing secrets.
+- Generate VAPID keys and configure `WEB_PUSH_ENABLED`, subject, public key, and private key.
+- Run the authorized LinkedIn controlled canary with one test slot/conversation before enabling its scheduler.
+- Back up the production SQLite database and verify additive migration application before Shadow rollout.
+- Keep `SDR_OUTBOUND_ENABLED`, `SDR_LINKEDIN_OUTBOUND_ENABLED`, `SDR_EMAIL_OUTBOUND_ENABLED`, and `NATIVE_CALENDAR_ENABLED` false.
 
 ## Next exact action
 
-1. Retomar desde `docs/SDR_AGENT_REVIEW_BACKLOG.md`.
-2. Mantener el bridge fail-closed y no habilitar envíos ni modo `auto`.
-3. Implementar primero el bridge/worker de Shadow Mode y conectar configuración, políticas y conocimiento al pipeline.
-4. Ejecutar las verificaciones registradas antes de avanzar a approval o producción.
+1. Review commit `09e8123` and push/deploy it only with explicit approval.
+2. Configure a non-production authorized environment and run the LinkedIn contract canary plus Shadow runtime with outbound gates false.
+3. Verify exact grounding, citations, handoff assignment, control lock, in-app alert, beep, Web Push, and deep link end to end.
+4. Only after that evidence, implement the action approval/rejection API and UI, then the idempotent outbox dispatcher guarded by `evaluatePreSendGuardrails`; do not enable auto.
+5. Build the native enterprise calendar only after approval and controlled auto checkpoints pass.
 
 ## Resume instruction
 
-Use this prompt in a new session:
-
-> Continue the SDR plan in `docs/SDR_AGENT_PLAN.md` from the checkpoint in `docs/SDR_AGENT_PROGRESS.md`. First verify the current SHA, working tree, and recorded tests. Do not repeat completed phases and do not enable outbound AI behavior.
+> Continue the SDR plan from `docs/SDR_AGENT_PROGRESS.md`. Verify HEAD, working tree, and all recorded tests first. Keep every outbound and calendar gate disabled until the documented canary/promotion evidence exists.

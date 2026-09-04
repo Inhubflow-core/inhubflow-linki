@@ -313,6 +313,9 @@ function createSdrV2Tables(db: Database.Database): void {
 
 function addIndexes(db: Database.Database): void {
   db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_sdr_decisions_job_unique
+      ON sdr_decisions(job_id)
+      WHERE job_id IS NOT NULL;
     CREATE INDEX IF NOT EXISTS idx_sdr_agents_workspace
       ON sdr_agents(workspace_owner_id, status, created_at);
     CREATE INDEX IF NOT EXISTS idx_sdr_threads_workspace_state
@@ -323,6 +326,15 @@ function addIndexes(db: Database.Database): void {
       ON sdr_handoffs(idempotency_key)
       WHERE idempotency_key IS NOT NULL;
   `);
+  if (hasTable(db, "email_replies")) {
+    db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_email_replies_account_message
+        ON email_replies(email_account_id, external_message_id)
+        WHERE email_account_id IS NOT NULL AND external_message_id IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_email_replies_external_thread
+        ON email_replies(email_account_id, external_thread_id, received_at);
+    `);
+  }
 }
 
 function backfillWorkspaceOwnership(db: Database.Database): void {

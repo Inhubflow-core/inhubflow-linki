@@ -1,148 +1,163 @@
+import crypto from "node:crypto";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getDb } from "@/lib/db";
-import { randomUUID } from "node:crypto";
+import { requireApiActor, canManageSdrAgent } from "@/lib/authz";
 import { ensureSdrAgent } from "@/lib/sdr-agent/seed";
+import { SdrModeSchema } from "@/lib/sdr-agent/contracts";
+import { resolveSdrOperationalStatus } from "@/lib/sdr-agent/runtime";
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
+interface ConfigBody {
+  name?: unknown;
+  mode?: unknown;
+  model?: unknown;
+  default_language?: unknown;
+  confidence_threshold?: unknown;
+  max_auto_turns?: unknown;
+  handoff_email?: unknown;
+  system_prompt?: unknown;
+  company_context?: unknown;
+  custom_instructions?: unknown;
+  handoff_rules?: unknown;
+}
+
+function jsonObject(value: string | null | undefined): Record<string, unknown> {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function parseOptionalString(value: unknown, field: string, max: number): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  if (typeof value !== "string" || value.length > max) throw new Error(`${field} is invalid`);
+  return value.trim();
+}
+
+function loadStats(db: ReturnType<typeof getDb>, workspaceOwnerId: string) {
+  const scalar = (sql: string, params: string[] = []) =>
+    (db.prepare(sql).get(...params) as { count: number }).count;
+  return {
+    totalDecisions: scalar("SELECT COUNT(*) AS count FROM sdr_decisions WHERE workspace_owner_id = ?", [workspaceOwnerId]),
+    totalHandoffs: scalar("SELECT COUNT(*) AS count FROM sdr_handoffs WHERE workspace_owner_id = ?", [workspaceOwnerId]),
+    openHandoffs: scalar("SELECT COUNT(*) AS count FROM sdr_handoffs WHERE workspace_owner_id = ? AND state IN ('open', 'acknowledged')", [workspaceOwnerId]),
+    unreadNotifications: scalar("SELECT COUNT(*) AS count FROM app_notifications WHERE workspace_owner_id = ? AND state = 'unread'", [workspaceOwnerId]),
+    totalThreads: scalar("SELECT COUNT(*) AS count FROM sdr_threads WHERE workspace_owner_id = ?", [workspaceOwnerId]),
+    activeThreads: scalar("SELECT COUNT(*) AS count FROM sdr_threads WHERE workspace_owner_id = ? AND state = 'AI_ACTIVE'", [workspaceOwnerId]),
+    queueDepth: scalar("SELECT COUNT(*) AS count FROM sdr_jobs WHERE workspace_owner_id = ? AND state IN ('queued', 'leased', 'waiting')", [workspaceOwnerId]),
+  };
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const actor = await requireApiActor(req, res);
+  if (!actor) return;
   const db = getDb();
+  const { agent, activeVersion } = ensureSdrAgent(db, actor.workspaceOwnerId);
+  if (!canManageSdrAgent(db, actor, agent.id)) {
+    return res.status(403).json({ error: "No autorizado para gestionar el Asistente SDR" });
+  }
 
   if (req.method === "GET") {
-    try {
-      const { agent, activeVersion } = ensureSdrAgent(db);
-
-      let policy = { company_context: "", handoff_rules: "" };
-      let config = { custom_instructions: "" };
-      try {
-        if (activeVersion?.policy_json) policy = JSON.parse(activeVersion.policy_json);
-        if (activeVersion?.config_json) config = JSON.parse(activeVersion.config_json);
-      } catch {}
-
-      // Metrics / Stats
-      const totalDecisions = (db.prepare("SELECT COUNT(*) as c FROM sdr_decisions").get() as any)?.c || 0;
-      const totalHandoffs = (db.prepare("SELECT COUNT(*) as c FROM sdr_decisions WHERE requires_human = 1").get() as any)?.c || 0;
-      const totalThreads = (db.prepare("SELECT COUNT(*) as c FROM sdr_threads").get() as any)?.c || 0;
-      const activeThreads = (db.prepare("SELECT COUNT(*) as c FROM sdr_threads WHERE state = 'AI_ACTIVE'").get() as any)?.c || 0;
-
-      const recentDecisions = db.prepare(`
-        SELECT d.*, t.full_name as target_name, t.company as target_company
-        FROM sdr_decisions d
-        LEFT JOIN sdr_threads th ON d.thread_id = th.id
-        LEFT JOIN targets t ON th.target_id = t.id
-        ORDER BY d.created_at DESC
-        LIMIT 10
-      `).all();
-
-      return res.status(200).json({
-        agent,
-        activeVersion: {
-          ...activeVersion,
-          policy,
-          config,
-        },
-        stats: {
-          totalDecisions,
-          totalHandoffs,
-          totalThreads,
-          activeThreads,
-        },
-        recentDecisions,
-      });
-    } catch (error: any) {
-      return res.status(500).json({ error: error.message || "Error al obtener configuración SDR" });
-    }
+    const policy = jsonObject(activeVersion?.policy_json);
+    const config = jsonObject(activeVersion?.config_json);
+    const recentDecisions = db.prepare(`
+      SELECT d.id, d.intent, d.confidence, d.risk_level, d.language,
+        d.recommended_action, d.requires_human, d.reason_code, d.reply_draft,
+        d.model, d.provider, d.latency_ms, d.policy_outcome, d.knowledge_status,
+        d.created_at, t.full_name AS target_name, t.company AS target_company
+      FROM sdr_decisions d
+      JOIN sdr_threads th ON th.id = d.thread_id
+      LEFT JOIN targets t ON t.id = th.target_id
+      WHERE d.workspace_owner_id = ?
+      ORDER BY d.created_at DESC LIMIT 20
+    `).all(actor.workspaceOwnerId);
+    return res.status(200).json({
+      agent,
+      activeVersion: activeVersion ? {
+        id: activeVersion.id,
+        version_number: activeVersion.version_number,
+        model: activeVersion.model,
+        system_prompt: activeVersion.system_prompt,
+        policy,
+        config,
+        publication_state: activeVersion.publication_state,
+      } : null,
+      runtime: resolveSdrOperationalStatus(db, agent, activeVersion),
+      stats: loadStats(db, actor.workspaceOwnerId),
+      recentDecisions,
+    });
   }
 
-  if (req.method === "POST" || req.method === "PUT") {
-    try {
-      const {
-        name,
-        mode,
-        model,
-        default_language,
-        confidence_threshold,
-        max_auto_turns,
-        handoff_email,
-        system_prompt,
-        company_context,
-        custom_instructions,
-        handoff_rules,
-      } = req.body;
+  if (req.method !== "POST" && req.method !== "PUT") {
+    res.setHeader("Allow", ["GET", "POST", "PUT"]);
+    return res.status(405).json({ error: "Method not allowed" });
+  }
 
-      const { agent } = ensureSdrAgent(db);
+  try {
+    const body = (req.body ?? {}) as ConfigBody;
+    const mode = body.mode === undefined ? undefined : SdrModeSchema.parse(body.mode);
+    const model = parseOptionalString(body.model, "model", 120);
+    const name = parseOptionalString(body.name, "name", 200);
+    const defaultLanguage = body.default_language === undefined ? undefined : body.default_language;
+    if (defaultLanguage !== undefined && !["en", "es", "pt-BR"].includes(String(defaultLanguage))) throw new Error("default_language is invalid");
+    const threshold = body.confidence_threshold === undefined ? undefined : Number(body.confidence_threshold);
+    if (threshold !== undefined && (!Number.isFinite(threshold) || threshold < 0 || threshold > 1)) throw new Error("confidence_threshold must be between 0 and 1");
+    const turns = body.max_auto_turns === undefined ? undefined : Number(body.max_auto_turns);
+    if (turns !== undefined && (!Number.isInteger(turns) || turns < 0 || turns > 20)) throw new Error("max_auto_turns must be an integer between 0 and 20");
+    const handoffEmail = parseOptionalString(body.handoff_email, "handoff_email", 320);
+    const systemPrompt = parseOptionalString(body.system_prompt, "system_prompt", 20_000);
+    const companyContext = parseOptionalString(body.company_context, "company_context", 20_000);
+    const customInstructions = parseOptionalString(body.custom_instructions, "custom_instructions", 10_000);
+    const handoffRules = parseOptionalString(body.handoff_rules, "handoff_rules", 10_000);
+    if (mode === "auto") return res.status(409).json({ error: "El modo automático requiere completar los gates de promoción y habilitarlo desde operaciones." });
 
-      db.transaction(() => {
-        // Update agent record
+    db.transaction(() => {
+      db.prepare(`
+        UPDATE sdr_agents SET name = COALESCE(?, name), mode = COALESCE(?, mode),
+          model = COALESCE(?, model), default_language = COALESCE(?, default_language),
+          confidence_threshold = COALESCE(?, confidence_threshold), max_auto_turns = COALESCE(?, max_auto_turns),
+          handoff_email = ?, config_revision = config_revision + 1, updated_at = datetime('now')
+        WHERE id = ? AND workspace_owner_id = ?
+      `).run(name, mode, model, defaultLanguage, threshold, turns, handoffEmail, agent.id, actor.workspaceOwnerId);
+
+      const currentPolicy = jsonObject(activeVersion?.policy_json);
+      const currentConfig = jsonObject(activeVersion?.config_json);
+      const nextPolicy = {
+        ...currentPolicy,
+        ...(companyContext !== undefined ? { company_context: companyContext } : {}),
+        ...(handoffRules !== undefined ? { handoff_rules: handoffRules } : {}),
+      };
+      const nextConfig = {
+        ...currentConfig,
+        ...(customInstructions !== undefined ? { custom_instructions: customInstructions } : {}),
+      };
+      if (systemPrompt !== undefined || companyContext !== undefined || customInstructions !== undefined || handoffRules !== undefined || model !== undefined) {
+        const versionId = crypto.randomUUID();
+        const nextVersion = ((db.prepare("SELECT COALESCE(MAX(version_number), 0) AS count FROM sdr_agent_versions WHERE agent_id = ?").get(agent.id) as { count: number }).count) + 1;
         db.prepare(`
-          UPDATE sdr_agents
-          SET
-            name = COALESCE(?, name),
-            mode = COALESCE(?, mode),
-            model = COALESCE(?, model),
-            default_language = COALESCE(?, default_language),
-            confidence_threshold = COALESCE(?, confidence_threshold),
-            max_auto_turns = COALESCE(?, max_auto_turns),
-            handoff_email = COALESCE(?, handoff_email),
-            updated_at = datetime('now')
-          WHERE id = ?
-        `).run(
-          name ?? null,
-          mode ?? null,
-          model ?? null,
-          default_language ?? null,
-          confidence_threshold ?? null,
-          max_auto_turns ?? null,
-          handoff_email ?? null,
-          agent.id
-        );
-
-        // If prompt or policies changed, create new version or update current
-        if (system_prompt !== undefined || company_context !== undefined || custom_instructions !== undefined || handoff_rules !== undefined) {
-          const currentVersion = db.prepare("SELECT * FROM sdr_agent_versions WHERE id = ?").get(agent.active_version_id) as any;
-          const currentPolicy = currentVersion?.policy_json ? JSON.parse(currentVersion.policy_json) : {};
-          const currentConfig = currentVersion?.config_json ? JSON.parse(currentVersion.config_json) : {};
-
-          const nextPolicy = {
-            ...currentPolicy,
-            company_context: company_context !== undefined ? company_context : currentPolicy.company_context,
-            handoff_rules: handoff_rules !== undefined ? handoff_rules : currentPolicy.handoff_rules,
-          };
-
-          const nextConfig = {
-            ...currentConfig,
-            custom_instructions: custom_instructions !== undefined ? custom_instructions : currentConfig.custom_instructions,
-          };
-
-          const newVersionId = randomUUID();
-          const nextVersionNum = ((db.prepare("SELECT MAX(version_number) as m FROM sdr_agent_versions WHERE agent_id = ?").get(agent.id) as any)?.m || 0) + 1;
-
-          db.prepare(`
-            INSERT INTO sdr_agent_versions (
-              id, agent_id, version_number, model, system_prompt, policy_json, config_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-          `).run(
-            newVersionId,
-            agent.id,
-            nextVersionNum,
-            model || agent.model || "gemini-3.6-flash",
-            system_prompt || currentVersion?.system_prompt || "",
-            JSON.stringify(nextPolicy),
-            JSON.stringify(nextConfig)
-          );
-
-          db.prepare(`
-            UPDATE sdr_agents
-            SET active_version_id = ?, updated_at = datetime('now')
-            WHERE id = ?
-          `).run(newVersionId, agent.id);
-        }
-      })();
-
-      return res.status(200).json({ ok: true, message: "Configuración guardada exitosamente" });
-    } catch (error: any) {
-      return res.status(500).json({ error: error.message || "Error al actualizar configuración SDR" });
-    }
+          INSERT INTO sdr_agent_versions (
+            id, agent_id, version_number, model, system_prompt, policy_json,
+            config_json, publication_state, published_by_user_id, published_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', ?, NULL)
+        `).run(versionId, agent.id, nextVersion, model ?? activeVersion?.model ?? agent.model, systemPrompt ?? activeVersion?.system_prompt ?? "", JSON.stringify(nextPolicy), JSON.stringify(nextConfig), actor.id);
+        db.prepare("UPDATE sdr_agents SET active_version_id = ?, updated_at = datetime('now') WHERE id = ?").run(versionId, agent.id);
+      }
+      db.prepare(`
+        INSERT INTO sdr_audit_events (
+          id, workspace_owner_id, actor_type, actor_user_id, entity_type,
+          entity_id, event_type, payload_json
+        ) VALUES (?, ?, 'user', ?, 'agent', ?, 'configuration_updated', ?)
+      `).run(crypto.randomUUID(), actor.workspaceOwnerId, actor.id, agent.id, JSON.stringify({ mode, model }));
+    })();
+    return res.status(200).json({ ok: true, message: "Configuración guardada como versión pendiente de publicación" });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Invalid SDR configuration" });
   }
-
-  res.setHeader("Allow", ["GET", "POST", "PUT"]);
-  return res.status(405).json({ error: "Method not allowed" });
 }
+
+export const config = { api: { bodyParser: { sizeLimit: "100kb" } } };

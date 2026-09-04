@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getDb } from "@/lib/db";
+import { canAccessEmailAccount, canAccessLinkedInAccount, canAccessSdrThread, requireApiActor } from "@/lib/authz";
 
 export interface InboxReply {
   id: string;
@@ -42,17 +43,39 @@ export interface InboxReply {
   linkedin_message_id: string | null;
   linkedin_reply_body: string | null;
   linkedin_reply_received_at: string | null;
+  // Canonical SDR conversation state.
+  sdr_thread_id: string | null;
+  sdr_thread_state: string | null;
+  sdr_control_epoch: number | null;
+  sdr_human_takeover_at: string | null;
+  sdr_human_takeover_by_user_id: string | null;
+  sdr_lock_reason: string | null;
+  sdr_handoff_id: string | null;
+  sdr_handoff_state: string | null;
+  sdr_handoff_reason: string | null;
+  sdr_action_id: string | null;
+  sdr_action_state: string | null;
+  sdr_reply_draft: string | null;
+  sdr_policy_outcome: string | null;
+  sdr_knowledge_status: string | null;
 }
 
 const VALID_CHANNELS = new Set(["email", "linkedin"]);
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
     res.setHeader("Allow", ["GET"]);
     return res.status(405).end();
   }
 
+  const actor = await requireApiActor(req, res);
+  if (!actor) return;
   const db = getDb();
+  const rawThreadId = Array.isArray(req.query.thread) ? req.query.thread[0] : req.query.thread;
+  const threadId = rawThreadId?.trim() || undefined;
+  if (threadId && !canAccessSdrThread(db, actor, threadId)) {
+    return res.status(404).json({ error: "Conversation not found" });
+  }
   const rawChannel = Array.isArray(req.query.channel) ? req.query.channel[0] : req.query.channel;
   const channel = rawChannel && VALID_CHANNELS.has(rawChannel) ? rawChannel : undefined;
   const rawAccountId = Array.isArray(req.query.accountId) ? req.query.accountId[0] : req.query.accountId;
@@ -63,7 +86,9 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   }
   if (accountId) {
     const account = db.prepare("SELECT 1 FROM accounts WHERE id = ?").get(accountId);
-    if (!account) return res.status(400).json({ error: "Invalid LinkedIn account filter" });
+    if (!account || !canAccessLinkedInAccount(db, actor, accountId)) {
+      return res.status(400).json({ error: "Invalid LinkedIn account filter" });
+    }
   }
 
   // OOO-followup replies intentionally leave email_replied_at NULL, so the captured
@@ -75,6 +100,19 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   if (channel === "linkedin") channelFilter = "AND (lie.id IS NOT NULL OR t.last_replied_at IS NOT NULL)";
 
   const params: string[] = [];
+  const linkedinAccountFilter = accountId ? "WHERE m.account_id = ?" : "";
+  if (accountId) params.push(accountId);
+
+  const sdrThreadJoin = threadId
+    ? `LEFT JOIN sdr_threads sdrt ON sdrt.id = ? AND sdrt.workspace_owner_id = ? AND sdrt.target_id = t.id`
+    : `LEFT JOIN sdr_threads sdrt ON sdrt.id = (
+        SELECT candidate.id FROM sdr_threads candidate
+        WHERE candidate.target_id = t.id AND candidate.workspace_owner_id = ?
+        ORDER BY datetime(candidate.updated_at) DESC, candidate.id DESC LIMIT 1
+      )`;
+  if (threadId) params.push(threadId, actor.workspaceOwnerId);
+  else params.push(actor.workspaceOwnerId);
+
   let accountFilter = "";
   if (accountId) {
     accountFilter = `
@@ -86,9 +124,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       )`;
     params.push(accountId, accountId);
   }
-
-  const linkedinAccountFilter = accountId ? "WHERE m.account_id = ?" : "";
-  if (accountId) params.unshift(accountId);
 
   const rows = db.prepare(`
     WITH ranked_linkedin_events AS (
@@ -184,7 +219,21 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       lie.external_thread_id AS linkedin_thread_id,
       lie.external_message_id AS linkedin_message_id,
       lie.body AS linkedin_reply_body,
-      lie.sent_at AS linkedin_reply_received_at
+      lie.sent_at AS linkedin_reply_received_at,
+      sdrt.id AS sdr_thread_id,
+      sdrt.state AS sdr_thread_state,
+      sdrt.control_epoch AS sdr_control_epoch,
+      sdrt.human_takeover_at AS sdr_human_takeover_at,
+      sdrt.human_takeover_by_user_id AS sdr_human_takeover_by_user_id,
+      sdrt.lock_reason AS sdr_lock_reason,
+      sdrh.id AS sdr_handoff_id,
+      sdrh.state AS sdr_handoff_state,
+      sdrh.reason_code AS sdr_handoff_reason,
+      sdra.id AS sdr_action_id,
+      sdra.state AS sdr_action_state,
+      sdrd.reply_draft AS sdr_reply_draft,
+      sdrd.policy_outcome AS sdr_policy_outcome,
+      sdrd.knowledge_status AS sdr_knowledge_status
     FROM targets t
     LEFT JOIN latest_email_reply er ON er.target_id = t.id
     LEFT JOIN latest_linkedin_event lie ON lie.target_id = t.id
@@ -199,13 +248,38 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     LEFT JOIN accounts lie_account ON lie_account.id = lie.account_id
     LEFT JOIN accounts linkedin_account
       ON linkedin_account.id = COALESCE(t.last_replied_account_id, lie.account_id, context_run.account_id, lc.account_id)
+    ${sdrThreadJoin}
+    LEFT JOIN sdr_handoffs sdrh ON sdrh.id = (
+      SELECT candidate.id FROM sdr_handoffs candidate
+      WHERE candidate.thread_id = sdrt.id
+      ORDER BY CASE candidate.state WHEN 'open' THEN 0 WHEN 'acknowledged' THEN 1 ELSE 2 END,
+        datetime(candidate.created_at) DESC, candidate.id DESC LIMIT 1
+    )
+    LEFT JOIN sdr_actions sdra ON sdra.id = (
+      SELECT candidate.id FROM sdr_actions candidate
+      WHERE candidate.thread_id = sdrt.id
+      ORDER BY datetime(candidate.created_at) DESC, candidate.id DESC LIMIT 1
+    )
+    LEFT JOIN sdr_decisions sdrd ON sdrd.id = (
+      SELECT candidate.id FROM sdr_decisions candidate
+      WHERE candidate.thread_id = sdrt.id
+      ORDER BY datetime(candidate.created_at) DESC, candidate.id DESC LIMIT 1
+    )
     WHERE 1=1
       ${channelFilter}
       ${accountFilter}
     ORDER BY replied_at DESC
   `).all(...params) as Array<InboxReply & { classification_json: string | null }>;
 
-  const replies: InboxReply[] = rows.map((row) => {
+  const scopedRows = rows.filter((row) => {
+    if (actor.isSuperAdmin) return true;
+    if (row.sdr_thread_id && canAccessSdrThread(db, actor, row.sdr_thread_id)) return true;
+    if (row.linkedin_account_id && canAccessLinkedInAccount(db, actor, row.linkedin_account_id)) return true;
+    if (row.email_account_id && canAccessEmailAccount(db, actor, row.email_account_id)) return true;
+    return false;
+  });
+
+  const replies: InboxReply[] = scopedRows.map((row) => {
     let reply_kind: string | null = null;
     let reply_summary: string | null = null;
     if (row.classification_json) {

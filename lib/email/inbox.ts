@@ -1,6 +1,7 @@
 import Imap from "imap";
 import { simpleParser } from "mailparser";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
+import { captureSdrInboundMessage } from "@/lib/sdr-agent/repository";
 import { getDb } from "@/lib/db";
 import { premium } from "@/lib/premium";
 import { decryptSecret } from "@/lib/crypto";
@@ -61,6 +62,7 @@ interface EmailAccount {
 export function captureReplyBody(
   imap: Imap,
   db: ReturnType<typeof getDb>,
+  emailAccountId: string,
   targetId: string,
   fromEmail: string,
   uid: number,
@@ -91,6 +93,20 @@ export function captureReplyBody(
           const parsedFrom =
             parsed.from?.value?.[0]?.address?.toLowerCase().trim() || fromEmail.toLowerCase();
           const receivedAt = parsed.date ? parsed.date.toISOString() : new Date().toISOString();
+          const messageId = parsed.messageId?.trim() ||
+            `<inhubflow-${createHash("sha256").update(raw).digest("hex")}@captured.local>`;
+          const inReplyTo = parsed.inReplyTo?.trim() || null;
+          const references = Array.isArray(parsed.references)
+            ? parsed.references.map(String)
+            : parsed.references ? [String(parsed.references)] : [];
+          const rootReference = references[0] || inReplyTo;
+          const normalizedSubject = (subject || "")
+            .replace(/^\s*(?:re|fw|fwd|aw|sv)\s*:\s*/i, "")
+            .trim()
+            .toLowerCase();
+          const externalThreadId = rootReference || `email-thread:${createHash("sha256")
+            .update(`${emailAccountId}:${targetId}:${normalizedSubject}`, "utf8")
+            .digest("hex")}`;
 
           // Prefer decoded plain text; fall back to stripping the HTML part.
           const rawText =
@@ -105,10 +121,10 @@ export function captureReplyBody(
 
           if (!bodyText) { resolve(null); return; }
 
-          // Dedup: skip if we already have a row for this target with the same received_at
+          // Dedup by provider Message-ID inside the originating email account.
           const existing = db.prepare(
-            "SELECT id FROM email_replies WHERE target_id = ? AND received_at = ?"
-          ).get(targetId, receivedAt) as { id: string } | undefined;
+            "SELECT id FROM email_replies WHERE email_account_id = ? AND external_message_id = ?"
+          ).get(emailAccountId, messageId) as { id: string } | undefined;
 
           if (existing) { resolve(null); return; }
 
@@ -122,10 +138,49 @@ export function captureReplyBody(
           ).get(targetId) as { id: string } | undefined;
 
           const replyId = randomUUID();
-          db.prepare(
-            `INSERT INTO email_replies (id, target_id, run_id, from_email, subject, body_text, received_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`
-          ).run(replyId, targetId, runRow?.id ?? null, parsedFrom, subject, bodyText, receivedAt);
+          db.transaction(() => {
+            db.prepare(`
+              INSERT INTO email_replies (
+                id, target_id, run_id, email_account_id, from_email, subject,
+                body_text, received_at, external_message_id, external_thread_id,
+                in_reply_to, references_json, headers_json
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(
+              replyId,
+              targetId,
+              runRow?.id ?? null,
+              emailAccountId,
+              parsedFrom,
+              subject,
+              bodyText,
+              receivedAt,
+              messageId,
+              externalThreadId,
+              inReplyTo,
+              JSON.stringify(references),
+              JSON.stringify({ messageId, inReplyTo, references }),
+            );
+            captureSdrInboundMessage(db, {
+              eventId: `email:${emailAccountId}:${messageId}`,
+              channel: "email",
+              targetId,
+              emailAccountId,
+              accountId: null,
+              externalThreadId,
+              externalMessageId: messageId,
+              senderExternalId: parsedFrom,
+              senderName: parsed.from?.value?.[0]?.name || null,
+              body: bodyText,
+              receivedAt,
+              metadata: {
+                source: "imap-inbox",
+                subject,
+                inReplyTo,
+                references,
+                runId: runRow?.id ?? null,
+              },
+            });
+          })();
           resolve(replyId);
         } catch (err) {
           console.warn(`[email-inbox] captureReplyBody parse/insert failed:`, err);
@@ -235,7 +290,7 @@ export async function syncEmailInbox(emailAccountId: string): Promise<{ replies:
                 // On any failure the contact stays enrolled (safe fallback, plan §3.2).
                 try {
                   const latestUid = uids[uids.length - 1];
-                  const replyId = await captureReplyBody(imap, db, target.id, target.email, latestUid);
+                  const replyId = await captureReplyBody(imap, db, emailAccountId, target.id, target.email, latestUid);
                   // The reply is always STORED (open-core). AI classification + auto-followup
                   // is a premium feature — skipped cleanly when ee/ is absent.
                   if (replyId && premium?.replies) {

@@ -1,10 +1,10 @@
 # SDR Agent — Operational Runbook
 
-This runbook starts with the safety and continuity rules needed before the SDR implementation exists. Extend it at every checkpoint.
+This runbook defines the safety, activation, continuity, and rollback rules for the operational SDR runtime. Extend it at every checkpoint.
 
 ## LinkedIn inbox contract capture (Phase 2B prerequisite)
 
-The current contract is `UNVERIFIED`. Do not implement or enable a production LinkedIn inbox source until this procedure has been completed.
+The LinkedIn messaging source is implemented as a fail-closed candidate contract. Keep automatic synchronization disabled until the controlled canary procedure in `docs/LINKEDIN_INBOX_CONTRACT.md` has passed.
 
 1. Use only a LinkedIn account and conversations for which the team has explicit authorization and consent. Record the InHubFlow commit SHA and a non-identifying account designation in `docs/LINKEDIN_INBOX_CONTRACT.md`.
 2. Use an observation-only browser session. Inspect the inbox request/response traffic without sending, marking read, archiving, reacting to, deleting, or otherwise mutating a conversation.
@@ -14,11 +14,45 @@ The current contract is `UNVERIFIED`. Do not implement or enable a production Li
 6. Review the adapter diff to verify that it has no send, mark-read, archive, reaction, delete, runner, scheduler, AI, or premium integration. A verified source still requires a separate controlled capture checkpoint before operational scheduling.
 7. If the observed contract is incomplete or changes during capture, leave the status `UNVERIFIED`; do not fill gaps with guessed endpoint or response fields.
 
-The Phase 2A adapter accepts only injected, provider-neutral observations and is intentionally not called by the runner. Its queued `classify` jobs remain disabled until a later SDR worker checkpoint.
+The campaign Inbox adapter now feeds accepted, idempotent observations into the durable SDR capture boundary. Worker processing remains separately gated by `SDR_RUNTIME_ENABLED`, the effective agent mode, publication/provider checks, and approved knowledge.
 
 ## Rollback for a read-only capture
 
 If a discovery session behaves unexpectedly, close the page, stop the controlled account's test activity, mark it for reauthentication if a wall appeared, and discard any unredacted capture outside the repository. Do not attempt repeated inbox actions to compensate. Restore the last verified InHubFlow commit SHA if the adapter or session lifecycle is found to have changed behavior.
+
+## Current runtime activation matrix
+
+The checked-in defaults are fail-closed. A stored agent mode does not enable processing or sending by itself.
+
+| Capability | Required environment gates | Required database gates |
+|---|---|---|
+| Read-only LinkedIn inbox scheduler | `LINKEDIN_CAMPAIGN_INBOX_SYNC_ENABLED=true`, `LINKEDIN_INBOX_CANARY_PASSED=true`, verified contract/version | Authenticated account and campaign-attributed target |
+| SDR capture/worker | `SDR_RUNTIME_ENABLED=true`, `SDR_AGENT_MODE=shadow` or higher | Active agent, `runtime_enabled=1`, account/target automation enabled, published version |
+| Gemini classification | Runtime gates plus `SDR_PROVIDER_ENABLED=true`, `GEMINI_API_KEY` | `provider_enabled=1`, approved knowledge, closed provider circuit |
+| Live simulator | `SDR_SIMULATION_LIVE_ENABLED=true`, Gemini credentials | Authorized workspace manager and approved knowledge |
+| Web Push | `WEB_PUSH_ENABLED=true` and all VAPID values | Active user subscription; in-app notifications remain durable without Push |
+| SDR outbound | Keep disabled at this checkpoint | No autonomous outbox dispatcher is enabled yet |
+| Native calendar | `NATIVE_CALENDAR_ENABLED=false` | Build only after non-calendar SDR checkpoints pass |
+
+Safe local Shadow activation, after configuring an authorized LinkedIn test account and approving knowledge:
+
+```text
+SDR_RUNTIME_ENABLED=true
+SDR_PROVIDER_ENABLED=true
+SDR_AGENT_MODE=shadow
+SDR_OUTBOUND_ENABLED=false
+SDR_LINKEDIN_OUTBOUND_ENABLED=false
+SDR_EMAIL_OUTBOUND_ENABLED=false
+NATIVE_CALENDAR_ENABLED=false
+```
+
+Before changing any runtime flag:
+
+1. Back up the SQLite database and record the deploy SHA.
+2. Complete the LinkedIn controlled canary with a test slot and test conversation.
+3. Confirm the agent version is published and every knowledge source used for answers is explicitly approved.
+4. Run `npm run test:sdr-foundation`, `npm run test:sdr-runtime`, `npm run test:sdr-authorization`, `npm run test:linkedin-campaign-inbox`, `npx tsc --noEmit`, focused ESLint, and `npm run build`.
+5. Start with Shadow only and verify decisions, citations, handoffs, assignment, exact deep links, beep, and Push delivery without any automated send.
 
 ## Global safety controls
 

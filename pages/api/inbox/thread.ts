@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import Imap from "imap";
 import { simpleParser } from "mailparser";
 import { getDb } from "@/lib/db";
+import { canAccessEmailAccount, requireApiActor, targetBelongsToEmailAccount } from "@/lib/authz";
 import { decryptSecret } from "@/lib/crypto";
 
 export interface EmailMessage {
@@ -21,10 +22,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).end();
   }
 
+  const actor = await requireApiActor(req, res);
+  if (!actor) return;
   const { targetId, emailAccountId } = req.query as { targetId?: string; emailAccountId?: string };
   if (!targetId || !emailAccountId) return res.status(400).json({ error: "targetId and emailAccountId required" });
 
   const db = getDb();
+  if (
+    !canAccessEmailAccount(db, actor, emailAccountId)
+    || !targetBelongsToEmailAccount(db, targetId, emailAccountId)
+  ) {
+    return res.status(404).json({ error: "Email conversation not found" });
+  }
 
   const target = db.prepare("SELECT email FROM targets WHERE id = ?").get(targetId) as { email: string | null } | undefined;
   if (!target?.email) return res.status(404).json({ error: "Target has no email" });
@@ -63,7 +72,7 @@ async function fetchThread(cfg: ImapConfig, contactEmail: string): Promise<Email
       host: cfg.host,
       port: cfg.port,
       tls: true,
-      tlsOptions: { rejectUnauthorized: false },
+      tlsOptions: { rejectUnauthorized: process.env.IMAP_ALLOW_SELF_SIGNED !== "true" },
       user: cfg.user,
       password: cfg.password,
       authTimeout: 10_000,

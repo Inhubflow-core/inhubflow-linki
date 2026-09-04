@@ -3,12 +3,14 @@ export * from "./jobs";
 export * from "./repository";
 export * from "./gemini";
 export * from "./pipeline";
+export * from "./runtime";
+export * from "./worker";
+export * from "./orchestrator";
+export * from "./handoff";
 export { createDisabledSdrBridge, type DisabledSdrBridgeOptions } from "./noop";
+export { createSdrBridge, type SdrBridgeOptions } from "./bridge";
 
-import { createDisabledSdrBridge } from "./noop";
+import { createSdrBridge } from "./bridge";
 
-/**
- * Stable core bridge. It is intentionally fail-closed in Phase 1A: importing
- * this module cannot initialize Gemini, access LinkedIn, or send anything.
- */
-export const sdrAgentBridge = createDisabledSdrBridge();
+/** Stable core bridge. Every capability remains fail-closed behind runtime gates. */
+export const sdrAgentBridge = createSdrBridge();

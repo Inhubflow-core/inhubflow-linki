@@ -1,8 +1,9 @@
-import crypto from "node:crypto";
 import type { Page } from "playwright";
 import { canonicalLinkedInVanity } from "./connection-reconciliation";
 import {
+  CAMPAIGN_OUTBOUND_TOLERANCE_MS,
   CampaignInboxSourceError,
+  parseCampaignTimestamp,
   type CampaignInboxObservation,
   type CampaignTargetScope,
 } from "./campaign-inbox";
@@ -13,7 +14,6 @@ const PROFILE_ENDPOINT = "https://www.linkedin.com/voyager/api/me";
 const PAGE_SIZE = 20;
 const MAX_CONVERSATION_PAGES = 50;
 const MAX_MESSAGE_PAGES = 10;
-const CAMPAIGN_TIME_TOLERANCE_MS = 10 * 60 * 1000;
 const AUTH_WALL = /\/login|\/authwall|\/checkpoint|\/uas\//i;
 
 interface JsonResponse {
@@ -47,6 +47,35 @@ export interface ParsedMessage {
   body: string;
   sentAt: string;
   isFromCurrentUser: boolean;
+}
+
+export interface CampaignMessageSelection {
+  outbound: ParsedMessage;
+  inbound: ParsedMessage[];
+}
+
+export function selectCampaignMessages(
+  messages: readonly ParsedMessage[],
+  campaignOutboundAt: string,
+): CampaignMessageSelection | null {
+  const campaignAt = parseCampaignTimestamp(campaignOutboundAt);
+  if (!Number.isFinite(campaignAt)) return null;
+  const outbound = messages
+    .filter((message) => message.isFromCurrentUser)
+    .sort((a, b) => parseCampaignTimestamp(a.sentAt) - parseCampaignTimestamp(b.sentAt))
+    .find((message) => {
+      const sentAt = parseCampaignTimestamp(message.sentAt);
+      return Number.isFinite(sentAt)
+        && sentAt >= campaignAt - CAMPAIGN_OUTBOUND_TOLERANCE_MS;
+    });
+  if (!outbound) return null;
+  const outboundAt = parseCampaignTimestamp(outbound.sentAt);
+  const inbound = messages.filter((message) => {
+    if (message.isFromCurrentUser) return false;
+    const sentAt = parseCampaignTimestamp(message.sentAt);
+    return Number.isFinite(sentAt) && sentAt > outboundAt;
+  });
+  return { outbound, inbound };
 }
 
 interface CandidateConversation extends ParsedConversation {
@@ -343,171 +372,55 @@ export class CampaignLinkedInMessagingSource {
     this.campaignCandidates = 0;
     const currentUrns = await this.loadCurrentProfileUrns(page);
     const candidates: CandidateConversation[] = [];
-    let totalPages = 0;
 
-    try {
-      for (let pageIndex = 0; pageIndex < this.maxConversationPages; pageIndex++) {
-        const start = pageIndex * PAGE_SIZE;
-        const url = `${CONVERSATION_ENDPOINT}?keyVersion=LEGACY_INBOX&q=participants&start=${start}&count=${PAGE_SIZE}`;
-        const response = await fetchJson(page, url);
-        if (response.status !== 200 || !response.body) break;
-        const collection = extractLegacyCollection(response.body);
-        if (!collection) break;
-        const conversations = parseConversations(response.body, this.scopes, currentUrns);
-        this.conversationsReviewed += collection.elements?.length ?? 0;
-        for (const conversation of conversations) {
-          const scope = scopeForIdentity(conversation.participant, this.scopes);
-          if (scope) {
-            candidates.push({ ...conversation, scope });
-            this.campaignCandidates++;
-          }
-        }
-        totalPages++;
-        const received = collection.elements?.length ?? 0;
-        if (received < PAGE_SIZE || received === 0) break;
+    for (let pageIndex = 0; pageIndex < this.maxConversationPages; pageIndex++) {
+      const start = pageIndex * PAGE_SIZE;
+      const url = `${CONVERSATION_ENDPOINT}?keyVersion=LEGACY_INBOX&q=participants&start=${start}&count=${PAGE_SIZE}`;
+      const response = await fetchJson(page, url);
+      assertResponse(response, "api_error");
+      const collection = extractLegacyCollection(response.body);
+      if (!collection) {
+        throw new CampaignInboxSourceError(
+          "LinkedIn conversation response shape is not recognized",
+          "contract_mismatch",
+        );
       }
-    } catch {
-      // Voyager REST failed — proceed to message load or DOM fallback
+      const conversations = parseConversations(response.body, this.scopes, currentUrns);
+      this.conversationsReviewed += collection.elements?.length ?? 0;
+      for (const conversation of conversations) {
+        const scope = scopeForIdentity(conversation.participant, this.scopes);
+        if (scope) {
+          candidates.push({ ...conversation, scope });
+          this.campaignCandidates++;
+        }
+      }
+      const received = collection.elements?.length ?? 0;
+      if (received < PAGE_SIZE || received === 0) break;
     }
 
     const observations: CampaignInboxObservation[] = [];
     for (const candidate of candidates) {
-      try {
-        const messages = await this.loadConversationMessages(page, candidate, currentUrns);
-        const outbounds = messages.filter((m) => m.isFromCurrentUser).sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt));
-        const firstOutbound = outbounds[0];
-        const outboundTimeStr = firstOutbound ? firstOutbound.sentAt : candidate.scope.outboundAt;
+      const messages = await this.loadConversationMessages(page, candidate, currentUrns);
+      const selection = selectCampaignMessages(messages, candidate.scope.outboundAt);
+      if (!selection) continue;
 
-        for (const message of messages) {
-          if (message.isFromCurrentUser) continue;
-          observations.push({
-            externalThreadId: candidate.threadId,
-            externalMessageId: message.messageId,
-            direction: "inbound",
-            body: message.body,
-            receivedAt: message.sentAt,
-            senderExternalId: message.sender.profileUrn,
-            senderName: message.sender.name,
-            senderMessagingUrn: message.sender.profileUrn,
-            senderProfileUrl: message.sender.profileUrl,
-            providerEventId: message.messageId,
-            rawKind: "message",
-            campaignOutboundObservedAt: outboundTimeStr,
-            campaignRunId: candidate.scope.runId,
-            campaignWorkflowId: candidate.scope.workflowId,
-          });
-        }
-      } catch { /* ignore per-conversation error */ }
-    }
-
-    // If API found no observations, extract directly from the rendered LinkedIn Messaging DOM
-    if (observations.length === 0) {
-      try {
-        const domThreads = await page.evaluate(() => {
-          const listItems = Array.from(document.querySelectorAll('.msg-conversation-listitem, li[class*="msg-conversation"]'));
-          const results = listItems.map((item) => {
-            const link = item.querySelector('a[href*="/messaging/thread/"], a[class*="msg-conversation-listitem__link"], a[class*="msg-conversation"]');
-            const href = link?.getAttribute('href') || '';
-            const threadMatch = href.match(/\/messaging\/thread\/([^/?#]+)/);
-            const threadId = threadMatch ? threadMatch[1] : href;
-
-            const nameEl = item.querySelector('.msg-conversation-listitem__participant-names, [class*="participant-name"], h3');
-            const name = (nameEl?.textContent || '').trim();
-
-            const profileLink = item.querySelector('a[href*="/in/"]');
-            const profileUrl = profileLink ? profileLink.getAttribute('href') : null;
-
-            const snippetEl = item.querySelector('.msg-conversation-card__message-snippet, [class*="message-snippet"]');
-            const lastMessage = (snippetEl?.textContent || '').trim();
-
-            const timeEl = item.querySelector('time, [class*="time-stamp"]');
-            const timeText = (timeEl?.textContent || '').trim();
-
-            return { threadId, name, profileUrl, lastMessage, timeText };
-          });
-
-          // Also check open active thread in main panel
-          const activeProfileLink = document.querySelector('.msg-thread__link-to-profile, .msg-entity-lockup__entity-title a[href*="/in/"]');
-          const activeProfileUrl = activeProfileLink ? activeProfileLink.getAttribute('href') : null;
-          const activeNameEl = document.querySelector('.msg-entity-lockup__entity-title, [class*="msg-entity-lockup"] h2, [class*="msg-entity-lockup"] a');
-          const activeName = (activeNameEl?.textContent || '').trim();
-          const activeMessageEls = Array.from(document.querySelectorAll('.msg-s-message-list__event, .msg-s-event-listitem__body'));
-          const activeLastMsgEl = activeMessageEls[activeMessageEls.length - 1];
-          const activeLastMsg = (activeLastMsgEl?.textContent || '').trim();
-          if (activeName && activeLastMsg) {
-            results.unshift({
-              threadId: window.location.pathname.match(/\/messaging\/thread\/([^/?#]+)/)?.[1] || '',
-              name: activeName,
-              profileUrl: activeProfileUrl,
-              lastMessage: activeLastMsg,
-              timeText: '',
-            });
-          }
-
-          return results;
+      for (const message of selection.inbound) {
+        observations.push({
+          externalThreadId: candidate.threadId,
+          externalMessageId: message.messageId,
+          direction: "inbound",
+          body: message.body,
+          receivedAt: message.sentAt,
+          senderExternalId: message.sender.profileUrn,
+          senderName: message.sender.name,
+          senderMessagingUrn: message.sender.profileUrn,
+          senderProfileUrl: message.sender.profileUrl,
+          providerEventId: message.messageId,
+          rawKind: "message",
+          campaignOutboundObservedAt: selection.outbound.sentAt,
+          campaignRunId: candidate.scope.runId,
+          campaignWorkflowId: candidate.scope.workflowId,
         });
-
-        this.conversationsReviewed += domThreads.length;
-        const normVanity = (url?: string | null) => {
-          if (!url) return null;
-          const match = url.match(/\/in\/([^/?#]+)/i);
-          return match ? match[1].toLowerCase() : null;
-        };
-        const normName = (name?: string | null) => {
-          if (!name) return "";
-          return name
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/[^a-z0-9]/g, "")
-            .trim();
-        };
-
-        for (const dom of domThreads) {
-          if (!dom.lastMessage) continue;
-          const domVanity = normVanity(dom.profileUrl);
-          const domNormName = normName(dom.name);
-
-          const matchedScope = this.scopes.find((s) => {
-            const scopeVanity = normVanity(s.linkedinUrl);
-            if (domVanity && scopeVanity && domVanity === scopeVanity) return true;
-            const scopeNormName = normName(s.fullName);
-            if (domNormName && scopeNormName && (domNormName === scopeNormName || domNormName.includes(scopeNormName) || scopeNormName.includes(domNormName))) {
-              return true;
-            }
-            return false;
-          });
-
-          if (matchedScope) {
-            this.campaignCandidates++;
-            let cleanBody = dom.lastMessage;
-            const colonIdx = cleanBody.indexOf(":");
-            if (colonIdx > 0 && colonIdx < 35) {
-              cleanBody = cleanBody.slice(colonIdx + 1).trim();
-            }
-            if (!cleanBody) cleanBody = dom.lastMessage;
-
-            const bodyHash = crypto.createHash("md5").update(cleanBody.trim()).digest("hex").slice(0, 16);
-            observations.push({
-              externalThreadId: dom.threadId || `thread-${matchedScope.targetId}`,
-              externalMessageId: `msg-${matchedScope.targetId}-${bodyHash}`,
-              direction: "inbound",
-              body: cleanBody,
-              receivedAt: new Date().toISOString(),
-              senderExternalId: matchedScope.messagingUrn || matchedScope.linkedinUrl || dom.name,
-              senderName: dom.name || matchedScope.fullName || "Lead",
-              senderMessagingUrn: matchedScope.messagingUrn || null,
-              senderProfileUrl: matchedScope.linkedinUrl || dom.profileUrl || null,
-              providerEventId: `event-${matchedScope.targetId}`,
-              rawKind: "message",
-              campaignOutboundObservedAt: matchedScope.outboundAt,
-              campaignRunId: matchedScope.runId,
-              campaignWorkflowId: matchedScope.workflowId,
-            });
-          }
-        }
-      } catch {
-        // DOM extraction non-fatal
       }
     }
 
@@ -516,38 +429,25 @@ export class CampaignLinkedInMessagingSource {
 
   private async loadCurrentProfileUrns(page: Page): Promise<Set<string>> {
     const urns = new Set<string>();
-    try {
-      const response = await fetchJson(page, PROFILE_ENDPOINT);
-      if (response.status === 200 && response.body && typeof response.body === "object") {
-        const visit = (value: unknown, depth: number): void => {
-          if (depth > 5 || !value || typeof value !== "object") return;
-          const record = value as Record<string, unknown>;
-          for (const key of ["entityUrn", "objectUrn", "profileUrn"]) {
-            if (typeof record[key] === "string" && record[key].includes("profile")) urns.add(record[key]);
-          }
-          for (const nested of Object.values(record)) {
-            if (nested && typeof nested === "object") visit(nested, depth + 1);
-          }
-        };
-        visit(response.body, 0);
-      }
-    } catch { /* profile API fallback below */ }
-
-    if (urns.size === 0) {
-      try {
-        const domUrls = await page.evaluate(() => {
-          const results: string[] = [];
-          const link = document.querySelector('.feed-identity-module a[href*="/in/"], a[href*="/in/"]');
-          if (link) {
-            const href = link.getAttribute('href');
-            if (href) results.push(href);
-          }
-          return results;
-        });
-        for (const u of domUrls) urns.add(u);
-      } catch { /* ignore */ }
+    const response = await fetchJson(page, PROFILE_ENDPOINT);
+    assertResponse(response, "api_error");
+    if (!response.body || typeof response.body !== "object") {
+      throw new CampaignInboxSourceError("LinkedIn current-user response shape is not recognized", "contract_mismatch");
     }
-
+    const visit = (value: unknown, depth: number): void => {
+      if (depth > 5 || !value || typeof value !== "object") return;
+      const record = value as Record<string, unknown>;
+      for (const key of ["entityUrn", "objectUrn", "profileUrn"]) {
+        if (typeof record[key] === "string" && record[key].includes("profile")) urns.add(record[key]);
+      }
+      for (const nested of Object.values(record)) {
+        if (nested && typeof nested === "object") visit(nested, depth + 1);
+      }
+    };
+    visit(response.body, 0);
+    if (urns.size === 0) {
+      throw new CampaignInboxSourceError("LinkedIn current-user profile URN is missing", "contract_mismatch");
+    }
     return urns;
   }
 
@@ -560,9 +460,14 @@ export class CampaignLinkedInMessagingSource {
     for (let pageIndex = 0; pageIndex < this.maxMessagePages; pageIndex++) {
       const url = `${CONVERSATION_ENDPOINT}/${encodeURIComponent(conversationPathId(candidate.threadId))}/events?start=${pageIndex * 100}&count=100`;
       const response = await fetchJson(page, url);
-      if (response.status !== 200 || !response.body) break;
+      assertResponse(response, "api_error");
       const collection = extractLegacyCollection(response.body);
-      if (!collection) break;
+      if (!collection) {
+        throw new CampaignInboxSourceError(
+          "LinkedIn message response shape is not recognized",
+          "contract_mismatch",
+        );
+      }
       all.push(...parseLegacyCampaignInboxFixture(response.body, currentUrns, candidate.participant));
       const received = collection.elements?.length ?? 0;
       if (received < 100 || received === 0) break;

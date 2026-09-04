@@ -6,6 +6,8 @@ import os from "node:os";
 import { getDb } from "@/lib/db";
 import { getSessionPage } from "@/lib/linkedin/session";
 import { sendMessage } from "@/lib/linkedin/message";
+import { canAccessLinkedInAccount, requireApiActor, targetBelongsToLinkedInAccount } from "@/lib/authz";
+import { takeHumanControl } from "@/lib/sdr-agent/handoff";
 
 export const config = {
   api: {
@@ -24,6 +26,9 @@ interface AttachmentPayload {
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
+  const actor = await requireApiActor(req, res);
+  if (!actor) return;
+
   const { targetId, accountId, messageText, threadId, attachment } = req.body as {
     targetId?: string;
     accountId?: string;
@@ -37,11 +42,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const db = getDb();
+  if (!canAccessLinkedInAccount(db, actor, accountId)) {
+    return res.status(404).json({ error: "Account not found" });
+  }
+  if (!targetBelongsToLinkedInAccount(db, targetId, accountId)) {
+    return res.status(404).json({ error: "Target not found for this account" });
+  }
   const target = db.prepare("SELECT id, full_name, linkedin_url, messaging_urn FROM targets WHERE id = ?").get(targetId) as
     | { id: string; full_name: string; linkedin_url: string; messaging_urn?: string | null }
     | undefined;
 
   if (!target) return res.status(404).json({ error: "Target not found" });
+
+  if (threadId) {
+    const threadMatches = db.prepare(`
+      SELECT 1 FROM linkedin_inbox_messages
+      WHERE account_id = ? AND target_id = ? AND external_thread_id = ?
+      UNION ALL
+      SELECT 1 FROM sdr_threads
+      WHERE channel = 'linkedin' AND linkedin_account_id = ?
+        AND target_id = ? AND external_thread_id = ?
+      LIMIT 1
+    `).get(accountId, targetId, threadId, accountId, targetId, threadId);
+    if (!threadMatches) return res.status(404).json({ error: "LinkedIn conversation not found" });
+  }
 
   const account = db.prepare("SELECT id, name, is_authenticated FROM accounts WHERE id = ?").get(accountId) as
     | { id: string; name: string; is_authenticated: number }
@@ -58,6 +82,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     WHERE rp.target_id = ? AND r.account_id = ?
     LIMIT 1
   `).get(targetId, accountId) as { run_id?: string; workflow_id?: string } | undefined;
+
+  const sdrThread = db.prepare(`
+    SELECT id FROM sdr_threads
+    WHERE target_id = ? AND channel = 'linkedin' AND linkedin_account_id = ?
+      AND (? IS NULL OR external_thread_id = ?)
+    ORDER BY updated_at DESC LIMIT 1
+  `).get(targetId, accountId, threadId ?? null, threadId ?? null) as { id: string } | undefined;
+  if (sdrThread) {
+    try {
+      takeHumanControl(db, {
+        threadId: sdrThread.id,
+        actorUserId: actor.id,
+        workspaceOwnerId: actor.workspaceOwnerId,
+        allowAdministrativeOverride: actor.isWorkspaceAdmin,
+      });
+    } catch (error) {
+      return res.status(409).json({ error: error instanceof Error ? error.message : "Conversation is locked" });
+    }
+  }
 
   let page;
   let tempFilePath: string | null = null;
@@ -186,6 +229,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       sentAt,
       JSON.stringify(metadata)
     );
+
+    if (sdrThread) {
+      db.transaction(() => {
+        db.prepare(`
+          INSERT INTO sdr_messages (
+            id, thread_id, direction, external_message_id, sender_name, body,
+            content_hash, sent_at, captured_at, delivery_status, metadata_json
+          ) VALUES (?, ?, 'outbound', ?, ?, ?, ?, ?, ?, 'sent', ?)
+          ON CONFLICT(thread_id, external_message_id) DO NOTHING
+        `).run(
+          crypto.randomUUID(),
+          sdrThread.id,
+          externalMessageId,
+          account.name || "Me",
+          finalBody,
+          crypto.createHash("sha256").update(finalBody, "utf8").digest("hex"),
+          sentAt,
+          sentAt,
+          JSON.stringify({ source: "human-inbox-reply", channel: "linkedin" }),
+        );
+        db.prepare(`
+          UPDATE sdr_threads SET last_outbound_at = ?, updated_at = datetime('now') WHERE id = ?
+        `).run(sentAt, sdrThread.id);
+      })();
+    }
 
     // 5. Update logs
     if (runProfile?.run_id) {

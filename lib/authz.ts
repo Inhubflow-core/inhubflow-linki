@@ -162,6 +162,63 @@ export function canAccessSdrThread(
   return false;
 }
 
+export function sdrThreadMatchesTarget(
+  db: Database.Database,
+  threadId: string,
+  targetId: string,
+): boolean {
+  return Boolean(
+    db.prepare("SELECT 1 FROM sdr_threads WHERE id = ? AND target_id = ?")
+      .get(threadId, targetId),
+  );
+}
+
+export function targetBelongsToLinkedInAccount(
+  db: Database.Database,
+  targetId: string,
+  accountId: string,
+): boolean {
+  return Boolean(db.prepare(`
+    SELECT 1
+    FROM targets t
+    WHERE t.id = ? AND (
+      t.last_replied_account_id = ?
+      OR EXISTS (
+        SELECT 1 FROM linkedin_inbox_messages m
+        WHERE m.target_id = t.id AND m.account_id = ?
+      )
+      OR EXISTS (
+        SELECT 1 FROM run_profiles rp
+        JOIN runs r ON r.id = rp.run_id
+        WHERE rp.target_id = t.id AND r.account_id = ?
+      )
+    )
+  `).get(targetId, accountId, accountId, accountId));
+}
+
+export function targetBelongsToEmailAccount(
+  db: Database.Database,
+  targetId: string,
+  emailAccountId: string,
+): boolean {
+  return Boolean(db.prepare(`
+    SELECT 1
+    FROM targets t
+    WHERE t.id = ? AND (
+      EXISTS (
+        SELECT 1 FROM email_replies er
+        WHERE er.target_id = t.id AND er.email_account_id = ?
+      )
+      OR EXISTS (
+        SELECT 1 FROM run_profiles rp
+        JOIN runs r ON r.id = rp.run_id
+        WHERE rp.target_id = t.id
+          AND COALESCE(rp.email_account_id, r.email_account_id) = ?
+      )
+    )
+  `).get(targetId, emailAccountId, emailAccountId));
+}
+
 export function canManageSdrAgent(
   db: Database.Database,
   actor: ApiActor,

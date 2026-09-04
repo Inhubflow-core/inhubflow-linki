@@ -13,12 +13,26 @@ export interface EmailAccount {
   password: string;
 }
 
+export interface SendEmailOptions {
+  messageId?: string;
+  inReplyTo?: string | null;
+  references?: string[];
+}
+
+export interface SendEmailResult {
+  messageId: string;
+  accepted: string[];
+  rejected: string[];
+  response: string | null;
+}
+
 export async function sendEmail(
   account: EmailAccount,
   to: string,
   subject: string,
-  body: string
-): Promise<void> {
+  body: string,
+  options: SendEmailOptions = {},
+): Promise<SendEmailResult> {
   const transporter = nodemailer.createTransport({
     host: account.smtp_host,
     port: account.smtp_port,
@@ -28,17 +42,26 @@ export async function sendEmail(
       pass: account.password,
     },
     // Allow self-signed certs (common in some corp SMTP setups)
-    tls: { rejectUnauthorized: false },
+    tls: { rejectUnauthorized: process.env.SMTP_ALLOW_SELF_SIGNED !== "true" },
   });
 
   const from = account.from_name
     ? `"${account.from_name}" <${account.from_email}>`
     : account.from_email;
 
-  await transporter.sendMail({
+  const info = await transporter.sendMail({
     from, to, subject, text: body,
     ...(account.reply_to ? { replyTo: account.reply_to } : {}),
+    ...(options.messageId ? { messageId: options.messageId } : {}),
+    ...(options.inReplyTo ? { inReplyTo: options.inReplyTo } : {}),
+    ...(options.references?.length ? { references: options.references } : {}),
   });
+  return {
+    messageId: String(info.messageId || options.messageId || ""),
+    accepted: Array.isArray(info.accepted) ? info.accepted.map(String) : [],
+    rejected: Array.isArray(info.rejected) ? info.rejected.map(String) : [],
+    response: typeof info.response === "string" ? info.response : null,
+  };
 }
 
 /**
@@ -52,7 +75,7 @@ export async function testSmtpConnection(account: Omit<EmailAccount, "id">): Pro
       port: account.smtp_port,
       secure: account.smtp_secure === 1,
       auth: { user: account.username, pass: account.password },
-      tls: { rejectUnauthorized: false },
+      tls: { rejectUnauthorized: process.env.SMTP_ALLOW_SELF_SIGNED !== "true" },
       connectionTimeout: 10_000,
       greetingTimeout: 10_000,
     });

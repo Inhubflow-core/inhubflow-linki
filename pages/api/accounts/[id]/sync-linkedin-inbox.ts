@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getDb } from "@/lib/db";
+import { canAccessLinkedInAccount, requireApiActor } from "@/lib/authz";
 import {
   campaignInboxContractVersion,
   syncLinkedInCampaignInbox,
@@ -11,10 +12,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).end();
   }
 
+  const actor = await requireApiActor(req, res);
+  if (!actor) return;
   const accountId = Array.isArray(req.query.id) ? req.query.id[0] : req.query.id;
   if (!accountId) return res.status(400).json({ error: "Missing account id" });
 
   const db = getDb();
+  if (!canAccessLinkedInAccount(db, actor, accountId)) {
+    return res.status(404).json({ error: "LinkedIn account not found" });
+  }
   const account = db.prepare("SELECT id, is_authenticated FROM accounts WHERE id = ?").get(accountId) as
     | { id: string; is_authenticated: number }
     | undefined;

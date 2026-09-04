@@ -11,6 +11,8 @@
     "lint": "eslint",
     "test:sdr-foundation": "node scripts/test-sdr-foundation.cjs",
     "test:sdr-shadow": "node scripts/test-sdr-shadow.cjs",
+    "test:sdr-runtime": "node scripts/test-sdr-runtime.cjs",
+    "test:sdr-authorization": "node scripts/test-sdr-authorization.cjs",
     "test:linkedin-connection-sync": "node scripts/test-linkedin-connection-sync.cjs",
     "test:linkedin-campaign-inbox": "node scripts/test-linkedin-campaign-inbox.cjs",
     "mirror:ee": "node scripts/mirror-ee.js"
@@ -42,7 +44,8 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "sonner": "^2.0.7",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

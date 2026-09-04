@@ -7,6 +7,7 @@ import Layout from "@/components/layout/Layout";
 import { Toaster } from "sonner";
 import { LanguageProvider } from "@/lib/i18n/LanguageContext";
 import { ThemeProvider, useTheme } from "@/lib/context/ThemeContext";
+import { NotificationProvider } from "@/components/notifications/NotificationProvider";
 
 const PUBLIC_PATHS = ["/login"];
 
@@ -34,7 +35,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function AppWithToaster({ Component, pageProps }: { Component: any; pageProps: any }) {
+function AppWithToaster({ Component, pageProps }: Pick<AppProps, "Component" | "pageProps">) {
   const { theme } = useTheme();
   return (
     <>
@@ -50,9 +51,11 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
       <ThemeProvider>
         <LanguageProvider>
           <AuthGuard>
-            <Layout>
-              <AppWithToaster Component={Component} pageProps={pageProps} />
-            </Layout>
+            <NotificationProvider>
+              <Layout>
+                <AppWithToaster Component={Component} pageProps={pageProps} />
+              </Layout>
+            </NotificationProvider>
           </AuthGuard>
         </LanguageProvider>
       </ThemeProvider>

@@ -1,54 +1,66 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getDb } from "@/lib/db";
-import { GeminiSdrProvider } from "@/lib/sdr-agent/gemini";
+import { requireApiActor, canManageSdrAgent } from "@/lib/authz";
 import { ensureSdrAgent } from "@/lib/sdr-agent/seed";
+import { simulateSdrDecision } from "@/lib/sdr-agent/simulation";
+import type { SdrConversationMessage } from "@/lib/sdr-agent/providers/provider";
+
+interface SimulationBody {
+  message?: unknown;
+  senderName?: unknown;
+  history?: unknown;
+  useLiveProvider?: unknown;
+}
+
+function parseHistory(value: unknown): SdrConversationMessage[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(-20).flatMap((item): SdrConversationMessage[] => {
+    if (!item || typeof item !== "object") return [];
+    const candidate = item as Record<string, unknown>;
+    if (
+      (candidate.direction !== "inbound" && candidate.direction !== "outbound" && candidate.direction !== "system") ||
+      typeof candidate.body !== "string" || candidate.body.length > 5_000
+    ) return [];
+    return [{
+      direction: candidate.direction,
+      body: candidate.body,
+      sentAt: typeof candidate.sentAt === "string" ? candidate.sentAt : undefined,
+    }];
+  });
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     res.setHeader("Allow", ["POST"]);
     return res.status(405).json({ error: "Method not allowed" });
   }
+  const actor = await requireApiActor(req, res);
+  if (!actor) return;
+  const db = getDb();
+  const { agent } = ensureSdrAgent(db, actor.workspaceOwnerId);
+  if (!canManageSdrAgent(db, actor, agent.id)) return res.status(403).json({ error: "No autorizado para usar el simulador SDR" });
+
+  const body = (req.body ?? {}) as SimulationBody;
+  if (typeof body.message !== "string" || !body.message.trim() || body.message.length > 20_000) {
+    return res.status(400).json({ error: "El mensaje debe contener entre 1 y 20000 caracteres" });
+  }
 
   try {
-    const { message, senderName, systemPrompt, companyContext, customInstructions } = req.body;
-
-    if (!message || typeof message !== "string") {
-      return res.status(400).json({ error: "El mensaje es obligatorio" });
+    const result = await simulateSdrDecision(db, {
+      workspaceOwnerId: actor.workspaceOwnerId,
+      message: body.message.trim(),
+      senderName: typeof body.senderName === "string" ? body.senderName.slice(0, 500) : null,
+      history: parseHistory(body.history),
+      useLiveProvider: body.useLiveProvider === true,
+    });
+    return res.status(200).json({ ok: true, ...result });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Error en la simulación SDR";
+    if (message === "Live SDR simulation is disabled") {
+      return res.status(409).json({ error: "La simulación live está desactivada; usa el provider de prueba o habilítala explícitamente." });
     }
-
-    const db = getDb();
-    const { agent, activeVersion } = ensureSdrAgent(db);
-
-    let policy = { company_context: "", handoff_rules: "" };
-    let config = { custom_instructions: "" };
-    try {
-      if (activeVersion?.policy_json) policy = JSON.parse(activeVersion.policy_json);
-      if (activeVersion?.config_json) config = JSON.parse(activeVersion.config_json);
-    } catch {}
-
-    const resolvedCompanyContext = companyContext ?? policy.company_context ?? "";
-    const resolvedCustomInstructions = customInstructions ?? config.custom_instructions ?? "";
-    const modelName = agent?.model || process.env.GEMINI_MODEL || "gemini-3.6-flash";
-
-    const startTime = Date.now();
-    const provider = new GeminiSdrProvider(process.env.GEMINI_API_KEY, modelName);
-
-    const decision = await provider.classifyAndDraft({
-      inboundMessage: message,
-      senderName: senderName || "Prospecto de Prueba",
-      companyContext: resolvedCompanyContext,
-      customInstructions: resolvedCustomInstructions,
-    });
-
-    const latencyMs = Date.now() - startTime;
-
-    return res.status(200).json({
-      ok: true,
-      decision,
-      latencyMs,
-      model: modelName,
-    });
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message || "Error en la simulación con Gemini" });
+    return res.status(500).json({ error: message });
   }
 }
+
+export const config = { api: { bodyParser: { sizeLimit: "100kb" } } };

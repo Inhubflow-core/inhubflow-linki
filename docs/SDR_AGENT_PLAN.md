@@ -3,7 +3,7 @@
 > 📌 **Referencia Histórica de Origen:**
 > Este proyecto utilizó originalmente como base tecnológica el software open-source [Linki](https://github.com/moaljumaa/linki) creado por Mo Aljumaa. A partir de la independencia total de InHubFlow (septiembre 2026), **se eliminan formalmente todas las restricciones de "no tocar core" o "no hacer cambios intrusivos"** que existían para mantener compatibilidad con upstream. InHubFlow ahora evoluciona como plataforma propietaria e independiente, con libertad total para modificar, refactorizar o potenciar su núcleo directamente.
 
-InHubFlow cuenta con un módulo SDR propio basado en Gemini que procesa conversaciones de LinkedIn por cada slot, clasifica la intención, responde preguntas, maneja objeciones, propone servicios, coordina reuniones en Calendly/Google Calendar y entrega la conversación a una persona cuando no pueda actuar con seguridad.
+InHubFlow cuenta con un módulo SDR propio basado en Gemini que procesa conversaciones de LinkedIn por cada slot, clasifica la intención, responde preguntas fundamentadas, maneja objeciones permitidas, propone servicios aprobados y entrega la conversación a una persona cuando no pueda actuar con seguridad. Después de completar el SDR no-calendar, coordinará reuniones mediante el calendario empresarial nativo de InHubFlow.
 
 ---
 
@@ -28,7 +28,7 @@ El comportamiento combinará:
 5. Function calling para acciones; Gemini nunca ejecuta directamente envíos, calendario o cambios de CRM.
 6. Orquestador determinista que valida confianza, permisos, estado, idempotencia y reglas comerciales.
 
-Usar el SDK oficial Google GenAI (`@google/genai`) detrás de una interfaz de proveedor. Verificar el modelo estable vigente al implementar; configurar un ID estable en DB/env (hoy la opción considerada es `gemini-3.7-flash`) y nunca depender de un alias móvil sin evaluación.
+Usar el SDK oficial Google GenAI (`@google/genai`) detrás de una interfaz de proveedor. Mantener el ID del modelo configurable y versionado en DB/env, y verificarlo antes de cada promoción; la implementación actual usa `gemini-3.6-flash` como valor predeterminado, nunca un alias móvil sin evaluación.
 
 ## Pipeline asíncrono y reanudable
 
@@ -66,7 +66,7 @@ Añadir migraciones idempotentes en `lib/db.ts` para tablas separadas del legacy
 - `sdr_decisions`: clasificación estructurada, confidence, risk, reasoning summary, citations, model/tokens/cost y prompt version.
 - `sdr_actions`: tool/action, payload validado, idempotency key, approval/execution state y resultado.
 - `human_handoffs`: motivo, resumen, recomendación, destinatario, SLA y resolución.
-- `calendar_integrations` y `meeting_bookings`: OAuth cifrado, calendar id, timezone, slots ofrecidos, selección y event id.
+- `native_calendars`, `calendar_resources`, `availability_rules`, `booking_holds`, `meeting_bookings`, `booking_participants` y `booking_reminders`: calendarios/recursos internos, timezone IANA, disponibilidad, selección, conflictos, reprogramación/cancelación y auditoría.
 - `notifications`: avisos in-app/email al responsable.
 
 No guardar chain-of-thought. Cifrar API keys, refresh tokens y secretos con `lib/crypto.ts`. Conservar un audit trail redactado y aplicar una política de retención.
@@ -186,15 +186,19 @@ Objetivo: no mezclar Inbox y SDR.
 
 **Checkpoint 5:** aprobación funciona; luego auto en una cuenta/contacto controlado sin duplicados ni destinatario incorrecto.
 
-## Fase 6 — Google Calendar
+## Fase 6 — Calendario empresarial nativo de InHubFlow
 
-- OAuth con state/CSRF, scopes mínimos, refresh tokens cifrados y callback seguro.
-- Herramientas FreeBusy/Events detrás de una interfaz calendar provider.
-- Preguntar timezone cuando falte; ofrecer 2–3 slots reales.
-- Crear evento sólo tras elección explícita; idempotency key y confirmación persistida.
-- Manejar expiración OAuth, conflictos de agenda y cancelaciones mediante handoff.
+Esta fase comienza sólo después de completar y verificar Shadow, approval y auto del SDR no-calendar. No integrar Google Calendar ni Calendly.
 
-**Checkpoint 6:** reunión de prueba creada una vez, en timezone correcto, y reflejada en Inbox/auditoría.
+- Crear calendarios y recursos internos con permisos por workspace/equipo/usuario.
+- Modelar reglas de disponibilidad, excepciones, buffers, duración, capacidad y zonas IANA con DST.
+- Consultar disponibilidad y crear holds transaccionales antes de ofrecer 2–3 horarios reales.
+- Crear una reserva sólo después de que el lead elija explícitamente un horario ofrecido; usar idempotency key, verificación de conflicto y confirmación persistida.
+- Proveer enlaces públicos de reserva seguros, participantes, reprogramación/cancelación, recordatorios y auditoría.
+- Vincular cada hold/reserva exactamente con el thread, mensaje, acción, lead y responsable del SDR/Inbox.
+- Ante timezone ambiguo, conflicto, hold vencido, permiso insuficiente o fallo de herramienta, realizar handoff.
+
+**Checkpoint 6:** reserva de prueba creada una vez, sin conflicto, en la zona/DST correcta, y reflejada exactamente en Inbox, notificaciones y auditoría.
 
 ## Fase 7 — RAG, objeciones y propuestas
 
@@ -229,10 +233,10 @@ Objetivo: no mezclar Inbox y SDR.
 - `lib/sdr-agent/tools/*`
 - `lib/linkedin/inbox-sync.ts`
 - `lib/linkedin/reply.ts`
-- `lib/google/calendar.ts`
+- `lib/calendar/**`
 - `pages/api/sdr-agents/**`
 - `pages/api/conversations/**`
-- `pages/api/integrations/google-calendar/**`
+- `pages/api/calendar/**`
 - `pages/inbox.tsx` y componentes extraídos bajo `components/inbox/**`
 - `lib/i18n/locales/{en,es,pt-BR}.json`
 - `docs/SDR_AGENT_PLAN.md`
@@ -280,7 +284,7 @@ Con USD 20 de crédito de desarrollo se debe priorizar **un checkpoint verificab
 ## Tests automáticos
 
 - Unit: schemas, policies, confidence gates, prompt-injection hard stops, pricing y timezone.
-- Integration: jobs/leases, restart, idempotency, DB transactions, provider failures, OAuth refresh y tool validation.
+- Integration: jobs/leases, restart, idempotency, DB transactions, provider failures, reservas/holds y validación de herramientas.
 - Fixtures EN/ES/PT-BR para cada intent y casos ambiguos/adversariales.
 - Simular cuatro slots y asegurar aislamiento/ownership.
 - Evals de clasificación, groundedness, tono, acción y handoff contra etiquetas humanas.
@@ -299,7 +303,7 @@ Con USD 20 de crédito de desarrollo se debe priorizar **un checkpoint verificab
 
 No activar `auto` si falta cualquiera de estos puntos:
 
-- credenciales Gemini y Calendar separadas/protegidas;
+- credenciales Gemini y secretos operativos separados/protegidos;
 - knowledge base aprobada;
 - evals trilingües con umbrales definidos;
 - handoff y kill switch probados;

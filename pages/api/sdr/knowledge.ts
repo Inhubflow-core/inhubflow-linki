@@ -1,89 +1,78 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getDb } from "@/lib/db";
-import { randomUUID } from "node:crypto";
+import { requireApiActor, canManageSdrAgent } from "@/lib/authz";
 import { ensureSdrAgent } from "@/lib/sdr-agent/seed";
+import {
+  approveKnowledgeSource,
+  createKnowledgeDraft,
+  listKnowledgeSources,
+  retireKnowledgeSource,
+} from "@/lib/sdr-agent/knowledge/repository";
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
+interface KnowledgeBody {
+  id?: unknown;
+  title?: unknown;
+  source_type?: unknown;
+  content?: unknown;
+  action?: unknown;
+}
+
+const SOURCE_TYPES = new Set(["text", "file", "url", "catalog", "policy"]);
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const actor = await requireApiActor(req, res);
+  if (!actor) return;
   const db = getDb();
+  const { agent } = ensureSdrAgent(db, actor.workspaceOwnerId);
+  if (!canManageSdrAgent(db, actor, agent.id)) {
+    return res.status(403).json({ error: "No autorizado para gestionar la base de conocimiento" });
+  }
 
   if (req.method === "GET") {
-    try {
-      const { agent } = ensureSdrAgent(db);
-      const sources = db.prepare("SELECT * FROM sdr_knowledge_sources WHERE agent_id = ? ORDER BY created_at DESC").all(agent.id) as any[];
-
-      const parsedSources = sources.map((s) => {
-        let meta = { content: "" };
-        try {
-          meta = JSON.parse(s.metadata_json);
-        } catch {}
-        return {
-          ...s,
-          content: meta.content || "",
-        };
-      });
-
-      return res.status(200).json({ sources: parsedSources });
-    } catch (error: any) {
-      return res.status(500).json({ error: error.message || "Error al obtener fuentes de conocimiento" });
-    }
+    const sources = listKnowledgeSources(db, agent.id, actor.workspaceOwnerId).map((source) => ({
+      ...source,
+      content: source.content ?? "",
+    }));
+    return res.status(200).json({ sources });
   }
 
-  if (req.method === "POST") {
-    try {
-      const { title, source_type, content, status } = req.body;
-      if (!title || !content) {
+  const body = (req.body ?? {}) as KnowledgeBody;
+  try {
+    if (req.method === "POST") {
+      if (body.action === "approve") {
+        if (typeof body.id !== "string") return res.status(400).json({ error: "id is required" });
+        const source = approveKnowledgeSource(db, body.id, actor.workspaceOwnerId, actor.id);
+        return res.status(200).json({ ok: true, source: { ...source, content: source.content ?? "" } });
+      }
+      if (typeof body.title !== "string" || typeof body.content !== "string") {
         return res.status(400).json({ error: "Título y contenido son obligatorios" });
       }
-
-      const { agent } = ensureSdrAgent(db);
-      const agentId = agent.id;
-      const id = randomUUID();
-      const metadata = JSON.stringify({ content: String(content) });
-
-      const allowedTypes = ["text", "file", "url", "catalog", "policy"];
-      const resolvedType = allowedTypes.includes(String(source_type).toLowerCase())
-        ? String(source_type).toLowerCase()
-        : "catalog";
-
-      const allowedStatuses = ["draft", "approved", "retired"];
-      const resolvedStatus = allowedStatuses.includes(String(status).toLowerCase())
-        ? String(status).toLowerCase()
-        : "approved";
-
-      db.prepare(`
-        INSERT INTO sdr_knowledge_sources (
-          id, agent_id, status, title, source_type, metadata_json
-        ) VALUES (?, ?, ?, ?, ?, ?)
-      `).run(
-        id,
-        agentId,
-        resolvedStatus,
-        title.trim(),
-        resolvedType,
-        metadata
-      );
-
-      return res.status(201).json({ id, ok: true });
-    } catch (error: any) {
-      console.error("[SDR Knowledge POST Error]:", error);
-      return res.status(500).json({ error: error.message || "Error al crear fuente de conocimiento" });
+      const sourceType = typeof body.source_type === "string" && SOURCE_TYPES.has(body.source_type)
+        ? body.source_type as "text" | "file" | "url" | "catalog" | "policy"
+        : "text";
+      const source = createKnowledgeDraft(db, {
+        agentId: agent.id,
+        workspaceOwnerId: actor.workspaceOwnerId,
+        title: body.title,
+        sourceType,
+        content: body.content,
+      });
+      return res.status(201).json({ ok: true, id: source.id, status: source.status });
     }
-  }
 
-  if (req.method === "DELETE") {
-    try {
-      const { id } = req.query;
-      if (!id || typeof id !== "string") {
-        return res.status(400).json({ error: "ID inválido" });
-      }
-
-      db.prepare("DELETE FROM sdr_knowledge_sources WHERE id = ?").run(id);
+    if (req.method === "DELETE") {
+      const id = typeof req.query.id === "string" ? req.query.id : "";
+      if (!id) return res.status(400).json({ error: "ID inválido" });
+      const retired = retireKnowledgeSource(db, id, actor.workspaceOwnerId);
+      if (!retired) return res.status(404).json({ error: "Knowledge source not found" });
       return res.status(200).json({ ok: true });
-    } catch (error: any) {
-      return res.status(500).json({ error: error.message || "Error al eliminar fuente" });
     }
-  }
 
-  res.setHeader("Allow", ["GET", "POST", "DELETE"]);
-  return res.status(405).json({ error: "Method not allowed" });
+    res.setHeader("Allow", ["GET", "POST", "DELETE"]);
+    return res.status(405).json({ error: "Method not allowed" });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Knowledge operation failed" });
+  }
 }
+
+export const config = { api: { bodyParser: { sizeLimit: "300kb" } } };

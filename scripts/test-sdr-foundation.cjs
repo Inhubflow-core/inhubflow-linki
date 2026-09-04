@@ -125,7 +125,10 @@ function testAdditiveSchema() {
     const tables = db.prepare(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'sdr_%' ORDER BY name"
     ).all();
-    assert.equal(tables.length, 13);
+    assert.equal(tables.length, 21);
+    assert.ok(tables.some((table) => table.name === "sdr_outbox"));
+    assert.ok(tables.some((table) => table.name === "sdr_runtime_state"));
+    assert.ok(tables.some((table) => table.name === "sdr_knowledge_chunks"));
     assert.equal(SDR_SCHEMA_MIGRATIONS.length, 29);
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM targets").get().count, 1);
     assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);

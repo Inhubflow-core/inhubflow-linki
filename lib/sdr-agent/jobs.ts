@@ -12,8 +12,10 @@ export type SdrJobType =
 export type SdrJobState = "queued" | "leased" | "waiting" | "completed" | "failed" | "cancelled";
 
 export interface EnqueueSdrJobInput {
+  workspaceOwnerId?: string | null;
   threadId?: string | null;
   messageId?: string | null;
+  controlEpoch?: number;
   jobType: SdrJobType;
   idempotencyKey: string;
   payload?: Record<string, unknown>;
@@ -38,6 +40,10 @@ export interface SdrJob {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+  workspace_owner_id: string | null;
+  control_epoch: number;
+  dead_letter_at: string | null;
+  heartbeat_at: string | null;
 }
 
 export interface LeasedSdrJob extends SdrJob {
@@ -98,14 +104,16 @@ export function enqueueSdrJob(db: Database.Database, input: EnqueueSdrJobInput):
 
   db.prepare(`
     INSERT INTO sdr_jobs (
-      id, thread_id, message_id, job_type, state, idempotency_key,
-      payload_json, max_attempts, next_attempt_at
-    ) VALUES (?, ?, ?, ?, 'queued', ?, ?, ?, ?)
+      id, workspace_owner_id, thread_id, message_id, control_epoch,
+      job_type, state, idempotency_key, payload_json, max_attempts, next_attempt_at
+    ) VALUES (?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?)
     ON CONFLICT(idempotency_key) DO NOTHING
   `).run(
     id,
+    input.workspaceOwnerId ?? null,
     input.threadId ?? null,
     input.messageId ?? null,
+    input.controlEpoch ?? 0,
     input.jobType,
     input.idempotencyKey,
     payloadJson,
@@ -142,11 +150,15 @@ export function recoverExpiredSdrLeases(db: Database.Database, now = new Date())
         WHEN attempts >= max_attempts THEN COALESCE(last_error, 'Lease expired after maximum attempts')
         ELSE last_error
       END,
+      dead_letter_at = CASE
+        WHEN attempts >= max_attempts THEN COALESCE(dead_letter_at, ?)
+        ELSE dead_letter_at
+      END,
       updated_at = ?
     WHERE state = 'leased'
       AND lease_expires_at IS NOT NULL
       AND lease_expires_at <= ?
-  `).run(timestamp, timestamp);
+  `).run(timestamp, timestamp, timestamp);
   return result.changes;
 }
 
@@ -187,9 +199,10 @@ export function leaseNextSdrJob(db: Database.Database, options: LeaseOptions): L
           attempts = attempts + 1,
           lease_token = ?,
           lease_expires_at = ?,
+          heartbeat_at = ?,
           updated_at = ?
         WHERE id = ? AND state = 'queued'
-      `).run(leaseToken, expiresSql, nowSql, candidate.id);
+      `).run(leaseToken, expiresSql, nowSql, nowSql, candidate.id);
       if (claimed.changes !== 1) continue;
       const job = readJob(db, candidate.id);
       if (job?.state === "leased" && job.lease_token === leaseToken && job.lease_expires_at) {
@@ -220,9 +233,10 @@ export function leaseSdrJob(db: Database.Database, jobId: string, options: Lease
       attempts = attempts + 1,
       lease_token = ?,
       lease_expires_at = ?,
+      heartbeat_at = ?,
       updated_at = ?
     WHERE id = ? AND state = 'queued'
-  `).run(leaseToken, expiresSql, nowSql, jobId);
+  `).run(leaseToken, expiresSql, nowSql, nowSql, jobId);
 
   if (claimed.changes !== 1) return null;
   const job = readJob(db, jobId);
@@ -247,10 +261,11 @@ export function renewSdrJobLease(
   }
   const result = db.prepare(`
     UPDATE sdr_jobs
-    SET lease_expires_at = ?, updated_at = ?
+    SET lease_expires_at = ?, heartbeat_at = ?, updated_at = ?
     WHERE id = ? AND state = 'leased' AND lease_token = ? AND lease_expires_at > ?
   `).run(
     toSqliteDate(new Date(now.getTime() + leaseMs)),
+    toSqliteDate(now),
     toSqliteDate(now),
     jobId,
     leaseToken,
@@ -316,10 +331,11 @@ export function failSdrJob(
       lease_expires_at = NULL,
       next_attempt_at = CASE WHEN attempts >= max_attempts THEN NULL ELSE ? END,
       last_error = ?,
+      dead_letter_at = CASE WHEN attempts >= max_attempts THEN ? ELSE dead_letter_at END,
       updated_at = ?,
       completed_at = CASE WHEN attempts >= max_attempts THEN ? ELSE NULL END
     WHERE id = ? AND state = 'leased' AND lease_token = ? AND lease_expires_at > ?
-  `).run(nextAttemptAt, error, timestamp, timestamp, jobId, options.leaseToken, timestamp);
+  `).run(nextAttemptAt, error, timestamp, timestamp, timestamp, jobId, options.leaseToken, timestamp);
 
   return readJob(db, jobId);
 }

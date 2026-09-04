@@ -1,5 +1,5 @@
 import Head from "next/head";
-import Link from "next/link";
+import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -7,17 +7,14 @@ import {
   RiAttachment2,
   RiBuildingLine,
   RiCheckDoubleLine,
-  RiCheckLine,
   RiCloseLine,
   RiDeleteBinLine,
   RiEmotionLine,
   RiExternalLinkLine,
   RiFilePdfLine,
   RiFileTextLine,
-  RiFilter3Line,
   RiImageLine,
   RiInboxLine,
-  RiInformationLine,
   RiLinkedinBoxLine,
   RiLoader4Line,
   RiMailLine,
@@ -28,10 +25,6 @@ import {
   RiSearchLine,
   RiSendPlaneLine,
   RiSparklingLine,
-  RiTimeLine,
-  RiUserLine,
-  RiVideoLine,
-  RiVolumeUpLine,
 } from "react-icons/ri";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import type { Locale, TranslationParams } from "@/lib/i18n/types";
@@ -60,6 +53,17 @@ interface LinkedInAccountOption {
   name: string;
   email: string;
   is_authenticated: number;
+}
+
+interface LinkedInDiagnosticReport {
+  account?: {
+    name?: string;
+    email?: string;
+    is_authenticated?: number;
+  };
+  browser?: {
+    screenshot?: string | null;
+  };
 }
 
 interface ChatAttachment {
@@ -230,10 +234,9 @@ function getAvatarColor(name: string | null | undefined): string {
 interface ChatPanelProps {
   reply: InboxReply;
   onActionDone: () => void;
-  hasPremium: boolean;
 }
 
-function ChatPanel({ reply, onActionDone, hasPremium }: ChatPanelProps) {
+function ChatPanel({ reply, onActionDone }: ChatPanelProps) {
   const { t, locale } = useTranslation();
   const hasEmailReply = reply.channel === "email" || reply.channel === "both";
   const hasLinkedInReply = reply.channel === "linkedin" || reply.channel === "both";
@@ -256,6 +259,7 @@ function ChatPanel({ reply, onActionDone, hasPremium }: ChatPanelProps) {
   const [aiSuggestionMeta, setAiSuggestionMeta] = useState<{ reasoning?: string; confidence?: string } | null>(null);
   const [autopilot, setAutopilot] = useState(reply.sdr_autopilot === 1);
   const [togglingAutopilot, setTogglingAutopilot] = useState(false);
+  const [changingControl, setChangingControl] = useState(false);
   const threadEndRef = useRef<HTMLDivElement>(null);
 
   // Sync autopilot state when reply prop updates
@@ -434,6 +438,9 @@ function ChatPanel({ reply, onActionDone, hasPremium }: ChatPanelProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           targetId: reply.id,
+          threadId: reply.sdr_thread_id,
+          accountId: reply.linkedin_account_id,
+          emailAccountId: reply.email_account_id,
           lastMessage: lastMsg,
           history,
         }),
@@ -464,6 +471,7 @@ function ChatPanel({ reply, onActionDone, hasPremium }: ChatPanelProps) {
     }
     setSending(true);
     try {
+      await acquireHumanControl();
       const response = await fetch("/api/inbox/reply-linkedin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -527,10 +535,13 @@ function ChatPanel({ reply, onActionDone, hasPremium }: ChatPanelProps) {
     if (!replyText.trim() || !reply.email || !reply.email_account_id) return;
     setSending(true);
     try {
+      await acquireHumanControl();
       const response = await fetch("/api/inbox/reply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          targetId: reply.id,
+          threadId: reply.sdr_thread_id,
           emailAccountId: reply.email_account_id,
           to: reply.email,
           subject: replySubject,
@@ -550,6 +561,51 @@ function ChatPanel({ reply, onActionDone, hasPremium }: ChatPanelProps) {
     }
   }
 
+  async function acquireHumanControl(): Promise<void> {
+    if (!reply.sdr_thread_id || reply.sdr_thread_state === "HUMAN_ACTIVE") return;
+    const response = await fetch(`/api/sdr/threads/${reply.sdr_thread_id}/takeover`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "No se pudo tomar control de la conversación");
+  }
+
+  async function handleTakeover() {
+    if (!reply.sdr_thread_id) return;
+    setChangingControl(true);
+    try {
+      await acquireHumanControl();
+      toast.success("Control humano activado. La IA permanecerá bloqueada hasta que la liberes.");
+      onActionDone();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo tomar control");
+    } finally {
+      setChangingControl(false);
+    }
+  }
+
+  async function handleReleaseControl() {
+    if (!reply.sdr_thread_id || !confirm("¿Liberar esta conversación para que el Asistente SDR pueda volver a actuar?")) return;
+    setChangingControl(true);
+    try {
+      const response = await fetch(`/api/sdr/threads/${reply.sdr_thread_id}/release`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nextState: "AI_ACTIVE" }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo liberar la IA");
+      toast.success("Control liberado explícitamente.");
+      onActionDone();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo liberar la IA");
+    } finally {
+      setChangingControl(false);
+    }
+  }
+
   async function handleToggleAutopilot() {
     setTogglingAutopilot(true);
     try {
@@ -557,7 +613,13 @@ function ChatPanel({ reply, onActionDone, hasPremium }: ChatPanelProps) {
       const res = await fetch("/api/inbox/toggle-autopilot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetId: reply.id, enabled: next }),
+        body: JSON.stringify({
+          targetId: reply.id,
+          accountId: reply.linkedin_account_id,
+          emailAccountId: reply.email_account_id,
+          threadId: reply.sdr_thread_id,
+          enabled: next,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al cambiar piloto automático");
@@ -566,8 +628,8 @@ function ChatPanel({ reply, onActionDone, hasPremium }: ChatPanelProps) {
         data.message || (next ? "Piloto Automático SDR activado." : "Piloto Automático SDR desactivado.")
       );
       onActionDone();
-    } catch (err: any) {
-      toast.error(err.message || "Error al alternar piloto automático");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error al alternar piloto automático");
     } finally {
       setTogglingAutopilot(false);
     }
@@ -675,6 +737,37 @@ function ChatPanel({ reply, onActionDone, hasPremium }: ChatPanelProps) {
           </button>
         </div>
       </div>
+
+      {reply.sdr_thread_id && ["HUMAN_REVIEW", "HUMAN_ACTIVE"].includes(reply.sdr_thread_state || "") && (
+        <div className={`mx-5 mt-4 flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between ${
+          reply.sdr_thread_state === "HUMAN_ACTIVE"
+            ? "border-blue-500/30 bg-blue-500/10"
+            : "border-amber-500/30 bg-amber-500/10"
+        }`}>
+          <div className="flex items-start gap-3">
+            <RiAlertLine className={reply.sdr_thread_state === "HUMAN_ACTIVE" ? "text-blue-500" : "text-amber-500"} size={20} />
+            <div>
+              <p className="text-sm font-semibold text-base-content">
+                {reply.sdr_thread_state === "HUMAN_ACTIVE" ? "Control humano activo" : "Intervención humana requerida"}
+              </p>
+              <p className="mt-0.5 text-xs text-base-content/60">
+                La IA está bloqueada para esta conversación{reply.sdr_handoff_reason ? ` · ${reply.sdr_handoff_reason}` : ""}.
+              </p>
+            </div>
+          </div>
+          {reply.sdr_thread_state === "HUMAN_REVIEW" ? (
+            <button type="button" onClick={handleTakeover} disabled={changingControl}
+              className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+              {changingControl ? "Tomando control…" : "Tomar control"}
+            </button>
+          ) : (
+            <button type="button" onClick={handleReleaseControl} disabled={changingControl}
+              className="rounded-xl border border-blue-500/30 bg-base-100 px-4 py-2 text-xs font-bold text-blue-500 disabled:opacity-50">
+              {changingControl ? "Actualizando…" : "Liberar IA"}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ── Messages Timeline Area ── */}
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-base-200/20">
@@ -952,12 +1045,13 @@ function ChatPanel({ reply, onActionDone, hasPremium }: ChatPanelProps) {
 
 // ── MAIN INBOX PAGE ──
 export default function InboxPage() {
+  const router = useRouter();
   const { t, locale } = useTranslation();
   const [replies, setReplies] = useState<InboxReply[]>([]);
   const [accounts, setAccounts] = useState<LinkedInAccountOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [channel, setChannel] = useState<ChannelFilter>("all");
+  const channel: ChannelFilter = "all";
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
   const [accountId, setAccountId] = useState("");
   const [selectedReply, setSelectedReply] = useState<InboxReply | null>(null);
@@ -965,7 +1059,7 @@ export default function InboxPage() {
   const [backfilling, setBackfilling] = useState(false);
   const [syncingLinkedIn, setSyncingLinkedIn] = useState(false);
   const [diagnosing, setDiagnosing] = useState(false);
-  const [diagnosticReport, setDiagnosticReport] = useState<any | null>(null);
+  const [diagnosticReport, setDiagnosticReport] = useState<LinkedInDiagnosticReport | null>(null);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default");
   const seenReplyIdsRef = useRef<Set<string>>(new Set());
   const initialLoadDoneRef = useRef(false);
@@ -1030,6 +1124,8 @@ export default function InboxPage() {
     const params = new URLSearchParams();
     if (channel !== "all") params.set("channel", channel);
     if (accountId) params.set("accountId", accountId);
+    const requestedThread = typeof router.query.thread === "string" ? router.query.thread : "";
+    if (requestedThread) params.set("thread", requestedThread);
 
     try {
       const response = await fetch(`/api/inbox?${params}`);
@@ -1052,64 +1148,31 @@ export default function InboxPage() {
     } finally {
       setLoading(false);
     }
-  }, [accountId, channel, t]);
+  }, [accountId, channel, router.query.thread, t]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  // Silent live auto-refresh for inbox list every 15s with Desktop Alerts and Sound
+  // Silent inbox refresh. Durable SDR alerts are handled globally by NotificationProvider.
   useEffect(() => {
     const interval = setInterval(() => {
       const params = new URLSearchParams();
       if (channel !== "all") params.set("channel", channel);
       if (accountId) params.set("accountId", accountId);
+      const requestedThread = typeof router.query.thread === "string" ? router.query.thread : "";
+      if (requestedThread) params.set("thread", requestedThread);
 
       fetch(`/api/inbox?${params}`)
-        .then((res) => res.json())
+        .then((response) => response.json())
         .then((data) => {
-          if (data.replies && Array.isArray(data.replies)) {
-            const newReplies = data.replies as InboxReply[];
-            setReplies(newReplies);
-
-            if (initialLoadDoneRef.current) {
-              for (const rep of newReplies) {
-                const repKey = `${rep.id}:${rep.linkedin_reply_received_at || rep.last_replied_at || ""}`;
-                if (!seenReplyIdsRef.current.has(repKey)) {
-                  seenReplyIdsRef.current.add(repKey);
-
-                  const sender = rep.full_name || rep.email || "Prospecto";
-                  const snippet =
-                    rep.linkedin_reply_body || rep.reply_body || rep.reply_summary || "Nuevo mensaje recibido";
-                  const isHandoff =
-                    rep.reply_kind === "human_handoff" ||
-                    rep.reply_kind === "objection" ||
-                    rep.reply_kind === "pricing";
-
-                  triggerDesktopNotification({
-                    title: isHandoff ? `⚠️ InHubFlow SDR: ¡Intervención Requerida!` : `💬 Nuevo mensaje de ${sender}`,
-                    body: `${sender}: "${snippet.slice(0, 110)}"`,
-                    onClick: () => {
-                      setSelectedReply(rep);
-                    },
-                  });
-                  break;
-                }
-              }
-            } else {
-              for (const rep of newReplies) {
-                const repKey = `${rep.id}:${rep.linkedin_reply_received_at || rep.last_replied_at || ""}`;
-                seenReplyIdsRef.current.add(repKey);
-              }
-              initialLoadDoneRef.current = true;
-            }
-          }
+          if (Array.isArray(data.replies)) setReplies(data.replies as InboxReply[]);
         })
         .catch(() => {});
-    }, 15000);
+    }, 15_000);
 
     return () => clearInterval(interval);
-  }, [accountId, channel]);
+  }, [accountId, channel, router.query.thread]);
 
   async function handleBackfill() {
     setBackfilling(true);
@@ -1168,8 +1231,8 @@ export default function InboxPage() {
       if (!res.ok) throw new Error(data.error || "Error al sincronizar LinkedIn");
       toast.success(`LinkedIn sincronizado: ${data.capturedCount || 0} respuestas capturadas.`);
       await load();
-    } catch (err: any) {
-      toast.error(err.message || "Error al sincronizar");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error al sincronizar");
     } finally {
       setSyncingLinkedIn(false);
     }
@@ -1186,10 +1249,10 @@ export default function InboxPage() {
       const res = await fetch(`/api/accounts/${accId}/diagnose-inbox-live`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al ejecutar diagnóstico.");
-      setDiagnosticReport(data);
+      setDiagnosticReport(data as LinkedInDiagnosticReport);
       toast.success("Diagnóstico en vivo completado.");
-    } catch (err: any) {
-      toast.error(err.message || "Error en el diagnóstico.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error en el diagnóstico.");
     } finally {
       setDiagnosing(false);
     }
@@ -1204,6 +1267,8 @@ export default function InboxPage() {
       if (quickFilter === "autopilot" && reply.sdr_autopilot !== 1) return false;
       if (
         quickFilter === "handoff" &&
+        reply.sdr_thread_state !== "HUMAN_REVIEW" &&
+        reply.sdr_thread_state !== "HUMAN_ACTIVE" &&
         reply.reply_kind !== "human_reply" &&
         reply.reply_kind !== "human_handoff" &&
         reply.reply_kind !== "objection" &&
@@ -1231,14 +1296,20 @@ export default function InboxPage() {
     });
   }, [replies, quickFilter, search]);
 
-  // Auto-select first conversation on initial load or if current selection is invalid
+  // Select the exact durable thread requested by a notification deep link.
   useEffect(() => {
+    const requestedThread = typeof router.query.thread === "string" ? router.query.thread : "";
+    if (requestedThread) {
+      const exact = filtered.find((reply) => reply.sdr_thread_id === requestedThread);
+      if (exact && selectedReply?.sdr_thread_id !== requestedThread) setSelectedReply(exact);
+      return;
+    }
     if (filtered.length > 0 && !selectedReply) {
       setSelectedReply(filtered[0]);
-    } else if (selectedReply && !filtered.some((r) => r.id === selectedReply.id)) {
+    } else if (selectedReply && !filtered.some((reply) => reply.id === selectedReply.id && reply.sdr_thread_id === selectedReply.sdr_thread_id)) {
       setSelectedReply(filtered[0] || null);
     }
-  }, [filtered, selectedReply]);
+  }, [filtered, router.query.thread, selectedReply]);
 
   return (
     <>
@@ -1280,13 +1351,13 @@ export default function InboxPage() {
                 </div>
               </div>
 
-              {diagnosticReport.browser?.screenshotBase64 && (
+              {diagnosticReport.browser?.screenshot && (
                 <div className="space-y-1.5">
                   <span className="text-xs font-semibold text-base-content/70">Captura en Vivo:</span>
                   <div className="rounded-xl overflow-hidden border border-base-300 bg-black/40">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={`data:image/png;base64,${diagnosticReport.browser.screenshotBase64}`}
+                      src={diagnosticReport.browser.screenshot}
                       alt="LinkedIn Live Screen"
                       className="w-full h-auto max-h-80 object-contain mx-auto"
                     />
@@ -1490,7 +1561,14 @@ export default function InboxPage() {
                 return (
                   <div
                     key={reply.id}
-                    onClick={() => setSelectedReply(reply)}
+                    onClick={() => {
+                      setSelectedReply(reply);
+                      const query = { ...router.query };
+                      if (reply.sdr_thread_id) query.thread = reply.sdr_thread_id;
+                      else delete query.thread;
+                      delete query.message;
+                      void router.replace({ pathname: "/inbox", query }, undefined, { shallow: true });
+                    }}
                     className={`relative p-3.5 cursor-pointer transition-all flex items-start gap-3 hover:bg-base-200/60 ${
                       isSelected
                         ? "bg-primary/10 border-l-4 border-primary"
@@ -1574,7 +1652,6 @@ export default function InboxPage() {
               key={selectedReply.id}
               reply={selectedReply}
               onActionDone={load}
-              hasPremium={true}
             />
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-base-200/10">

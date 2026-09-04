@@ -1,4 +1,6 @@
-# SDR IA — Recomendaciones para retomar
+# SDR IA — Recomendaciones para retomar (histórico)
+
+> **Superseded on 2026-09-04:** this review describes the older `f7ba894`/`b31c207` state. The operational bridge, worker, grounding, deterministic guardrails, durable handoff, and notifications have since been implemented in the current working tree. Do not resume from the unchecked items below; use [`SDR_AGENT_PROGRESS.md`](./SDR_AGENT_PROGRESS.md) as the source of truth. The remaining next phase is controlled Shadow canary evidence, followed by approval/outbox work with outbound gates still disabled.
 
 Fecha de revisión: 2026-08-28
 

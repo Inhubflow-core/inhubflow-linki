@@ -48,7 +48,7 @@ export const SdrInboundMessageSchema = z.discriminatedUnion("channel", [
 ]);
 export type SdrInboundMessage = z.infer<typeof SdrInboundMessageSchema>;
 
-export type SdrPublishReason = "queued" | "disabled" | "module_unavailable" | "invalid_configuration" | "invalid_event";
+export type SdrPublishReason = "queued" | "captured" | "disabled" | "module_unavailable" | "invalid_configuration" | "invalid_event";
 
 export interface SdrPublishResult {
   accepted: boolean;
@@ -60,8 +60,9 @@ export interface SdrPublishResult {
 export interface SdrTickResult {
   processed: number;
   failed: number;
+  cancelled?: number;
   skipped: boolean;
-  reason?: "disabled" | "module_unavailable" | "invalid_configuration";
+  reason?: string;
 }
 
 export interface SdrModuleStatus {
@@ -69,6 +70,14 @@ export interface SdrModuleStatus {
   requestedMode: SdrMode;
   effectiveMode: SdrMode;
   outboundEnabled: boolean;
+  inboundEnabled?: boolean;
+  providerEnabled?: boolean;
+  linkedinOutboundEnabled?: boolean;
+  emailOutboundEnabled?: boolean;
+  calendarEnabled?: boolean;
+  blockers?: string[];
+  worker?: Record<string, unknown> | null;
+  queue?: Record<string, number>;
   reason: "ready" | "disabled" | "module_unavailable" | "invalid_configuration";
 }
 
@@ -77,7 +86,7 @@ export interface SdrModuleStatus {
  * policies, and channel-specific implementations stay behind this boundary.
  */
 export interface SdrModuleBridge {
-  getStatus(): SdrModuleStatus;
+  getStatus(workspaceOwnerId?: string): SdrModuleStatus;
   publishInboundMessage(event: unknown): Promise<SdrPublishResult>;
   runWorkerTick(): Promise<SdrTickResult>;
 }

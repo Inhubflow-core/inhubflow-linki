@@ -34,12 +34,18 @@ const {
   listCampaignInboxAccountIds,
   shouldSyncLinkedInCampaignInbox,
 } = require("../lib/linkedin/campaign-inbox.ts");
-const { parseLegacyCampaignInboxFixture } = require("../lib/linkedin/campaign-inbox-source.ts");
+const {
+  parseLegacyCampaignInboxFixture,
+  selectCampaignMessages,
+} = require("../lib/linkedin/campaign-inbox-source.ts");
+const { applySdrSchema } = require("../lib/sdr-agent/schema.ts");
 
 function createDb() {
   const db = new Database(":memory:");
   db.pragma("foreign_keys = ON");
   db.exec(`
+    CREATE TABLE users (id TEXT PRIMARY KEY, owner_id TEXT, created_at TEXT DEFAULT (datetime('now')));
+    CREATE TABLE email_accounts (id TEXT PRIMARY KEY);
     CREATE TABLE accounts (id TEXT PRIMARY KEY, name TEXT, email TEXT, is_authenticated INTEGER DEFAULT 1,
       linkedin_inbox_synced_at TEXT, linkedin_inbox_sync_error TEXT, linkedin_inbox_contract_version TEXT);
     CREATE TABLE targets (id TEXT PRIMARY KEY, full_name TEXT, linkedin_url TEXT, messaging_urn TEXT,
@@ -69,6 +75,7 @@ function createDb() {
       UNIQUE(account_id, external_thread_id, external_message_id)
     );
   `);
+  applySdrSchema(db);
   return db;
 }
 
@@ -123,6 +130,11 @@ try {
   };
   let result = captureCampaignInboxObservations(db, "account-a", [inbound], scopes);
   assert.equal(result.captured, 1);
+  assert.equal(db.prepare("SELECT COUNT(*) AS c FROM sdr_threads").get().c, 1);
+  assert.equal(db.prepare("SELECT COUNT(*) AS c FROM sdr_messages").get().c, 1);
+  assert.equal(db.prepare("SELECT COUNT(*) AS c FROM sdr_jobs").get().c, 1);
+  assert.equal(db.prepare("SELECT external_thread_id FROM sdr_threads").get().external_thread_id, inbound.externalThreadId);
+  assert.equal(db.prepare("SELECT external_message_id FROM sdr_messages").get().external_message_id, inbound.externalMessageId);
   assert.equal(db.prepare("SELECT body FROM linkedin_inbox_messages").get().body, inbound.body);
   assert.equal(db.prepare("SELECT last_replied_account_id FROM targets WHERE id = 'campaign-target'").get().last_replied_account_id, "account-a");
   assert.equal(db.prepare("SELECT state FROM run_profile_tracks WHERE id = 'track-campaign'").get().state, "skipped");
@@ -130,6 +142,9 @@ try {
   result = captureCampaignInboxObservations(db, "account-a", [inbound], scopes);
   assert.equal(result.captured, 0);
   assert.equal(result.duplicates, 1);
+  assert.equal(db.prepare("SELECT COUNT(*) AS c FROM sdr_threads").get().c, 1);
+  assert.equal(db.prepare("SELECT COUNT(*) AS c FROM sdr_messages").get().c, 1);
+  assert.equal(db.prepare("SELECT COUNT(*) AS c FROM sdr_jobs").get().c, 1);
 
   result = captureCampaignInboxObservations(db, "account-a", [{
     ...inbound,
@@ -149,6 +164,67 @@ try {
   }], scopes);
   assert.equal(result.skipped[0].reason, "invalid_observation");
   assert.equal(db.prepare("SELECT COUNT(*) AS c FROM linkedin_inbox_messages").get().c, 1);
+
+  result = captureCampaignInboxObservations(db, "account-a", [{
+    ...inbound,
+    externalMessageId: "stale-message",
+    body: "Historical reply",
+    receivedAt: "2026-08-28T09:59:00.000Z",
+  }], scopes);
+  assert.equal(result.captured, 0);
+  assert.equal(result.skipped[0].reason, "stale_message");
+
+  result = captureCampaignInboxObservations(db, "account-a", [{
+    ...inbound,
+    externalMessageId: "unverified-outbound",
+    body: "Reply after unrelated outbound",
+    campaignOutboundObservedAt: "2026-08-28T09:30:00.000Z",
+  }], scopes);
+  assert.equal(result.captured, 0);
+  assert.equal(result.skipped[0].reason, "not_campaign_message");
+
+  result = captureCampaignInboxObservations(db, "account-a", [{
+    ...inbound,
+    externalMessageId: "wrong-run",
+    body: "Reply attributed to another run",
+    campaignRunId: "run-b",
+  }], scopes);
+  assert.equal(result.captured, 0);
+  assert.equal(result.skipped[0].reason, "not_campaign_message");
+
+  result = captureCampaignInboxObservations(db, "account-a", [{
+    ...inbound,
+    externalMessageId: "message-repeated-body",
+    body: "Another campaign reply",
+    receivedAt: "2026-08-28T11:05:00.000Z",
+  }], scopes);
+  assert.equal(result.captured, 1);
+  assert.equal(result.duplicates, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS c FROM linkedin_inbox_messages").get().c, 2);
+
+  const self = {
+    profileUrn: "urn:li:fsd_profile:self",
+    publicIdentifier: "self",
+    profileUrl: "https://linkedin.com/in/self/",
+    name: "Self",
+  };
+  const contact = {
+    profileUrn: "urn:li:fsd_profile:campaign-contact",
+    publicIdentifier: "campaign-contact",
+    profileUrl: "https://linkedin.com/in/campaign-contact/",
+    name: "Campaign Contact",
+  };
+  const selectedMessages = selectCampaignMessages([
+    { messageId: "old-outbound", sender: self, body: "Old outreach", sentAt: "2026-08-01T09:00:00.000Z", isFromCurrentUser: true },
+    { messageId: "old-inbound", sender: contact, body: "Old reply", sentAt: "2026-08-01T09:05:00.000Z", isFromCurrentUser: false },
+    { messageId: "campaign-outbound", sender: self, body: "Campaign outreach", sentAt: "2026-08-28T09:58:00.000Z", isFromCurrentUser: true },
+    { messageId: "campaign-inbound", sender: contact, body: "Campaign reply", sentAt: "2026-08-28T10:10:00.000Z", isFromCurrentUser: false },
+  ], "2026-08-28 10:00:00");
+  assert.equal(selectedMessages.outbound.messageId, "campaign-outbound");
+  assert.deepEqual(selectedMessages.inbound.map((message) => message.messageId), ["campaign-inbound"]);
+  assert.equal(selectCampaignMessages([
+    { messageId: "too-old-outbound", sender: self, body: "Old outreach", sentAt: "2026-08-28T09:40:00.000Z", isFromCurrentUser: true },
+  ], "2026-08-28 10:00:00"), null);
 
   db.prepare("UPDATE accounts SET linkedin_inbox_synced_at = datetime('now') WHERE id = 'account-a'").run();
   assert.equal(shouldSyncLinkedInCampaignInbox("account-a", db), false);

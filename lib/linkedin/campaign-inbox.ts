@@ -7,6 +7,7 @@ import {
   canonicalLinkedInVanity,
 } from "@/lib/linkedin/connection-reconciliation";
 import type { LinkedInInboxObservation } from "./inbox-sync";
+import { captureSdrInboundMessage } from "@/lib/sdr-agent/repository";
 
 export interface CampaignTargetScope {
   targetId: string;
@@ -62,7 +63,8 @@ export interface CampaignInboxSyncOptions {
 }
 
 export function campaignInboxSchedulerEnabled(): boolean {
-  return process.env.LINKEDIN_CAMPAIGN_INBOX_SYNC_ENABLED === "true";
+  return process.env.LINKEDIN_CAMPAIGN_INBOX_SYNC_ENABLED === "true"
+    && process.env.LINKEDIN_INBOX_CANARY_PASSED === "true";
 }
 
 export function campaignInboxContractVersion(): string | null {
@@ -149,7 +151,9 @@ function observationKey(value: unknown): { externalThreadId?: string; externalMe
   };
 }
 
-function parseTimestamp(value: string): number {
+export const CAMPAIGN_OUTBOUND_TOLERANCE_MS = 10 * 60 * 1000;
+
+export function parseCampaignTimestamp(value: string): number {
   const normalized = value.includes("T") ? value : `${value.replace(" ", "T")}Z`;
   return Date.parse(normalized);
 }
@@ -157,16 +161,6 @@ function parseTimestamp(value: string): number {
 function normalizeUrn(value: string | null | undefined): string | null {
   const normalized = value?.trim();
   return normalized || null;
-}
-
-function normalizePersonName(name?: string | null): string {
-  if (!name) return "";
-  return name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]/g, "")
-    .trim();
 }
 
 function findScope(
@@ -197,22 +191,6 @@ function findScope(
       return { reason: "identity_conflict" };
     }
     return { scope: vanityMatches[0], identityMode: "profile_url" };
-  }
-
-  // Name-based fallback matching ONLY when URN and Vanity URL are both absent (e.g. DOM extraction where LinkedIn didn't render profile link in card)
-  if (!senderUrn && !senderVanity) {
-    const obsName = normalizePersonName(observation.senderName);
-    if (obsName) {
-      const nameMatches = scopes.filter((scope) => {
-        const scopeName = normalizePersonName(scope.fullName);
-        return scopeName && (scopeName === obsName || scopeName.includes(obsName) || obsName.includes(scopeName));
-      });
-      if (nameMatches.length === 1) {
-        return { scope: nameMatches[0], identityMode: "profile_url" };
-      }
-      if (nameMatches.length > 1) return { reason: "ambiguous_target" };
-    }
-    return { reason: "invalid_observation" };
   }
 
   return { reason: "unmatched_target" };
@@ -260,7 +238,7 @@ export function captureCampaignInboxObservations(
 
   for (const observation of observations) {
     const key = observationKey(observation);
-    const receivedAtMs = typeof observation.receivedAt === "string" ? parseTimestamp(observation.receivedAt) : NaN;
+    const receivedAtMs = typeof observation.receivedAt === "string" ? parseCampaignTimestamp(observation.receivedAt) : NaN;
     if (
       observation.direction !== "inbound"
       || typeof observation.body !== "string"
@@ -279,15 +257,29 @@ export function captureCampaignInboxObservations(
       result.skipped.push({ ...key, reason: match.reason });
       continue;
     }
+    if (match.scope.accountId !== accountId) {
+      result.skipped.push({ ...key, reason: "wrong_account_ownership" });
+      continue;
+    }
+    if (observation.campaignRunId !== match.scope.runId) {
+      result.skipped.push({ ...key, reason: "not_campaign_message" });
+      continue;
+    }
 
-    const alreadyCaptured = db.prepare(`
-      SELECT 1 FROM linkedin_inbox_messages
-      WHERE target_id = ? AND account_id = ? AND direction = 'inbound' AND body = ?
-      LIMIT 1
-    `).get(match.scope.targetId, accountId, observation.body.trim());
-    if (alreadyCaptured) {
-      result.duplicates++;
-      result.skipped.push({ ...key, reason: "duplicate" });
+    const campaignOutboundAtMs = parseCampaignTimestamp(match.scope.outboundAt);
+    const observedOutboundAtMs = typeof observation.campaignOutboundObservedAt === "string"
+      ? parseCampaignTimestamp(observation.campaignOutboundObservedAt)
+      : NaN;
+    if (
+      !Number.isFinite(campaignOutboundAtMs)
+      || !Number.isFinite(observedOutboundAtMs)
+      || observedOutboundAtMs < campaignOutboundAtMs - CAMPAIGN_OUTBOUND_TOLERANCE_MS
+    ) {
+      result.skipped.push({ ...key, reason: "not_campaign_message" });
+      continue;
+    }
+    if (receivedAtMs <= observedOutboundAtMs) {
+      result.skipped.push({ ...key, reason: "stale_message" });
       continue;
     }
 
@@ -295,6 +287,7 @@ export function captureCampaignInboxObservations(
     const metadata = JSON.stringify({
       source: "campaign-inbox",
       campaign_outbound_at: match.scope.outboundAt,
+      campaign_outbound_observed_at: new Date(observedOutboundAtMs).toISOString(),
       provider_event_id: observation.providerEventId ?? null,
     });
     const captured = db.transaction(() => {
@@ -316,6 +309,24 @@ export function captureCampaignInboxObservations(
       if (inserted.changes !== 1) return false;
       updateReply.run(sentAt, accountId, match.scope.targetId, sentAt);
       stopTracks.run(match.scope.targetId, accountId);
+      captureSdrInboundMessage(db, {
+        eventId: `linkedin-campaign:${accountId}:${observation.externalMessageId}`,
+        channel: "linkedin",
+        targetId: match.scope.targetId,
+        accountId,
+        externalThreadId: observation.externalThreadId,
+        externalMessageId: observation.externalMessageId,
+        senderExternalId: observation.senderExternalId ?? observation.senderMessagingUrn ?? null,
+        senderName: observation.senderName ?? null,
+        body: observation.body.trim(),
+        receivedAt: sentAt,
+        metadata: {
+          source: "campaign-inbox",
+          campaignRunId: match.scope.runId,
+          campaignWorkflowId: match.scope.workflowId,
+          identityMode: match.identityMode,
+        },
+      });
       return true;
     })();
     if (captured) result.captured++;
@@ -338,7 +349,7 @@ export function shouldSyncLinkedInCampaignInbox(
   const intervalMs = process.env.LINKEDIN_INBOX_SYNC_INTERVAL_MS
     ? parseInt(process.env.LINKEDIN_INBOX_SYNC_INTERVAL_MS, 10)
     : 60 * 1000;
-  return Date.now() - parseTimestamp(row.linkedin_inbox_synced_at) >= intervalMs;
+  return Date.now() - parseCampaignTimestamp(row.linkedin_inbox_synced_at) >= intervalMs;
 }
 
 export async function syncLinkedInCampaignInbox(
