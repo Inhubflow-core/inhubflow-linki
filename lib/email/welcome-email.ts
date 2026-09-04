@@ -163,7 +163,10 @@ export async function sendWelcomeEmail(params: WelcomeEmailParams): Promise<{ su
               <p style="margin: 0; color: #94a3b8; font-size: 11px;">
                 Escríbenos directamente respondiendo a este correo o contacta a <a href="mailto:soporte@inhubflow.online" style="color: #2563eb; text-decoration: none;">soporte@inhubflow.online</a>
               </p>
-              <p style="margin: 12px 0 0 0; color: #cbd5e1; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;">
+              <p style="margin: 10px 0 4px 0; color: #94a3b8; font-size: 10px;">
+                Este es un correo transaccional generado automáticamente por la activación de tu cuenta corporativa.
+              </p>
+              <p style="margin: 6px 0 0 0; color: #cbd5e1; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;">
                 &copy; 2026 InHubFlow B2B Suite • inhubflow.online
               </p>
             </td>
@@ -177,6 +180,38 @@ export async function sendWelcomeEmail(params: WelcomeEmailParams): Promise<{ su
 </html>
   `;
 
+  const textContent = `
+Hola ${displayName},
+
+Tu espacio de trabajo en InHubFlow B2B Suite ha sido activado con éxito. Ya puedes comenzar a automatizar tus campañas de LinkedIn, prospección multicanal y agendamiento comercial con Inteligencia Artificial.
+
+DATOS DE ACCESO A TU PLATAFORMA:
+- Plataforma: ${loginUrl}
+- Usuario / Email: ${to}
+- Contraseña temporal: ${password}
+- Plan Activado: ${planName} (${slotsLimit} Slots)
+
+Para ingresar directamente a tu cuenta:
+${loginUrl}
+
+Primeros pasos recomendados:
+1. Inicia sesión con tu correo y tu contraseña temporal.
+2. Ve a Configuración > LinkedIn para conectar tu cuenta o las de tu equipo.
+3. Usa el Lead Finder para crear listas de contactos calificados.
+4. Configura tu Asistente SDR con IA para automatizar el seguimiento de prospectos.
+
+Recomendación de seguridad: Puedes cambiar tu contraseña temporal en cualquier momento desde Configuración > General.
+
+¿Necesitas ayuda o soporte para configurar tus campañas?
+Responde directamente a este correo o escribe a soporte@inhubflow.online
+
+---
+InHubFlow B2B Suite • inhubflow.online
+Este es un correo transaccional generado automáticamente por la activación de tu cuenta corporativa.
+`.trim();
+
+  const emailSubject = `Acceso a tu cuenta — InHubFlow B2B Suite (${planName})`;
+
   // Attempt 1: Send via official domain
   try {
     const res = await fetch("https://api.resend.com/emails", {
@@ -188,8 +223,13 @@ export async function sendWelcomeEmail(params: WelcomeEmailParams): Promise<{ su
       body: JSON.stringify({
         from: primaryFrom,
         to: [to],
-        subject: `¡Bienvenido a InHubFlow B2B! 🚀 Tus credenciales de acceso (${planName})`,
+        reply_to: "info@inhubflow.online",
+        subject: emailSubject,
         html,
+        text: textContent,
+        headers: {
+          "X-Entity-Ref-ID": `welcome-${Date.now()}`,
+        },
       }),
     });
 
@@ -212,8 +252,10 @@ export async function sendWelcomeEmail(params: WelcomeEmailParams): Promise<{ su
       body: JSON.stringify({
         from: "InHubFlow Suite <onboarding@resend.dev>",
         to: [to],
-        subject: `¡Bienvenido a InHubFlow B2B! 🚀 Tus credenciales de acceso (${planName})`,
+        reply_to: "info@inhubflow.online",
+        subject: emailSubject,
         html,
+        text: textContent,
       }),
     });
 
