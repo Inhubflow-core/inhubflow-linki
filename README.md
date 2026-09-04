@@ -10,7 +10,7 @@
 
 **InHubFlow** es una plataforma de prospección B2B y automatización multicanal diseñada para fundadores, consultores y agencias que buscan escalar su pipeline de ventas sin depender de herramientas desconectadas ni pagar licencias abusivas por usuario.
 
-Permite construir secuencias multicanal sincronizadas (LinkedIn + Email), enriquecer prospectos, gestionar respuestas con un Agente SDR de IA autónomo 24/7 y proteger las cuentas con tecnología de navegación sigilosa (Playwright Stealth).
+Permite construir secuencias multicanal sincronizadas (LinkedIn + Email), enriquecer prospectos, gestionar respuestas con un Asistente SDR de IA autónomo 24/7 y proteger las cuentas con tecnología de navegación sigilosa (Playwright Stealth).
 
 ---
 
@@ -21,7 +21,7 @@ Permite construir secuencias multicanal sincronizadas (LinkedIn + Email), enriqu
 - **Constructor visual de flujos**: encadena pasos con tiempos de espera configurables y condiciones inteligentes.
 - **A/B Testing de mensajes**: rota plantillas dinámicamente para optimizar tasas de respuesta.
 
-### 🤖 Agente SDR de IA 24/7 (Nativo)
+### 🤖 Asistente SDR de IA 24/7 (Nativo)
 - **Calificación y Respuestas Autónomas**: lee respuestas entrantes, responde dudas u objeciones frecuentes y envía enlaces de Calendly/Google Calendar cuando el prospecto está listo para agendar.
 - **Bandeja de Entrada Unificada**: centraliza conversaciones de múltiples cuentas de LinkedIn y cuentas de email en un solo lugar.
 

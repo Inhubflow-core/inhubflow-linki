@@ -985,7 +985,7 @@ export default function InboxPage() {
       playNotificationChime();
       triggerDesktopNotification({
         title: "🔔 Notificaciones InHubFlow Activas",
-        body: "¡Listo! Sonará un timbre y recibirás una alerta cuando tu Agente SDR IA requiera tu ayuda.",
+        body: "¡Listo! Sonará un timbre y recibirás una alerta cuando tu Asistente SDR IA requiera tu ayuda.",
         onClick: () => {},
       });
       toast.success("Notificaciones activas. ¡Prueba emitida con sonido!");

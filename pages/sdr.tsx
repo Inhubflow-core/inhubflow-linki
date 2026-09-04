@@ -126,7 +126,7 @@ export default function SdrPage() {
       setData(json);
 
       // Populate Form State
-      setAgentName(json.agent.name || "Agente SDR InHubFlow");
+      setAgentName(json.agent.name || "Asistente SDR InHubFlow");
       setMode(json.agent.mode || "shadow");
       setModel(json.agent.model || "gemini-3.6-flash");
       setConfidenceThreshold(json.agent.confidence_threshold || 0.85);
@@ -183,7 +183,7 @@ export default function SdrPage() {
         throw new Error(err.error || "Error al guardar");
       }
 
-      toast.success("Configuración del Agente SDR guardada correctamente");
+      toast.success("Configuración del Asistente SDR guardada correctamente");
       loadConfig();
     } catch (err: any) {
       toast.error(err.message || "Error al guardar cambios");

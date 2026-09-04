@@ -56,7 +56,7 @@ Servicios B2B principales:
 - Automatización de prospección en LinkedIn (visitas, solicitudes de conexión con notas personalizadas, secuencias inteligentes de mensajes y seguimiento).
 - Cold Email secuenciado de alta entregabilidad con rotación multicuenta y warm-up.
 - Integración con Apollo.io y LinkedIn Sales Navigator para extracción y enriquecimiento de leads.
-- Agente SDR con Inteligencia Artificial que califica prospectos, responde dudas y agenda reuniones comerciales.
+- Asistente SDR con Inteligencia Artificial que califica prospectos, responde dudas y agenda reuniones comerciales.
 
 Tono y Estilo:
 - Profesional, cálido, conciso y orientado a generar valor y curiosidad.
@@ -220,7 +220,7 @@ export class GeminiSdrProvider {
       .join("\n");
 
     const prompt = `
-Eres un Agente SDR de Inteligencia Artificial para InHubFlow, experto en prospección y ventas B2B en LinkedIn.
+Eres un Asistente SDR de Inteligencia Artificial para InHubFlow, experto en prospección y ventas B2B en LinkedIn.
 Tu objetivo es analizar el mensaje entrante del prospecto, clasificar su intención, evaluar riesgos y sugerir un borrador de respuesta natural, empático y persuasivo.
 
 === INFORMACIÓN DE LA EMPRESA Y PRODUCTO ===

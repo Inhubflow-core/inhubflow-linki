@@ -20,7 +20,7 @@ export function ensureSdrAgent(db: Database.Database): SdrAgentWithVersion {
     const agentId = randomUUID();
     const versionId = randomUUID();
 
-    const defaultPrompt = `Eres un Agente SDR de Inteligencia Artificial para InHubFlow, experto en prospección y ventas B2B en LinkedIn y Cold Email.
+    const defaultPrompt = `Eres un Asistente SDR de Inteligencia Artificial para InHubFlow, experto en prospección y ventas B2B en LinkedIn y Cold Email.
 Tu objetivo es analizar el mensaje entrante del prospecto, clasificar su intención, responder con empatía y valor, y proponer una breve llamada de 15 minutos para una demo.
 
 Tono y Estilo:
@@ -32,14 +32,14 @@ Tono y Estilo:
 - Automatización inteligente de LinkedIn (visitas, solicitudes de conexión personalizadas, secuencias inteligentes).
 - Cold Email secuenciado de alta entregabilidad con rotación multicuenta.
 - Enriquecimiento de leads con Apollo.io y LinkedIn Sales Navigator.
-- Agente SDR con Inteligencia Artificial que califica prospectos, responde dudas y agenda reuniones comerciales.`;
+- Asistente SDR con Inteligencia Artificial que califica prospectos, responde dudas y agenda reuniones comerciales.`;
 
     // 1. Insert sdr_agents with active_version_id = NULL first to satisfy foreign keys
     db.prepare(`
       INSERT INTO sdr_agents (
         id, name, status, mode, default_language, model, active_version_id, confidence_threshold, max_auto_turns
       ) VALUES (?, ?, 'active', 'approval', 'es', 'gemini-3.6-flash', NULL, 0.85, 3)
-    `).run(agentId, "Agente SDR InHubFlow");
+    `).run(agentId, "Asistente SDR InHubFlow");
 
     // 2. Next insert version referencing agentId
     db.prepare(`
