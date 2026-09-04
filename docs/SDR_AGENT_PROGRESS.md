@@ -5,8 +5,8 @@ Updated: 2026-09-04
 ## Current checkpoint
 
 - Phase: **operational non-calendar runtime through durable handoff; outbound execution still disabled**
-- Status: **implemented, locally verified, and committed; not pushed or deployed**
-- Runtime checkpoint commit: `09e8123` (`feat(sdr): add grounded runtime and human handoff`)
+- Status: **implemented, locally verified, committed, and pushed to `origin/main`; not deployed**
+- Runtime checkpoint commit: `12efd84` (`feat(sdr): add grounded runtime and human handoff`)
 - Provider: Gemini behind the provider-neutral `SdrProvider` adapter.
 - LinkedIn inbox contract: `CANDIDATE_CANARY`; automatic scheduler remains gated off until the controlled canary passes.
 - SDR worker/provider: fail-closed environment and database gates; checked-in example defaults are off.
