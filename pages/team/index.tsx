@@ -7,6 +7,7 @@ import {
   RiTeamLine,
   RiUserAddLine,
   RiUserLine,
+  RiUserFollowLine,
   RiCheckLine,
   RiFileCopyLine,
   RiDeleteBinLine,
@@ -17,6 +18,9 @@ import {
   RiMailLine,
   RiCloseLine,
   RiInformationLine,
+  RiCpuLine,
+  RiMailSendLine,
+  RiSearchLine,
 } from "react-icons/ri";
 
 interface Member {
@@ -65,6 +69,11 @@ export default function TeamManagementPage() {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [capacity, setCapacity] = useState<Capacity>({ totalSlots: 1, usedSlots: 1, availableSlots: 0 });
+
+  // Navigation & Filter states (same format as admin / other pages)
+  const [activeTab, setActiveTab] = useState<"members" | "invitations">("members");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState<"all" | "owner" | "admin" | "member">("all");
 
   // Modal State
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -171,98 +180,249 @@ export default function TeamManagementPage() {
 
   const currentUser = session?.user as any;
 
+  // Filtered members
+  const filteredMembers = members.filter((m) => {
+    const q = searchTerm.toLowerCase().trim();
+    const matchesSearch =
+      !q ||
+      m.name?.toLowerCase().includes(q) ||
+      m.email?.toLowerCase().includes(q) ||
+      m.account_name?.toLowerCase().includes(q);
+
+    const matchesRole =
+      roleFilter === "all" ||
+      (roleFilter === "admin" && m.role === "admin") ||
+      (roleFilter === "member" && m.role !== "admin");
+
+    return matchesSearch && matchesRole;
+  });
+
+  const showOwnerRow =
+    (roleFilter === "all" || roleFilter === "owner") &&
+    (!searchTerm.trim() ||
+      currentUser?.name?.toLowerCase().includes(searchTerm.toLowerCase().trim()) ||
+      currentUser?.email?.toLowerCase().includes(searchTerm.toLowerCase().trim()));
+
+  const filteredInvitations = invitations.filter((inv) => {
+    const q = searchTerm.toLowerCase().trim();
+    return (
+      !q ||
+      inv.email?.toLowerCase().includes(q) ||
+      inv.invite_code?.toLowerCase().includes(q) ||
+      inv.account_name?.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <>
       <Head>
-        <title>Mi Equipo & Vendedores | InHubFlow</title>
+        <title>Equipo Comercial & Embajadores — InHubFlow</title>
       </Head>
 
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-4 sm:p-6 lg:p-8">
-        <div className="max-w-7xl mx-auto space-y-6">
-          {/* Header Banner */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 sm:p-8 shadow-xs">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                    <RiTeamLine size={24} />
-                  </span>
-                  <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                    Multi-Seat Team Management
-                  </span>
-                </div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-                  Equipo Comercial & Embajadores
-                </h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-2xl">
-                  Asigna slots dedicados de LinkedIn a tus vendedores o promotores oficiales. Cada miembro tiene su propia bandeja de entrada privada y únicamente ve sus conversaciones asignadas.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={loadTeamData}
-                  className="p-3 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors"
-                  title="Refrescar"
-                >
-                  <RiRefreshLine className={loading ? "animate-spin" : ""} size={18} />
-                </button>
-
-                <button
-                  onClick={() => {
-                    setInviteEmail("");
-                    setInviteAccount("");
-                    setGeneratedInviteUrl(null);
-                    setIsInviteModalOpen(true);
-                  }}
-                  disabled={capacity.availableSlots <= 0}
-                  className={`inline-flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm shadow-md transition-all cursor-pointer ${
-                    capacity.availableSlots > 0
-                      ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-600/20 active:scale-98"
-                      : "bg-gray-300 dark:bg-gray-800 text-gray-500 cursor-not-allowed"
-                  }`}
-                >
-                  <RiUserAddLine size={18} />
-                  <span>+ Invitar Vendedor</span>
-                </button>
-              </div>
+      <div className="space-y-6">
+        {/* ── Top Header Banner (Exact match of Admin and Dashboard standard) ── */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 border border-brand-500/20 dark:border-brand-500/10 p-5 md:p-6 rounded-2xl">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <span className="p-2 rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400">
+                <RiTeamLine size={24} />
+              </span>
+              <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                Equipo Comercial & Embajadores
+              </h1>
             </div>
-
-            {/* Capacity KPI Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
-              <div className="bg-gray-50 dark:bg-gray-800/40 rounded-2xl p-4 border border-gray-100 dark:border-gray-800">
-                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Slots Contratados</span>
-                <p className="text-2xl font-black text-gray-900 dark:text-white mt-1">{capacity.totalSlots}</p>
-                <span className="text-[11px] text-gray-400">Capacidad total</span>
-              </div>
-
-              <div className="bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl p-4 border border-emerald-100 dark:border-emerald-900/30">
-                <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Slots Asignados</span>
-                <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{capacity.usedSlots}</p>
-                <span className="text-[11px] text-emerald-600/70">En uso activo</span>
-              </div>
-
-              <div className="bg-blue-50/50 dark:bg-blue-950/20 rounded-2xl p-4 border border-blue-100 dark:border-blue-900/30">
-                <span className="text-xs font-semibold text-blue-700 dark:text-blue-400">Slots Disponibles</span>
-                <p className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">{capacity.availableSlots}</p>
-                <span className="text-[11px] text-blue-600/70">Para invitar</span>
-              </div>
-
-              <div className="bg-amber-50/50 dark:bg-amber-950/20 rounded-2xl p-4 border border-amber-100 dark:border-amber-900/30">
-                <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">Invitaciones Pendientes</span>
-                <p className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">{invitations.length}</p>
-                <span className="text-[11px] text-amber-600/70">Por registrarse</span>
-              </div>
-            </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Asigna slots dedicados de LinkedIn a tus vendedores o promotores oficiales. Cada miembro tiene su propia bandeja de entrada privada y únicamente ve sus conversaciones asignadas.
+            </p>
           </div>
 
-          {/* Active Team Members Section */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 shadow-xs">
-            <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              onClick={loadTeamData}
+              title="Refrescar datos"
+              className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors shadow-xs cursor-pointer"
+            >
+              <RiRefreshLine className={loading ? "animate-spin" : ""} size={18} />
+            </button>
+
+            <button
+              onClick={() => {
+                setInviteEmail("");
+                setInviteAccount("");
+                setGeneratedInviteUrl(null);
+                setIsInviteModalOpen(true);
+              }}
+              disabled={capacity.availableSlots <= 0}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm shadow-xs transition-all ${
+                capacity.availableSlots > 0
+                  ? "bg-brand-600 hover:bg-brand-700 text-white cursor-pointer active:scale-98"
+                  : "bg-gray-300 dark:bg-gray-800 text-gray-500 cursor-not-allowed"
+              }`}
+            >
+              <RiUserAddLine size={18} />
+              <span>+ Invitar Vendedor</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ── Section Switcher Tabs ── */}
+        <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-800 pb-2">
+          <button
+            onClick={() => setActiveTab("members")}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl transition-colors cursor-pointer ${
+              activeTab === "members"
+                ? "bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20"
+                : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+            }`}
+          >
+            <RiUserFollowLine size={18} />
+            <span>Miembros del Equipo</span>
+            <span className="px-2 py-0.5 text-xs rounded-full bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+              {members.length + 1}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("invitations")}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl transition-colors cursor-pointer ${
+              activeTab === "invitations"
+                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+            }`}
+          >
+            <RiMailSendLine size={18} />
+            <span>Invitaciones Pendientes</span>
+            <span className="px-2 py-0.5 text-xs rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold">
+              {invitations.length}
+            </span>
+          </button>
+        </div>
+
+        {/* ── KPI Stats Grid (Exact match of Admin style) ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
+            <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider">Slots Contratados</span>
+              <span className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                <RiCpuLine size={18} />
+              </span>
+            </div>
+            <div className="text-3xl font-extrabold text-gray-900 dark:text-white">
+              {capacity.totalSlots}
+            </div>
+            <div className="text-xs text-gray-400 mt-1">Capacidad total contratada</div>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
+            <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider">Slots Asignados</span>
+              <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                <RiUserFollowLine size={18} />
+              </span>
+            </div>
+            <div className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">
+              {capacity.usedSlots}
+            </div>
+            <div className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1">En uso activo</div>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
+            <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider">Slots Disponibles</span>
+              <span className="p-2 rounded-xl bg-indigo-500/10 text-brand-600 dark:text-brand-400">
+                <RiUserAddLine size={18} />
+              </span>
+            </div>
+            <div className="text-3xl font-extrabold text-brand-600 dark:text-brand-400">
+              {capacity.availableSlots}
+            </div>
+            <div className="text-xs text-gray-400 mt-1">Para invitar o asignar</div>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
+            <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider">Invitaciones Pendientes</span>
+              <span className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                <RiMailSendLine size={18} />
+              </span>
+            </div>
+            <div className="text-3xl font-extrabold text-amber-600 dark:text-amber-400">
+              {invitations.length}
+            </div>
+            <div className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-1">Por registrarse</div>
+          </div>
+        </div>
+
+        {/* ── Filters and Search ── */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
+          <div className="relative w-full sm:w-80">
+            <RiSearchLine className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder={activeTab === "members" ? "Buscar por usuario, email o cuenta..." : "Buscar por email o código..."}
+              className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            />
+          </div>
+
+          {activeTab === "members" && (
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className="text-gray-400 mr-1">Filtrar:</span>
+              <button
+                onClick={() => setRoleFilter("all")}
+                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                  roleFilter === "all"
+                    ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
+                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                }`}
+              >
+                Todos
+              </button>
+              <button
+                onClick={() => setRoleFilter("owner")}
+                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                  roleFilter === "owner"
+                    ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
+                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                }`}
+              >
+                Owner
+              </button>
+              <button
+                onClick={() => setRoleFilter("admin")}
+                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                  roleFilter === "admin"
+                    ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
+                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                }`}
+              >
+                Admins
+              </button>
+              <button
+                onClick={() => setRoleFilter("member")}
+                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                  roleFilter === "member"
+                    ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
+                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                }`}
+              >
+                Vendedores
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* ── SECTION 1: ACTIVE MEMBERS ── */}
+        {activeTab === "members" && (
+          <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs overflow-hidden">
+            <div className="p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Miembros del Equipo Activos</h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Usuarios que tienen acceso a sus slots de prospección.
+                <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                  Miembros del Equipo Activos
+                </h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Usuarios con acceso individual y slots de prospección asignados.
                 </p>
               </div>
             </div>
@@ -270,51 +430,53 @@ export default function TeamManagementPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-gray-100 dark:border-gray-800 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                    <th className="py-3 px-4">Usuario / Vendedor</th>
-                    <th className="py-3 px-4">Rol</th>
-                    <th className="py-3 px-4">Cuenta de LinkedIn Asignada</th>
-                    <th className="py-3 px-4">Fecha de Alta</th>
-                    <th className="py-3 px-4 text-right">Acciones</th>
+                  <tr className="bg-gray-50/50 dark:bg-gray-800/40 border-b border-gray-100 dark:border-gray-800 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <th className="py-3 px-5">Usuario / Vendedor</th>
+                    <th className="py-3 px-5">Rol</th>
+                    <th className="py-3 px-5">Cuenta de LinkedIn Asignada</th>
+                    <th className="py-3 px-5">Fecha Registro</th>
+                    <th className="py-3 px-5 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800/60">
                   {/* Row for Workspace Owner */}
-                  <tr className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center shadow-xs">
-                          👑
+                  {showOwnerRow && (
+                    <tr className="hover:bg-gray-50/80 dark:hover:bg-gray-800/40 transition-colors">
+                      <td className="py-4 px-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center shadow-xs shrink-0">
+                            👑
+                          </div>
+                          <div>
+                            <p className="font-bold text-gray-900 dark:text-white leading-tight">
+                              {currentUser?.name || "Tú (Administrador Master)"}
+                            </p>
+                            <p className="text-xs text-gray-400">{currentUser?.email}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-bold text-gray-900 dark:text-white leading-tight">
-                            {currentUser?.name || "Tú (Administrador Master)"}
-                          </p>
-                          <p className="text-xs text-gray-400">{currentUser?.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                        <RiShieldUserLine size={13} />
-                        Workspace Owner
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className="text-xs text-gray-500 dark:text-gray-400">Acceso a todas las cuentas</span>
-                    </td>
-                    <td className="py-3.5 px-4 text-xs text-gray-400">-</td>
-                    <td className="py-3.5 px-4 text-right">
-                      <span className="text-xs text-gray-400 font-semibold italic">Principal</span>
-                    </td>
-                  </tr>
+                      </td>
+                      <td className="py-4 px-5">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                          <RiShieldUserLine size={13} />
+                          Workspace Owner
+                        </span>
+                      </td>
+                      <td className="py-4 px-5">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">Acceso a todas las cuentas</span>
+                      </td>
+                      <td className="py-4 px-5 text-xs text-gray-400">-</td>
+                      <td className="py-4 px-5 text-right">
+                        <span className="text-xs text-gray-400 font-semibold italic">Principal</span>
+                      </td>
+                    </tr>
+                  )}
 
                   {/* Team Members */}
-                  {members.map((m) => (
-                    <tr key={m.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
-                      <td className="py-3.5 px-4">
+                  {filteredMembers.map((m) => (
+                    <tr key={m.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-800/40 transition-colors">
+                      <td className="py-4 px-5">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-xs flex items-center justify-center border border-emerald-500/20">
+                          <div className="w-9 h-9 rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400 font-bold text-xs flex items-center justify-center border border-brand-500/20 shrink-0">
                             {m.name ? m.name[0].toUpperCase() : "V"}
                           </div>
                           <div>
@@ -323,16 +485,20 @@ export default function TeamManagementPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="py-3.5 px-4">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                      <td className="py-4 px-5">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                          m.role === "admin"
+                            ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20"
+                            : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                        }`}>
                           <RiUserLine size={13} />
                           {m.role === "admin" ? "Co-Admin" : "Vendedor / SDR"}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4">
+                      <td className="py-4 px-5">
                         {m.account_name ? (
                           <div className="flex items-center gap-1.5 text-xs text-gray-800 dark:text-gray-200">
-                            <RiLinkedinBoxLine size={16} className="text-[#0A66C2]" />
+                            <RiLinkedinBoxLine size={16} className="text-[#0A66C2] shrink-0" />
                             <span className="font-semibold">{m.account_name}</span>
                             {m.account_authenticated ? (
                               <span className="w-2 h-2 rounded-full bg-emerald-500" title="Conectado" />
@@ -344,25 +510,26 @@ export default function TeamManagementPage() {
                           <span className="text-xs text-amber-500 font-medium">Sin cuenta vinculada</span>
                         )}
                       </td>
-                      <td className="py-3.5 px-4 text-xs text-gray-400">
+                      <td className="py-4 px-5 text-xs text-gray-400">
                         {m.created_at ? new Date(m.created_at).toLocaleDateString() : "-"}
                       </td>
-                      <td className="py-3.5 px-4 text-right">
+                      <td className="py-4 px-5 text-right">
                         <button
                           onClick={() => handleRevoke(m.id, m.name || m.email)}
-                          className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl transition-colors cursor-pointer"
+                          className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-colors cursor-pointer inline-flex items-center gap-1 text-xs font-medium"
                           title="Revocar acceso y liberar slot"
                         >
                           <RiDeleteBinLine size={16} />
+                          <span className="hidden sm:inline">Revocar</span>
                         </button>
                       </td>
                     </tr>
                   ))}
 
-                  {members.length === 0 && (
+                  {!showOwnerRow && filteredMembers.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-xs text-gray-400">
-                        Aún no tienes vendedores o miembros secundarios en tu equipo. ¡Haz clic en "+ Invitar Vendedor" para agregar uno!
+                      <td colSpan={5} className="py-12 text-center text-xs text-gray-400">
+                        No se encontraron miembros con los filtros aplicados.
                       </td>
                     </tr>
                   )}
@@ -370,100 +537,127 @@ export default function TeamManagementPage() {
               </table>
             </div>
           </div>
+        )}
 
-          {/* Pending Invitations Section */}
-          {invitations.length > 0 && (
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 shadow-xs">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900 dark:text-white">Invitaciones Pendientes</h2>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Enlaces de activación enviados que aún no han sido completados.
-                  </p>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-100 dark:border-gray-800 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                      <th className="py-3 px-4">Correo Invitado</th>
-                      <th className="py-3 px-4">Código / Enlace</th>
-                      <th className="py-3 px-4">Válido Hasta</th>
-                      <th className="py-3 px-4 text-right">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800/60">
-                    {invitations.map((inv) => (
-                      <tr key={inv.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
-                        <td className="py-3.5 px-4 font-semibold text-gray-900 dark:text-white">
-                          <div className="flex items-center gap-2">
-                            <RiMailLine size={16} className="text-gray-400" />
-                            <span>{inv.email}</span>
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-2">
-                            <code className="text-xs font-mono px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
-                              {inv.invite_code}
-                            </code>
-                            <button
-                              onClick={() => copyToClipboard(inv.invite_url, inv.id)}
-                              className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors cursor-pointer"
-                              title="Copiar enlace de invitación"
-                            >
-                              {copiedId === inv.id ? (
-                                <RiCheckLine size={14} className="text-emerald-500" />
-                              ) : (
-                                <RiFileCopyLine size={14} />
-                              )}
-                            </button>
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4 text-xs text-gray-400">
-                          <div className="flex items-center gap-1.5">
-                            <RiTimeLine size={14} />
-                            <span>{new Date(inv.expires_at).toLocaleDateString()}</span>
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4 text-right">
-                          <button
-                            onClick={() => handleRevoke(inv.id, inv.email)}
-                            className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl transition-colors cursor-pointer"
-                            title="Cancelar invitación"
-                          >
-                            <RiDeleteBinLine size={16} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+        {/* ── SECTION 2: PENDING INVITATIONS ── */}
+        {activeTab === "invitations" && (
+          <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs overflow-hidden">
+            <div className="p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                  Invitaciones Pendientes de Registro
+                </h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Enlaces de activación enviados que aún no han sido reclamados por los vendedores.
+                </p>
               </div>
             </div>
-          )}
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="bg-gray-50/50 dark:bg-gray-800/40 border-b border-gray-100 dark:border-gray-800 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <th className="py-3 px-5">Correo Invitado</th>
+                    <th className="py-3 px-5">Código / Enlace</th>
+                    <th className="py-3 px-5">Cuenta Asignada</th>
+                    <th className="py-3 px-5">Válido Hasta</th>
+                    <th className="py-3 px-5 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800/60">
+                  {filteredInvitations.map((inv) => (
+                    <tr key={inv.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-800/40 transition-colors">
+                      <td className="py-4 px-5 font-semibold text-gray-900 dark:text-white">
+                        <div className="flex items-center gap-2">
+                          <RiMailLine size={16} className="text-gray-400 shrink-0" />
+                          <span>{inv.email}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-5">
+                        <div className="flex items-center gap-2">
+                          <code className="text-xs font-mono px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+                            {inv.invite_code}
+                          </code>
+                          <button
+                            onClick={() => copyToClipboard(inv.invite_url, inv.id)}
+                            className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors cursor-pointer"
+                            title="Copiar enlace de invitación"
+                          >
+                            {copiedId === inv.id ? (
+                              <RiCheckLine size={14} className="text-emerald-500" />
+                            ) : (
+                              <RiFileCopyLine size={14} />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                      <td className="py-4 px-5 text-xs text-gray-500 dark:text-gray-400">
+                        {inv.account_name ? (
+                          <span className="font-semibold text-gray-800 dark:text-gray-200">{inv.account_name}</span>
+                        ) : (
+                          <span className="text-gray-400 italic">Sin pre-asignar</span>
+                        )}
+                      </td>
+                      <td className="py-4 px-5 text-xs text-gray-400">
+                        <div className="flex items-center gap-1.5">
+                          <RiTimeLine size={14} className="shrink-0" />
+                          <span>{new Date(inv.expires_at).toLocaleDateString()}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-5 text-right">
+                        <button
+                          onClick={() => handleRevoke(inv.id, inv.email)}
+                          className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-colors cursor-pointer inline-flex items-center gap-1 text-xs font-medium"
+                          title="Cancelar invitación"
+                        >
+                          <RiDeleteBinLine size={16} />
+                          <span className="hidden sm:inline">Cancelar</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+
+                  {filteredInvitations.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-12 text-center text-xs text-gray-400">
+                        No hay invitaciones pendientes actualmente.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ── Bottom Info Banner (Matching Admin standard style) ── */}
+        <div className="flex items-start gap-3 p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 text-xs text-blue-800 dark:text-blue-300">
+          <RiInformationLine size={18} className="shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" />
+          <div className="leading-relaxed">
+            <span className="font-bold">Privacidad y Aislamiento de Slots Multi-Seat:</span> Cada vendedor o embajador invitado dispone de su propio acceso individual privado y únicamente tiene visibilidad sobre la cuenta de LinkedIn que le haya sido vinculada, con su bandeja de mensajes aislada. El Workspace Owner mantiene acceso y control total.
+          </div>
         </div>
       </div>
 
-      {/* Invite Member Modal */}
+      {/* ── Invite Member Modal (Matching Standard Modal Design) ── */}
       {isInviteModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative space-y-5">
-            <button
-              onClick={() => setIsInviteModalOpen(false)}
-              className="absolute top-6 right-6 p-2 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
-            >
-              <RiCloseLine size={20} />
-            </button>
-
-            <div>
-              <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 mb-2 inline-block">
-                Nuevo Acceso a Slot
-              </span>
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Invitar Vendedor o Embajador</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Se generará un enlace único para que tu colaborador active su cuenta y conecte su perfil de LinkedIn.
-              </p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-6 shadow-xl space-y-5 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-brand-500/10 text-brand-600 dark:text-brand-400">
+                  <RiUserAddLine size={18} />
+                </span>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                  Invitar Vendedor o Embajador
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsInviteModalOpen(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors cursor-pointer"
+              >
+                <RiCloseLine size={20} />
+              </button>
             </div>
 
             {generatedInviteUrl ? (
@@ -473,7 +667,7 @@ export default function TeamManagementPage() {
                   <span>¡Invitación lista para enviar!</span>
                 </div>
                 <p className="text-xs text-gray-600 dark:text-gray-300">
-                  Comparte este enlace con tu vendedor para que cree su contraseña e inicie sesión en su slot:
+                  Comparte este enlace seguro con tu colaborador para que defina su contraseña e ingrese directamente:
                 </p>
                 <div className="flex items-center gap-2 bg-white dark:bg-gray-900 p-2.5 rounded-xl border border-emerald-300 dark:border-emerald-800">
                   <input
@@ -484,7 +678,7 @@ export default function TeamManagementPage() {
                   />
                   <button
                     onClick={() => copyToClipboard(generatedInviteUrl, "modal")}
-                    className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-500 transition-all cursor-pointer shrink-0"
+                    className="px-3 py-1.5 rounded-lg bg-brand-600 text-white font-bold text-xs hover:bg-brand-500 transition-all cursor-pointer shrink-0"
                   >
                     {copiedId === "modal" ? "¡Copiado!" : "Copiar"}
                   </button>
@@ -492,15 +686,15 @@ export default function TeamManagementPage() {
                 <button
                   type="button"
                   onClick={() => setIsInviteModalOpen(false)}
-                  className="w-full py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-xs font-bold text-gray-700 dark:text-gray-300 transition-colors"
+                  className="w-full py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-xs font-bold text-gray-700 dark:text-gray-300 transition-colors cursor-pointer"
                 >
                   Cerrar
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleCreateInvite} className="space-y-4">
+              <form onSubmit={handleCreateInvite} className="space-y-4 text-sm">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
                     Correo Electrónico del Vendedor / Embajador *
                   </label>
                   <input
@@ -509,18 +703,18 @@ export default function TeamManagementPage() {
                     placeholder="vendedor@tuempresa.com"
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-white"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
                     Rol en el Workspace
                   </label>
                   <select
                     value={inviteRole}
                     onChange={(e) => setInviteRole(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-white"
                   >
                     <option value="member">Vendedor / SDR (Solo ve su cuenta e inbox)</option>
                     <option value="admin">Co-Administrador (Puede ver todas las cuentas)</option>
@@ -529,13 +723,13 @@ export default function TeamManagementPage() {
 
                 {accounts.length > 0 && (
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
                       Vincular a Cuenta de LinkedIn Existente (Opcional)
                     </label>
                     <select
                       value={inviteAccount}
                       onChange={(e) => setInviteAccount(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-white"
                     >
                       <option value="">Dejar que el vendedor conecte su propia cuenta</option>
                       {accounts.map((acc) => (
@@ -558,14 +752,14 @@ export default function TeamManagementPage() {
                   <button
                     type="button"
                     onClick={() => setIsInviteModalOpen(false)}
-                    className="px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-800 text-xs font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                    className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-800 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all cursor-pointer active:scale-98 disabled:opacity-50"
+                    className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-medium text-xs shadow-xs transition-all cursor-pointer active:scale-98 disabled:opacity-50"
                   >
                     {isSubmitting ? "Generando..." : "Generar Enlace de Invitación"}
                   </button>
