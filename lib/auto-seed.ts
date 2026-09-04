@@ -83,9 +83,12 @@ export function autoSeedInstance(db: Database.Database): AutoSeedResult {
     }
   }
 
-  // 4. Ensure SDR Agent is seeded and ready
+  // 4. Ensure the default workspace SDR Agent exists but remains fail-closed.
   try {
-    ensureSdrAgent(db);
+    const workspaceOwner = db.prepare(
+      "SELECT id FROM users WHERE email = ? AND owner_id IS NULL",
+    ).get(adminEmail) as { id: string } | undefined;
+    if (workspaceOwner) ensureSdrAgent(db, workspaceOwner.id);
   } catch (err) {
     console.error("[InHubFlow AutoSeed] SDR seeding warning:", err);
   }

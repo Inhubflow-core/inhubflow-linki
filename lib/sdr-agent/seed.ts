@@ -1,83 +1,189 @@
+import { createHash, randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
-import { randomUUID } from "node:crypto";
 import { applySdrSchema } from "./schema";
 
-export interface SdrAgentWithVersion {
-  agent: any;
-  activeVersion: any;
+export interface SdrAgentRecord {
+  id: string;
+  workspace_owner_id: string | null;
+  name: string;
+  status: "draft" | "active" | "paused" | "archived";
+  mode: "off" | "shadow" | "approval" | "auto";
+  default_language: "en" | "es" | "pt-BR";
+  model: string | null;
+  active_version_id: string | null;
+  handoff_email: string | null;
+  confidence_threshold: number;
+  max_auto_turns: number;
+  daily_budget_usd: number | null;
+  runtime_enabled: number;
+  provider_enabled: number;
+  outbound_enabled: number;
+  config_revision: number;
 }
 
-export function ensureSdrAgent(db: Database.Database): SdrAgentWithVersion {
-  try {
-    applySdrSchema(db);
-  } catch (err) {
-    console.error("[SDR Schema Error]:", err);
-  }
+export interface SdrAgentVersionRecord {
+  id: string;
+  agent_id: string;
+  version_number: number;
+  model: string | null;
+  system_prompt: string;
+  policy_json: string;
+  config_json: string;
+  knowledge_revision: string | null;
+  publication_state: string;
+  revision_hash: string | null;
+  published_at: string;
+}
 
-  let agent = db.prepare("SELECT * FROM sdr_agents ORDER BY created_at ASC LIMIT 1").get() as any;
+export interface SdrAgentWithVersion {
+  agent: SdrAgentRecord;
+  activeVersion: SdrAgentVersionRecord | null;
+}
+
+function resolveWorkspaceOwnerId(
+  db: Database.Database,
+  requested?: string | null,
+): string {
+  if (requested?.trim()) return requested.trim();
+  const owners = db.prepare(
+    "SELECT id FROM users WHERE owner_id IS NULL ORDER BY created_at ASC, id ASC LIMIT 2",
+  ).all() as Array<{ id: string }>;
+  if (owners.length !== 1) {
+    throw new Error("A workspace owner id is required to resolve the SDR agent safely");
+  }
+  return owners[0].id;
+}
+
+function revisionHash(input: {
+  model: string;
+  prompt: string;
+  policyJson: string;
+  configJson: string;
+}): string {
+  return createHash("sha256")
+    .update(JSON.stringify(input), "utf8")
+    .digest("hex");
+}
+
+function claimLegacyAgent(
+  db: Database.Database,
+  workspaceOwnerId: string,
+): SdrAgentRecord | null {
+  const scopedCount = (db.prepare(
+    "SELECT COUNT(*) AS count FROM sdr_agents WHERE workspace_owner_id IS NOT NULL",
+  ).get() as { count: number }).count;
+  if (scopedCount !== 0) return null;
+
+  const legacy = db.prepare(
+    "SELECT * FROM sdr_agents WHERE workspace_owner_id IS NULL ORDER BY created_at ASC LIMIT 2",
+  ).all() as SdrAgentRecord[];
+  if (legacy.length !== 1) return null;
+
+  db.prepare(`
+    UPDATE sdr_agents
+    SET workspace_owner_id = ?, mode = 'off', runtime_enabled = 0,
+      provider_enabled = 0, outbound_enabled = 0, updated_at = datetime('now')
+    WHERE id = ? AND workspace_owner_id IS NULL
+  `).run(workspaceOwnerId, legacy[0].id);
+  db.prepare(`
+    UPDATE sdr_knowledge_sources
+    SET workspace_owner_id = ?,
+      status = CASE
+        WHEN title = 'Catálogo de Servicios InHubFlow' AND approved_by_user_id IS NULL THEN 'draft'
+        ELSE status
+      END,
+      updated_at = datetime('now')
+    WHERE agent_id = ?
+  `).run(workspaceOwnerId, legacy[0].id);
+
+  return db.prepare("SELECT * FROM sdr_agents WHERE id = ?").get(legacy[0].id) as SdrAgentRecord;
+}
+
+export function ensureSdrAgent(
+  db: Database.Database,
+  requestedWorkspaceOwnerId?: string | null,
+): SdrAgentWithVersion {
+  applySdrSchema(db);
+  const workspaceOwnerId = resolveWorkspaceOwnerId(db, requestedWorkspaceOwnerId);
+
+  let agent = db.prepare(`
+    SELECT * FROM sdr_agents
+    WHERE workspace_owner_id = ? AND status != 'archived'
+    ORDER BY created_at ASC
+    LIMIT 1
+  `).get(workspaceOwnerId) as SdrAgentRecord | undefined;
+
+  agent ??= claimLegacyAgent(db, workspaceOwnerId) ?? undefined;
 
   if (!agent) {
     const agentId = randomUUID();
     const versionId = randomUUID();
+    const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.6-flash";
+    const defaultPrompt = `Eres el Asistente SDR de InHubFlow. Analiza mensajes comerciales y redacta únicamente respuestas respaldadas por fuentes de conocimiento aprobadas. Si la información es insuficiente, si se solicita una propuesta o condición especial, o si existe riesgo, deriva a una persona sin inventar datos.`;
+    const defaultCompanyContext = `Describe aquí la empresa, productos, servicios, precios aprobados, preguntas frecuentes y políticas comerciales antes de publicar esta versión.`;
+    const policyJson = JSON.stringify({
+      company_context: defaultCompanyContext,
+      handoff_rules: "Derivar ante información no respaldada, propuesta especial, negociación, riesgo o petición humana.",
+    });
+    const configJson = JSON.stringify({ custom_instructions: "" });
+    const hash = revisionHash({ model, prompt: defaultPrompt, policyJson, configJson });
 
-    const defaultPrompt = `Eres un Asistente SDR de Inteligencia Artificial para InHubFlow, experto en prospección y ventas B2B en LinkedIn y Cold Email.
-Tu objetivo es analizar el mensaje entrante del prospecto, clasificar su intención, responder con empatía y valor, y proponer una breve llamada de 15 minutos para una demo.
+    db.transaction(() => {
+      db.prepare(`
+        INSERT INTO sdr_agents (
+          id, workspace_owner_id, name, status, mode, default_language, model,
+          active_version_id, confidence_threshold, max_auto_turns,
+          created_by_user_id, runtime_enabled, provider_enabled, outbound_enabled
+        ) VALUES (?, ?, ?, 'draft', 'off', 'es', ?, NULL, 0.85, 3, ?, 0, 0, 0)
+      `).run(
+        agentId,
+        workspaceOwnerId,
+        "Asistente SDR InHubFlow",
+        model,
+        workspaceOwnerId,
+      );
 
-Tono y Estilo:
-- Profesional, cercano, empático y orientado a la acción.
-- Respuestas breves y al grano (máximo 2 a 3 párrafos cortos).
-- Si el prospecto tiene dudas o objeciones, valida su perspectiva y explica cómo InHubFlow le ahorra tiempo y multiplica sus oportunidades comerciales.`;
+      db.prepare(`
+        INSERT INTO sdr_agent_versions (
+          id, agent_id, version_number, model, system_prompt, policy_json,
+          config_json, publication_state, revision_hash
+        ) VALUES (?, ?, 1, ?, ?, ?, ?, 'draft', ?)
+      `).run(versionId, agentId, model, defaultPrompt, policyJson, configJson, hash);
 
-    const defaultCompanyContext = `InHubFlow es una suite empresarial de prospección comercial omnicanal B2B:
-- Automatización inteligente de LinkedIn (visitas, solicitudes de conexión personalizadas, secuencias inteligentes).
-- Cold Email secuenciado de alta entregabilidad con rotación multicuenta.
-- Enriquecimiento de leads con Apollo.io y LinkedIn Sales Navigator.
-- Asistente SDR con Inteligencia Artificial que califica prospectos, responde dudas y agenda reuniones comerciales.`;
+      db.prepare(
+        "UPDATE sdr_agents SET active_version_id = ? WHERE id = ?",
+      ).run(versionId, agentId);
 
-    // 1. Insert sdr_agents with active_version_id = NULL first to satisfy foreign keys
-    db.prepare(`
-      INSERT INTO sdr_agents (
-        id, name, status, mode, default_language, model, active_version_id, confidence_threshold, max_auto_turns
-      ) VALUES (?, ?, 'active', 'approval', 'es', 'gemini-3.6-flash', NULL, 0.85, 3)
-    `).run(agentId, "Asistente SDR InHubFlow");
-
-    // 2. Next insert version referencing agentId
-    db.prepare(`
-      INSERT INTO sdr_agent_versions (
-        id, agent_id, version_number, model, system_prompt, policy_json, config_json
-      ) VALUES (?, ?, 1, 'gemini-3.6-flash', ?, ?, ?)
-    `).run(
-      versionId,
-      agentId,
-      defaultPrompt,
-      JSON.stringify({
-        company_context: defaultCompanyContext,
-        handoff_rules: "Derivar si piden hablar con un humano o solicitan descuentos especiales fuera de catálogo."
-      }),
-      JSON.stringify({ custom_instructions: "" })
-    );
-
-    // 3. Now link active_version_id on sdr_agents
-    db.prepare("UPDATE sdr_agents SET active_version_id = ? WHERE id = ?").run(versionId, agentId);
-
-    // 4. Seed initial knowledge source
-    try {
       db.prepare(`
         INSERT INTO sdr_knowledge_sources (
-          id, agent_id, status, title, source_type, metadata_json
-        ) VALUES (?, ?, 'approved', 'Catálogo de Servicios InHubFlow', 'catalog', ?)
-      `).run(randomUUID(), agentId, JSON.stringify({ content: defaultCompanyContext }));
-    } catch {}
+          id, agent_id, workspace_owner_id, status, title, source_type,
+          content, metadata_json
+        ) VALUES (?, ?, ?, 'draft', 'Contexto inicial de InHubFlow', 'catalog', ?, ?)
+      `).run(
+        randomUUID(),
+        agentId,
+        workspaceOwnerId,
+        defaultCompanyContext,
+        JSON.stringify({ content: defaultCompanyContext }),
+      );
+    })();
 
-    agent = db.prepare("SELECT * FROM sdr_agents WHERE id = ?").get(agentId) as any;
+    agent = db.prepare("SELECT * FROM sdr_agents WHERE id = ?").get(agentId) as SdrAgentRecord;
   }
 
-  let activeVersion: any = null;
-  if (agent?.active_version_id) {
-    activeVersion = db.prepare("SELECT * FROM sdr_agent_versions WHERE id = ?").get(agent.active_version_id);
+  let activeVersion: SdrAgentVersionRecord | null = null;
+  if (agent.active_version_id) {
+    activeVersion = (db.prepare(
+      "SELECT * FROM sdr_agent_versions WHERE id = ? AND agent_id = ?",
+    ).get(agent.active_version_id, agent.id) as SdrAgentVersionRecord | undefined) ?? null;
   }
-  if (!activeVersion && agent?.id) {
-    activeVersion = db.prepare("SELECT * FROM sdr_agent_versions WHERE agent_id = ? ORDER BY version_number DESC LIMIT 1").get(agent.id);
+  if (!activeVersion) {
+    activeVersion = (db.prepare(`
+      SELECT * FROM sdr_agent_versions
+      WHERE agent_id = ?
+      ORDER BY version_number DESC
+      LIMIT 1
+    `).get(agent.id) as SdrAgentVersionRecord | undefined) ?? null;
   }
 
   return { agent, activeVersion };

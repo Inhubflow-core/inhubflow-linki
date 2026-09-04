@@ -1105,7 +1105,7 @@ export default function AdminSubscribersPage() {
               <RiMailSendLine size={16} className="shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
               <div>
                 <strong className="block font-semibold">Envío de credenciales automático:</strong>
-                <span>Al crear el cliente, recibirá de inmediato un correo oficial de bienvenida desde <strong>bienvenida@inhubflow.online</strong> con su link de login y contraseña.</span>
+                <span>Al crear el cliente, recibirá de inmediato un correo oficial de bienvenida desde <strong>info@inhubflow.online</strong> con su link de login y contraseña.</span>
               </div>
             </div>
 

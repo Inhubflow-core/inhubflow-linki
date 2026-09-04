@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3";
+import { applySdrSchemaV2 } from "./schema-v2";
 
 /**
  * Additive, module-owned schema. InHubFlow core calls only applySdrSchema; all SDR
@@ -268,5 +269,6 @@ export const SDR_SCHEMA_MIGRATIONS: readonly string[] = [
 export function applySdrSchema(db: Database.Database): void {
   db.transaction(() => {
     for (const statement of SDR_SCHEMA_MIGRATIONS) db.exec(statement);
+    applySdrSchemaV2(db);
   })();
 }

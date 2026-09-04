@@ -26,7 +26,7 @@ export async function sendWelcomeEmail(params: WelcomeEmailParams): Promise<{ su
     console.warn("[Resend Welcome Email] ⚠️ RESEND_API_KEY no está configurada en las variables de entorno.");
     return { success: false, error: "RESEND_API_KEY no configurada en el servidor" };
   }
-  const primaryFrom = process.env.RESEND_FROM_EMAIL || "InHubFlow B2B Suite <bienvenida@inhubflow.online>";
+  const primaryFrom = process.env.RESEND_FROM_EMAIL || "InHubFlow B2B Suite <info@inhubflow.online>";
 
   const planName =
     planTier === "business"
