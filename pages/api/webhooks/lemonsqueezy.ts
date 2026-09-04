@@ -78,7 +78,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!user) {
           // Provision new tenant user
           const newUserId = randomUUID();
-          const tempPassword = customData.admin_password || "InHubFlow2026!";
+          const tempPassword = customData.admin_password || `InHubFlow${Math.floor(1000 + Math.random() * 9000)}!`;
           const passwordHash = bcrypt.hashSync(tempPassword, 10);
 
           db.prepare(`
@@ -100,6 +100,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           );
 
           console.log(`[LemonSqueezy Webhook] 👤 User created: ${customerEmail} (Plan: ${planTier}, Slots: ${slots})`);
+
+          // Send automated welcome email with credentials
+          try {
+            const { sendWelcomeEmail } = await import("@/lib/email/welcome-email");
+            await sendWelcomeEmail({
+              to: customerEmail,
+              companyName: companyName,
+              password: tempPassword,
+              planTier: planTier,
+              slotsLimit: slots,
+            });
+          } catch (mailErr) {
+            console.error("[LemonSqueezy Webhook] Failed to send welcome email:", mailErr);
+          }
+
           user = { id: newUserId, email: customerEmail, partner_id: targetPartnerId };
         } else {
           // Update existing user with plan and partner

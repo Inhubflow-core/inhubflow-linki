@@ -199,6 +199,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         console.warn("[admin/subscribers] Warning: Failed to insert subscription log:", logErr);
       }
 
+      // Automatically send Welcome Email with credentials via Resend
+      try {
+        const { sendWelcomeEmail } = await import("@/lib/email/welcome-email");
+        await sendWelcomeEmail({
+          to: cleanEmail,
+          companyName: company_name || undefined,
+          password: password,
+          planTier: initialPlan,
+          slotsLimit: initialSlots,
+        });
+      } catch (mailErr) {
+        console.error("[admin/subscribers] Warning: Failed to send welcome email:", mailErr);
+      }
+
       const created = db.prepare("SELECT id, email, role, company_name, slots_limit, subscription_status, plan_tier, created_at FROM users WHERE id = ?").get(newId);
 
       return res.status(201).json({ ok: true, user: created });

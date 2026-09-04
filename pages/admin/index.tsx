@@ -21,7 +21,9 @@ import {
   RiMoneyDollarCircleLine,
   RiExternalLinkLine,
   RiBankCardLine,
+  RiMailSendLine,
 } from "react-icons/ri";
+import { toast } from "sonner";
 
 interface Subscriber {
   id: string;
@@ -109,6 +111,7 @@ export default function AdminSubscribersPage() {
   const [newSlots, setNewSlots] = useState(1);
   const [newPlan, setNewPlan] = useState<"starter" | "growth" | "business" | "custom">("starter");
   const [creating, setCreating] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
   const [formError, setFormError] = useState("");
 
   const editSlotsInputId = useId();
@@ -1016,22 +1019,60 @@ export default function AdminSubscribersPage() {
                 />
               </div>
 
-              <div className="pt-2 flex items-center justify-end gap-3">
+              <div className="pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium text-xs hover:bg-gray-100 dark:hover:bg-gray-800"
+                  onClick={async () => {
+                    if (!selectedSub) return;
+                    setSendingEmail(true);
+                    try {
+                      const res = await fetch("/api/admin/subscribers/test-email", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          to: selectedSub.email,
+                          companyName: editCompany,
+                          planTier: editPlan,
+                          slotsLimit: editSlots,
+                        }),
+                      });
+                      const data = await res.json();
+                      if (res.ok) {
+                        toast.success(`¡Email con credenciales enviado a ${selectedSub.email}!`);
+                      } else {
+                        toast.error(data.error || "No se pudo enviar el correo");
+                      }
+                    } catch {
+                      toast.error("Error al conectar con el servidor de correo");
+                    } finally {
+                      setSendingEmail(false);
+                    }
+                  }}
+                  disabled={sendingEmail}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-medium text-xs hover:bg-blue-100 dark:hover:bg-blue-900/40 cursor-pointer disabled:opacity-50"
+                  title="Reenviar correo de bienvenida con credenciales vía Resend"
                 >
-                  Cancelar
+                  <RiMailSendLine size={15} />
+                  <span>{sendingEmail ? "Enviando..." : "Enviar Email de Acceso"}</span>
                 </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-medium text-xs shadow-xs disabled:opacity-50"
-                >
-                  <RiCheckLine size={16} />
-                  <span>{saving ? "Guardando..." : "Guardar Cambios"}</span>
-                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium text-xs hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-medium text-xs shadow-xs disabled:opacity-50 cursor-pointer"
+                  >
+                    <RiCheckLine size={16} />
+                    <span>{saving ? "Guardando..." : "Guardar Cambios"}</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -1059,6 +1100,14 @@ export default function AdminSubscribersPage() {
                 {formError}
               </div>
             )}
+
+            <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-300 text-xs flex items-start gap-2.5">
+              <RiMailSendLine size={16} className="shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
+              <div>
+                <strong className="block font-semibold">Envío de credenciales automático:</strong>
+                <span>Al crear el cliente, recibirá de inmediato un correo oficial de bienvenida desde <strong>bienvenida@inhubflow.online</strong> con su link de login y contraseña.</span>
+              </div>
+            </div>
 
             <form onSubmit={handleCreateUser} className="space-y-4 text-sm">
               <div>

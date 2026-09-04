@@ -138,6 +138,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
 
       console.log(`[Paddle Webhook] 👤 New user automatically created: ${customerEmail} (Slots: ${slots})`);
+
+      // Send automated welcome email with credentials
+      try {
+        const { sendWelcomeEmail } = await import("@/lib/email/welcome-email");
+        await sendWelcomeEmail({
+          to: customerEmail,
+          companyName: undefined,
+          password: randomPassword,
+          planTier: planTier,
+          slotsLimit: slots,
+        });
+      } catch (mailErr) {
+        console.error("[Paddle Webhook] Failed to send welcome email:", mailErr);
+      }
     } else if (targetUserId) {
       // Update existing user according to event type
       if (
