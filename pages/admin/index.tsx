@@ -1129,12 +1129,18 @@ export default function AdminSubscribersPage() {
                   <select
                     id={newPlanSelectId}
                     value={newPlan}
-                    onChange={(e) => setNewPlan(e.target.value as "starter" | "growth" | "business" | "scale" | "custom")}
+                    onChange={(e) => {
+                      const val = e.target.value as "starter" | "growth" | "business" | "scale" | "custom";
+                      setNewPlan(val);
+                      if (val === "starter") setNewSlots(1);
+                      else if (val === "growth") setNewSlots(5);
+                      else if (val === "business") setNewSlots(10);
+                    }}
                     className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm"
                   >
-                    <option value="starter">Starter (1)</option>
-                    <option value="growth">Growth (5)</option>
-                    <option value="business">Business (10)</option>
+                    <option value="starter">Starter (1 Slot)</option>
+                    <option value="growth">Growth (5 Slots)</option>
+                    <option value="business">Business (10 Slots)</option>
                     <option value="custom">Custom</option>
                   </select>
                 </div>

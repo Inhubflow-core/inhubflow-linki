@@ -106,38 +106,55 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const newSlots = typeof slots_limit === "number" ? Math.max(1, slots_limit) : 1;
       const validStatuses = ["active", "trial", "past_due", "canceled"];
       const newStatus = validStatuses.includes(subscription_status || "") ? subscription_status : "active";
-      const validPlans = ["starter", "growth", "scale", "custom"];
-      const newPlan = validPlans.includes(plan_tier || "") ? plan_tier : "starter";
+      const validPlans = ["starter", "growth", "business", "scale", "custom"];
+      let newPlan = validPlans.includes(plan_tier || "") ? plan_tier : "starter";
 
-      db.prepare(
-        `UPDATE users 
-         SET slots_limit = ?, subscription_status = ?, plan_tier = ?, company_name = ?, updated_at = datetime('now')
-         WHERE id = ?`
-      ).run(newSlots, newStatus, newPlan, company_name || null, id);
+      try {
+        db.prepare(
+          `UPDATE users 
+           SET slots_limit = ?, subscription_status = ?, plan_tier = ?, company_name = ?, updated_at = datetime('now')
+           WHERE id = ?`
+        ).run(newSlots, newStatus, newPlan, company_name || null, id);
+      } catch (updateErr: any) {
+        if (updateErr?.message?.includes("CHECK constraint") && newPlan === "business") {
+          newPlan = "scale";
+          db.prepare(
+            `UPDATE users 
+             SET slots_limit = ?, subscription_status = ?, plan_tier = ?, company_name = ?, updated_at = datetime('now')
+             WHERE id = ?`
+          ).run(newSlots, newStatus, newPlan, company_name || null, id);
+        } else {
+          throw updateErr;
+        }
+      }
 
       // Log manual adjustment
-      db.prepare(
-        `INSERT INTO subscription_logs (id, user_id, event_type, plan_tier, slots, payload_json)
-         VALUES (?, ?, 'admin_manual_override', ?, ?, ?)`
-      ).run(
-        randomUUID(),
-        id,
-        newPlan,
-        newSlots,
-        JSON.stringify({
-          updated_by: session.user.email,
-          new_slots: newSlots,
-          new_status: newStatus,
-          new_plan: newPlan,
-        })
-      );
+      try {
+        db.prepare(
+          `INSERT INTO subscription_logs (id, user_id, event_type, plan_tier, slots, payload_json)
+           VALUES (?, ?, 'admin_manual_override', ?, ?, ?)`
+        ).run(
+          randomUUID(),
+          id,
+          newPlan,
+          newSlots,
+          JSON.stringify({
+            updated_by: session?.user?.email || "admin",
+            new_slots: newSlots,
+            new_status: newStatus,
+            new_plan: newPlan,
+          })
+        );
+      } catch (logErr) {
+        console.warn("[admin/subscribers] Warning: Failed to insert update log:", logErr);
+      }
 
       const updated = db.prepare("SELECT id, email, role, company_name, slots_limit, subscription_status, plan_tier, updated_at FROM users WHERE id = ?").get(id);
 
       return res.status(200).json({ ok: true, user: updated });
     } catch (err: unknown) {
       console.error("[admin/subscribers] PUT Error:", err);
-      return res.status(500).json({ error: "Error al actualizar suscriptor" });
+      return res.status(500).json({ error: (err as Error)?.message || "Error al actualizar suscriptor" });
     }
   }
 
@@ -164,32 +181,48 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const hash = bcrypt.hashSync(password, 10);
       const newId = randomUUID();
       const initialSlots = typeof slots_limit === "number" ? Math.max(1, slots_limit) : 1;
-      const initialPlan = plan_tier || (initialSlots === 1 ? "starter" : initialSlots === 5 ? "growth" : initialSlots === 10 ? "scale" : "custom");
+      let initialPlan = plan_tier || (initialSlots === 1 ? "starter" : initialSlots === 5 ? "growth" : initialSlots === 10 ? "business" : "custom");
 
-      db.prepare(
-        `INSERT INTO users (id, email, password_hash, role, company_name, slots_limit, subscription_status, plan_tier)
-         VALUES (?, ?, ?, 'user', ?, ?, 'active', ?)`
-      ).run(newId, cleanEmail, hash, company_name || null, initialSlots, initialPlan);
+      try {
+        db.prepare(
+          `INSERT INTO users (id, email, password_hash, role, company_name, slots_limit, subscription_status, plan_tier)
+           VALUES (?, ?, ?, 'user', ?, ?, 'active', ?)`
+        ).run(newId, cleanEmail, hash, company_name || null, initialSlots, initialPlan);
+      } catch (insertErr: any) {
+        if (insertErr?.message?.includes("CHECK constraint") && initialPlan === "business") {
+          initialPlan = "scale";
+          db.prepare(
+            `INSERT INTO users (id, email, password_hash, role, company_name, slots_limit, subscription_status, plan_tier)
+             VALUES (?, ?, ?, 'user', ?, ?, 'active', ?)`
+          ).run(newId, cleanEmail, hash, company_name || null, initialSlots, initialPlan);
+        } else {
+          throw insertErr;
+        }
+      }
 
       // Log creation
-      db.prepare(
-        `INSERT INTO subscription_logs (id, user_id, customer_email, event_type, plan_tier, slots, payload_json)
-         VALUES (?, ?, ?, 'admin_manual_create', ?, ?, ?)`
-      ).run(
-        randomUUID(),
-        newId,
-        cleanEmail,
-        initialPlan,
-        initialSlots,
-        JSON.stringify({ created_by: session.user.email })
-      );
+      try {
+        db.prepare(
+          `INSERT INTO subscription_logs (id, user_id, customer_email, event_type, plan_tier, slots, payload_json)
+           VALUES (?, ?, ?, 'admin_manual_create', ?, ?, ?)`
+        ).run(
+          randomUUID(),
+          newId,
+          cleanEmail,
+          initialPlan,
+          initialSlots,
+          JSON.stringify({ created_by: session?.user?.email || "admin" })
+        );
+      } catch (logErr) {
+        console.warn("[admin/subscribers] Warning: Failed to insert subscription log:", logErr);
+      }
 
       const created = db.prepare("SELECT id, email, role, company_name, slots_limit, subscription_status, plan_tier, created_at FROM users WHERE id = ?").get(newId);
 
       return res.status(201).json({ ok: true, user: created });
     } catch (err: unknown) {
       console.error("[admin/subscribers] POST Error:", err);
-      return res.status(500).json({ error: "Error al crear nuevo suscriptor" });
+      return res.status(500).json({ error: (err as Error)?.message || "Error al crear nuevo suscriptor" });
     }
   }
 

@@ -530,6 +530,7 @@ function runMigrations(db: Database.Database) {
     "ALTER TABLE users ADD COLUMN lemon_subscription_id TEXT",
     "ALTER TABLE users ADD COLUMN partner_id TEXT",
     "ALTER TABLE users ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))",
+    "ALTER TABLE subscription_logs ADD COLUMN customer_email TEXT",
     `CREATE TABLE IF NOT EXISTS subscription_logs (
       id TEXT PRIMARY KEY,
       user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
@@ -1035,7 +1036,7 @@ function initDb(db: Database.Database) {
       company_name TEXT,
       slots_limit INTEGER DEFAULT 1,
       subscription_status TEXT DEFAULT 'active' CHECK(subscription_status IN ('active', 'trial', 'past_due', 'canceled')),
-      plan_tier TEXT DEFAULT 'starter' CHECK(plan_tier IN ('starter', 'growth', 'scale', 'custom')),
+      plan_tier TEXT DEFAULT 'starter' CHECK(plan_tier IN ('starter', 'growth', 'business', 'scale', 'custom')),
       paddle_customer_id TEXT,
       paddle_subscription_id TEXT,
       created_at TEXT DEFAULT (datetime('now')),
