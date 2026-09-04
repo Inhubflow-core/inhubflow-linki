@@ -602,6 +602,7 @@ function runMigrations(db: Database.Database) {
     "CREATE INDEX IF NOT EXISTS idx_team_invitations_code ON team_invitations(invite_code)",
     "CREATE INDEX IF NOT EXISTS idx_team_invitations_owner ON team_invitations(owner_id, status)",
     "CREATE INDEX IF NOT EXISTS idx_users_owner ON users(owner_id)",
+    "ALTER TABLE email_accounts ADD COLUMN owner_id TEXT REFERENCES users(id) ON DELETE SET NULL",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }

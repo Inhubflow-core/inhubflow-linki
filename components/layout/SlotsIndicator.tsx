@@ -91,7 +91,7 @@ export function SlotsIndicator() {
             </div>
             <p className="text-[11px] text-gray-500 dark:text-gray-400">
               {isFull
-                ? "Has alcanzado el límite de 4 slots de tu suscripción."
+                ? `Has alcanzado el límite de ${limit} slots de tu suscripción.`
                 : `Tienes ${settings.slotsRemaining} slot(s) disponible(s) para conectar cuentas.`}
             </p>
           </div>

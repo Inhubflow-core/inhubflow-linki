@@ -245,7 +245,11 @@ const BLANK_LI_FORM = {
 };
 
 function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
-  const [accounts, setAccounts] = useState<LiAccount[]>(initialAccounts);
+  const { data: session } = useSession();
+  const [accounts, setAccounts] = useState<LiAccount[]>(initialAccounts || []);
+  const [slotsLimit, setSlotsLimit] = useState<number>(() => {
+    return (session?.user as any)?.role === "admin" ? 999 : ((session?.user as any)?.slots_limit || 4);
+  });
   const [showModal, setShowModal] = useState(false);
   const [editingAccount, setEditingAccount] = useState<LiAccount | null>(null);
   const [form, setForm] = useState(BLANK_LI_FORM);
@@ -253,6 +257,17 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
   const [authModal, setAuthModal] = useState<string | null>(null);
   const [authForm, setAuthForm] = useState({ li_at: "", document_cookie: "" });
   const [authLoading, setAuthLoading] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/instance/settings")
+      .then((r) => r.json())
+      .then((d) => {
+        if (typeof d?.slotsLimit === "number") {
+          setSlotsLimit(d.slotsLimit);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   function openAuthModal(account: LiAccount) {
     setAuthModal(account.id);
@@ -264,10 +279,12 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
     setAuthForm({ li_at: "", document_cookie: "" });
   }
 
-
   async function refresh() {
     const res = await fetch("/api/accounts");
-    setAccounts(await res.json());
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) setAccounts(data);
+    }
   }
 
   function openCreate() {
@@ -384,21 +401,23 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
           <div className="flex items-center gap-2">
             <h3 className="font-bold text-sm text-gray-900 dark:text-white">Cuentas de LinkedIn (Slots B2B)</h3>
             <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full ${
-              accounts.length >= 4 
+              slotsLimit !== 999 && accounts.length >= slotsLimit
                 ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300' 
                 : 'bg-brand-500/10 text-brand-600 dark:text-brand-400'
             }`}>
-              {accounts.length} / 4 Slots Utilizados
+              {accounts.length} / {slotsLimit === 999 ? "∞" : slotsLimit} Slots Utilizados
             </span>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {accounts.length >= 4 
-              ? 'Has alcanzado la capacidad máxima de 4 cuentas para este espacio de trabajo.' 
-              : `Puedes conectar hasta ${4 - accounts.length} cuenta(s) más para automatizar prospección en LinkedIn.`}
+            {slotsLimit !== 999 && accounts.length >= slotsLimit
+              ? `Has alcanzado la capacidad máxima de ${slotsLimit} cuentas para este espacio de trabajo.` 
+              : slotsLimit === 999
+              ? "Tienes capacidad ilimitada de cuentas como Administrador Master."
+              : `Puedes conectar hasta ${Math.max(0, slotsLimit - accounts.length)} cuenta(s) más para automatizar prospección en LinkedIn.`}
           </p>
         </div>
 
-        {accounts.length < 4 ? (
+        {slotsLimit === 999 || accounts.length < slotsLimit ? (
           <button
             className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-brand-500 text-white hover:bg-brand-600 transition-colors shadow-sm cursor-pointer shrink-0"
             onClick={openCreate}

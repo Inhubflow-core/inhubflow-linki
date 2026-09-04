@@ -139,7 +139,7 @@ export default function Header({
                       </span>
                     </div>
                     <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                      LinkedIn & Cold Email (4 Slots)
+                      {`LinkedIn & Cold Email (${(session?.user as any)?.role === "admin" ? "Ilimitados" : `${(session?.user as any)?.slots_limit || 4} Slots`})`}
                     </p>
                   </div>
                 </div>

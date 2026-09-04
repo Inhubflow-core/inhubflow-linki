@@ -43,12 +43,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.json(accounts);
       }
 
-      // 3. Admin / Workspace Owner: Sees all accounts
+      const isSuperAdmin =
+        currentUser?.role === "admin" ||
+        currentUser?.email?.trim().toLowerCase() === "inhubflow@gmail.com";
+
+      // 3. SuperAdmin: Sees all accounts
+      if (isSuperAdmin) {
+        const accounts = db.prepare(`
+          SELECT ${ACCOUNT_COLUMNS},
+            (SELECT COUNT(*) FROM runs r WHERE r.account_id = a.id AND r.status IN ('running', 'paused')) AS active_run_count
+          FROM accounts a ORDER BY a.created_at DESC
+        `).all();
+        return res.json(accounts);
+      }
+
+      // 4. Workspace Owner (Client): Sees only their accounts
+      const workspaceOwnerId = currentUser?.owner_id || currentUser?.id;
       const accounts = db.prepare(`
         SELECT ${ACCOUNT_COLUMNS},
           (SELECT COUNT(*) FROM runs r WHERE r.account_id = a.id AND r.status IN ('running', 'paused')) AS active_run_count
-        FROM accounts a ORDER BY a.created_at DESC
-      `).all();
+        FROM accounts a 
+        WHERE a.owner_id = ? OR a.assigned_user_id = ?
+        ORDER BY a.created_at DESC
+      `).all(workspaceOwnerId, currentUser?.id);
       return res.json(accounts);
     }
 
@@ -75,12 +92,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Check slots limit
       try {
         const { slotsLimit: instanceLimit } = getInstanceSettings(db);
-        const userSlots = (session?.user as { slots_limit?: number; role?: string })?.slots_limit;
-        const userRole = (session?.user as { role?: string })?.role;
-        const effectiveLimit = userRole === "admin" ? 999 : (userSlots || instanceLimit);
+        const isSuperAdmin =
+          currentUser?.role === "admin" ||
+          currentUser?.email?.trim().toLowerCase() === "inhubflow@gmail.com";
+        const workspaceOwnerId = currentUser?.owner_id || currentUser?.id;
+        
+        let effectiveLimit = instanceLimit;
+        if (isSuperAdmin) {
+          effectiveLimit = 999;
+        } else if (workspaceOwnerId) {
+          const ownerRow = db.prepare("SELECT slots_limit FROM users WHERE id = ?").get(workspaceOwnerId) as { slots_limit?: number } | undefined;
+          effectiveLimit = ownerRow?.slots_limit || (session?.user as { slots_limit?: number })?.slots_limit || instanceLimit;
+        }
 
-        if (!currentUser?.owner_id) {
-          const countRow = db.prepare("SELECT COUNT(*) as count FROM accounts").get() as { count: number };
+        if (!isSuperAdmin) {
+          const countRow = db.prepare(
+            "SELECT COUNT(*) as count FROM accounts WHERE owner_id = ? OR assigned_user_id = ?"
+          ).get(workspaceOwnerId, currentUser?.id) as { count: number };
           if (countRow && countRow.count >= effectiveLimit) {
             return res.status(403).json({
               error: `Has alcanzado el límite de ${effectiveLimit} slots/cuentas de tu suscripción actual.`,
