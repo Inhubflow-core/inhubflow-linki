@@ -6,7 +6,17 @@ import { useRouter } from "next/router";
 import { getDb } from "@/lib/db";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
-import { RiAddLine, RiDeleteBinLine, RiCloseLine, RiCalendarLine, RiUserSearchLine } from "react-icons/ri";
+import {
+  RiAddLine,
+  RiDeleteBinLine,
+  RiCloseLine,
+  RiCalendarLine,
+  RiUserSearchLine,
+  RiLinkedinBoxFill,
+  RiDownloadLine,
+  RiSparklingLine,
+  RiInformationLine,
+} from "react-icons/ri";
 
 interface List {
   id: string;
@@ -17,6 +27,12 @@ interface List {
   active_run_id: string | null;
   active_run_status: string | null;
   active_workflow_name: string | null;
+}
+
+interface Account {
+  id: string;
+  name: string;
+  is_authenticated: number;
 }
 
 interface ImportJob {
@@ -37,6 +53,12 @@ interface ImportJob {
   finished_at: string | null;
 }
 
+interface ListsPageProps {
+  initialLists: List[];
+  accounts: Account[];
+  apolloConfigured: boolean;
+}
+
 export const getServerSideProps: GetServerSideProps = async () => {
   const db = getDb();
   const lists = db
@@ -52,21 +74,37 @@ export const getServerSideProps: GetServerSideProps = async () => {
        GROUP BY l.id
        ORDER BY l.created_at DESC`
     )
-    .all();
-  return { props: { initialLists: lists } };
+    .all() as List[];
+  const accounts = db
+    .prepare("SELECT id, name, is_authenticated FROM accounts ORDER BY name ASC")
+    .all() as Account[];
+  const apolloConfigured = Boolean(process.env.APOLLO_API_KEY?.trim());
+  return { props: { initialLists: lists, accounts, apolloConfigured } };
 };
 
-export default function ListsPage({ initialLists }: { initialLists: List[] }) {
+export default function ListsPage({ initialLists, accounts = [], apolloConfigured = false }: ListsPageProps) {
   const router = useRouter();
   const { t } = useTranslation();
   const [lists, setLists] = useState<List[]>(initialLists);
   const [showModal, setShowModal] = useState(false);
+  const [modalMode, setModalMode] = useState<"sales_nav" | "empty">("sales_nav");
   const [form, setForm] = useState({ name: "", description: "" });
+  const [salesNavForm, setSalesNavForm] = useState({
+    name: "",
+    sales_nav_url: "",
+    account_id: accounts.find((a) => a.is_authenticated)?.id || accounts[0]?.id || "",
+    enrich: true,
+  });
   const [loading, setLoading] = useState(false);
   const [jobs, setJobs] = useState<ImportJob[]>([]);
   const [dailyCap, setDailyCap] = useState(1500);
   const [importedToday, setImportedToday] = useState(0);
   const prevRunningRef = useRef(0);
+
+  function openCreateModal(mode: "sales_nav" | "empty") {
+    setModalMode(mode);
+    setShowModal(true);
+  }
 
   useEffect(() => {
     let alive = true;
@@ -106,7 +144,7 @@ export default function ListsPage({ initialLists }: { initialLists: List[] }) {
     setLists(await res.json());
   }
 
-  async function createList(e: React.FormEvent) {
+  async function createEmptyList(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     const res = await fetch("/api/lists", {
@@ -116,16 +154,74 @@ export default function ListsPage({ initialLists }: { initialLists: List[] }) {
     });
     setLoading(false);
     if (!res.ok) { toast.error("Failed to create list"); return; }
-    toast.success("List created");
+    toast.success(t("lists.listCreated"));
     setShowModal(false);
     setForm({ name: "", description: "" });
     refresh();
   }
 
+  async function createSalesNavList(e: React.FormEvent) {
+    e.preventDefault();
+    if (!salesNavForm.sales_nav_url.trim()) {
+      toast.error(t("lists.salesNavUrl") + " requerida");
+      return;
+    }
+    if (!salesNavForm.account_id) {
+      toast.error("Selecciona una cuenta de LinkedIn conectada");
+      return;
+    }
+
+    setLoading(true);
+    const listRes = await fetch("/api/lists", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: salesNavForm.name.trim() || "Lista Sales Navigator",
+        description: `Importación Sales Navigator: ${salesNavForm.sales_nav_url.slice(0, 100)}`,
+      }),
+    });
+
+    if (!listRes.ok) {
+      setLoading(false);
+      toast.error("Error al crear la lista");
+      return;
+    }
+
+    const newList = await listRes.json();
+
+    const importRes = await fetch(`/api/lists/${newList.id}/import`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sales_nav_url: salesNavForm.sales_nav_url.trim(),
+        account_id: salesNavForm.account_id,
+        enrich: apolloConfigured ? salesNavForm.enrich : false,
+      }),
+    });
+
+    setLoading(false);
+    if (!importRes.ok) {
+      const err = await importRes.json();
+      toast.error(err.error || "Error al iniciar importación de Sales Navigator");
+      router.push(`/lists/${newList.id}`);
+      return;
+    }
+
+    toast.success("¡Lista creada e importación de Sales Navigator iniciada!");
+    setShowModal(false);
+    setSalesNavForm({
+      name: "",
+      sales_nav_url: "",
+      account_id: accounts.find((a) => a.is_authenticated)?.id || accounts[0]?.id || "",
+      enrich: true,
+    });
+    router.push(`/lists/${newList.id}`);
+  }
+
   async function deleteList(id: string) {
-    if (!confirm("Delete this list and all its leads?")) return;
+    if (!confirm(t("lists.deleteConfirm"))) return;
     await fetch(`/api/lists/${id}`, { method: "DELETE" });
-    toast.success("List deleted");
+    toast.success(t("lists.listDeleted"));
     setLists((prev) => prev.filter((l) => l.id !== id));
   }
 
@@ -150,7 +246,7 @@ export default function ListsPage({ initialLists }: { initialLists: List[] }) {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <Link
             href="/lead-finder"
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
@@ -158,8 +254,16 @@ export default function ListsPage({ initialLists }: { initialLists: List[] }) {
             <RiUserSearchLine size={16} /> {t("nav.leadFinder")}
           </Link>
           <button
+            onClick={() => openCreateModal("sales_nav")}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all shadow-xs"
+            title={t("lists.importSalesNavDesc")}
+          >
+            <RiLinkedinBoxFill size={17} className="text-[#0A66C2]" />
+            <span>{t("lists.importSalesNavShort") || "Sales Navigator"}</span>
+          </button>
+          <button
             data-tour="lists-new"
-            onClick={() => setShowModal(true)}
+            onClick={() => openCreateModal("empty")}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-all shadow-xs"
           >
             <RiAddLine size={16} /> {t("lists.newList")}
@@ -223,8 +327,39 @@ export default function ListsPage({ initialLists }: { initialLists: List[] }) {
       )}
 
       {lists.length === 0 ? (
-        <div className="text-center py-16 text-base-content/40 text-sm">
-          {t("lists.noLists")}
+        <div className="text-center py-14 px-4 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30">
+          <div className="inline-flex p-3 rounded-2xl bg-brand-500/10 text-brand-500 dark:bg-brand-500/20 mb-3">
+            <RiUserSearchLine size={28} />
+          </div>
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">
+            {t("lists.noLists")}
+          </h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 max-w-md mx-auto mb-6">
+            Crea listas importando desde LinkedIn Sales Navigator, usando el buscador de Lead Finder o subiendo un archivo CSV.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={() => openCreateModal("sales_nav")}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-[#0A66C2] hover:bg-[#004182] !text-white shadow-xs transition-all"
+            >
+              <RiLinkedinBoxFill size={18} />
+              {t("lists.importSalesNav")}
+            </button>
+            <Link
+              href="/lead-finder"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs md:text-sm font-medium bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 shadow-xs transition-all"
+            >
+              <RiUserSearchLine size={16} />
+              {t("nav.leadFinder")}
+            </Link>
+            <button
+              onClick={() => openCreateModal("empty")}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-gray-800 transition-all"
+            >
+              <RiAddLine size={16} />
+              {t("lists.newList")}
+            </button>
+          </div>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-base-300/50">
@@ -310,39 +445,199 @@ export default function ListsPage({ initialLists }: { initialLists: List[] }) {
 
       {showModal && (
         <div className="modal modal-open">
-          <div className="modal-box bg-base-200 border border-base-300/50 max-w-md">
-            <h3 className="font-semibold text-base mb-4">{t("lists.newList")}</h3>
-            <form onSubmit={createList} className="flex flex-col gap-3">
-              <div>
-                <label className="label text-xs text-base-content/50 pb-1">{t("common.name")}</label>
-                <input
-                  className="input input-bordered input-sm w-full bg-base-300/50"
-                  placeholder={t("lists.namePlaceholder")}
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <label className="label text-xs text-base-content/50 pb-1">{t("common.description")} {t("common.optional")}</label>
-                <input
-                  className="input input-bordered input-sm w-full bg-base-300/50"
-                  placeholder={t("lists.descPlaceholder")}
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                />
-              </div>
-              <div className="modal-action mt-2">
-                <button type="button" className="btn btn-ghost btn-sm text-base-content/60" onClick={() => setShowModal(false)}>
-                  {t("common.cancel")}
+          <div className="modal-box bg-base-200 border border-base-300/50 max-w-lg">
+            {/* Modal Header with Tabs */}
+            <div className="flex items-center justify-between border-b border-base-300/60 pb-3 mb-4">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModalMode("sales_nav")}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    modalMode === "sales_nav"
+                      ? "bg-[#0A66C2] text-white shadow-xs"
+                      : "text-base-content/60 hover:text-base-content hover:bg-base-300/50"
+                  }`}
+                >
+                  <RiLinkedinBoxFill size={16} />
+                  <span>{t("lists.tabSalesNav")}</span>
                 </button>
-                <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-50" disabled={loading}>
-                  {loading ? <span className="loading loading-spinner loading-xs" /> : t("lists.createList")}
+                <button
+                  type="button"
+                  onClick={() => setModalMode("empty")}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    modalMode === "empty"
+                      ? "bg-brand-500 text-white shadow-xs"
+                      : "text-base-content/60 hover:text-base-content hover:bg-base-300/50"
+                  }`}
+                >
+                  <RiAddLine size={15} />
+                  <span>{t("lists.tabEmptyList")}</span>
                 </button>
               </div>
-            </form>
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs btn-circle text-base-content/50"
+                onClick={() => setShowModal(false)}
+              >
+                <RiCloseLine size={16} />
+              </button>
+            </div>
+
+            {/* Mode 1: Sales Navigator Import Form */}
+            {modalMode === "sales_nav" && (
+              <form onSubmit={createSalesNavList} className="flex flex-col gap-3.5">
+                <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-900 dark:text-blue-200 flex items-start gap-2.5">
+                  <RiInformationLine size={18} className="text-[#0A66C2] shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold block mb-0.5">Integración Directa con LinkedIn Sales Navigator</span>
+                    {t("lists.importSalesNavDesc")} La extracción se realiza en segundo plano con intervalos humanos para proteger tu cuenta de LinkedIn.
+                  </div>
+                </div>
+
+                <div>
+                  <label className="label text-xs font-medium text-base-content/70 pb-1">
+                    {t("common.name")} de la Lista <span className="text-brand-500">*</span>
+                  </label>
+                  <input
+                    className="input input-bordered input-sm w-full bg-base-300/50 text-xs"
+                    placeholder="ej: Directores de Operaciones LatAm - Sales Nav"
+                    value={salesNavForm.name}
+                    onChange={(e) => setSalesNavForm({ ...salesNavForm, name: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="label text-xs font-medium text-base-content/70 pb-1">
+                    {t("lists.salesNavUrl")} <span className="text-brand-500">*</span>
+                  </label>
+                  <input
+                    className="input input-bordered input-sm w-full bg-base-300/50 font-mono text-xs"
+                    placeholder="https://www.linkedin.com/sales/lists/people/... o /sales/search/people?..."
+                    value={salesNavForm.sales_nav_url}
+                    onChange={(e) => setSalesNavForm({ ...salesNavForm, sales_nav_url: e.target.value })}
+                    required
+                  />
+                  <span className="text-[11px] text-base-content/40 mt-1 block">
+                    Pega la URL de una lista de personas guardada o una búsqueda de Sales Navigator.
+                  </span>
+                </div>
+
+                <div>
+                  <label className="label text-xs font-medium text-base-content/70 pb-1">
+                    {t("lists.accountToUse")} <span className="text-brand-500">*</span>
+                  </label>
+                  {accounts.length === 0 || !accounts.some((a) => a.is_authenticated) ? (
+                    <div className="p-2.5 rounded-lg bg-warning/10 border border-warning/20 text-xs text-warning">
+                      ⚠️ {t("lists.noAuthAccountsAlert")}{" "}
+                      <Link href="/settings" className="underline font-semibold ml-1">
+                        Ir a Cuentas →
+                      </Link>
+                    </div>
+                  ) : (
+                    <select
+                      className="select select-bordered select-sm w-full bg-base-300/50 text-xs cursor-pointer"
+                      value={salesNavForm.account_id}
+                      onChange={(e) => setSalesNavForm({ ...salesNavForm, account_id: e.target.value })}
+                      required
+                    >
+                      <option value="">{t("lists.selectAccount")}</option>
+                      {accounts.map((a) => (
+                        <option key={a.id} value={a.id} disabled={!a.is_authenticated}>
+                          {a.name} {!a.is_authenticated ? `(${t("lists.notAuthenticated")})` : "✓ Autenticada"}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                {apolloConfigured && (
+                  <label className="flex items-center gap-2 cursor-pointer text-xs text-base-content/70 pt-1">
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-xs checkbox-primary"
+                      checked={salesNavForm.enrich}
+                      onChange={(e) => setSalesNavForm({ ...salesNavForm, enrich: e.target.checked })}
+                    />
+                    <RiSparklingLine size={14} className="text-brand-500" />
+                    <span>{t("lists.enrichWithApollo")}</span>
+                  </label>
+                )}
+
+                <div className="modal-action mt-2 pt-2 border-t border-base-300/50 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm text-base-content/60"
+                    onClick={() => setShowModal(false)}
+                    disabled={loading}
+                  >
+                    {t("common.cancel")}
+                  </button>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-[#0A66C2] hover:bg-[#004182] !text-white shadow-xs transition-colors disabled:opacity-50"
+                    disabled={loading || !accounts.some((a) => a.is_authenticated)}
+                  >
+                    {loading ? (
+                      <span className="loading loading-spinner loading-xs" />
+                    ) : (
+                      <>
+                        <RiDownloadLine size={15} />
+                        {t("lists.createAndImport")}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Mode 2: Empty / Manual List Form */}
+            {modalMode === "empty" && (
+              <form onSubmit={createEmptyList} className="flex flex-col gap-3.5">
+                <div>
+                  <label className="label text-xs font-medium text-base-content/70 pb-1">
+                    {t("common.name")} de la Lista <span className="text-brand-500">*</span>
+                  </label>
+                  <input
+                    className="input input-bordered input-sm w-full bg-base-300/50 text-xs"
+                    placeholder={t("lists.namePlaceholder")}
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="label text-xs font-medium text-base-content/70 pb-1">
+                    {t("common.description")} ({t("common.optional")})
+                  </label>
+                  <input
+                    className="input input-bordered input-sm w-full bg-base-300/50 text-xs"
+                    placeholder={t("lists.descPlaceholder")}
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  />
+                </div>
+                <div className="modal-action mt-2 pt-2 border-t border-base-300/50 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm text-base-content/60"
+                    onClick={() => setShowModal(false)}
+                    disabled={loading}
+                  >
+                    {t("common.cancel")}
+                  </button>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white shadow-xs transition-colors disabled:opacity-50"
+                    disabled={loading}
+                  >
+                    {loading ? <span className="loading loading-spinner loading-xs" /> : t("lists.createList")}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
-          <div className="modal-backdrop" onClick={() => setShowModal(false)} />
+          <div className="modal-backdrop" onClick={() => !loading && setShowModal(false)} />
         </div>
       )}
     </div>

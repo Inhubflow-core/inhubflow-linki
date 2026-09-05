@@ -13,6 +13,7 @@ import {
   RiArrowRightLine, RiSearchLine, RiPlayLine, RiHistoryLine,
 } from "react-icons/ri";
 import FilterBar, { ActiveFilter, applyFiltersClient } from "@/components/ui/FilterBar";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 
 const PAGE_SIZE = 25;
 
@@ -132,6 +133,7 @@ export default function ListDetailPage({
   runHistory: RunHistoryItem[];
 }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [targets, setTargets] = useState<Target[]>(initialList.targets);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<ActiveFilter[]>([]);
@@ -476,7 +478,7 @@ export default function ListDetailPage({
             onClick={() => { setImportSource("pick"); setShowImport(true); }}
             disabled={importing}
           >
-            <RiDownloadLine size={15} /> {importing ? "Importing…" : "Import"}
+            <RiDownloadLine size={15} /> {importing ? (t("lists.importing") || "Importing…") : (t("lists.importLeads") || "Import")}
           </button>
         </div>
       </div>
@@ -551,8 +553,28 @@ export default function ListDetailPage({
       )}
 
       {targets.length === 0 && !importing ? (
-        <div className="text-center py-16 text-base-content/40 text-sm">
-          No leads yet. Import from a Sales Navigator list URL.
+        <div className="text-center py-16 flex flex-col items-center justify-center">
+          <p className="text-base-content/40 text-sm mb-4">
+            {t("lists.noLeadsYet") || "No leads yet. Import from a Sales Navigator list URL."}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setImportSource("sales_nav"); setShowImport(true); }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#0a66c2]/15 text-[#0a66c2] dark:text-[#70b5f9] border border-[#0a66c2]/30 hover:bg-[#0a66c2]/25 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z"/>
+              </svg>
+              <span>{t("lists.importSalesNav") || "Importar de Sales Navigator"}</span>
+            </button>
+            <button
+              onClick={() => { setImportSource("csv"); setShowImport(true); }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-base-300 hover:bg-base-300/80 text-base-content border border-base-content/10 transition-colors"
+            >
+              <RiDownloadLine size={13} />
+              <span>{t("lists.csvFile") || "Subir CSV"}</span>
+            </button>
+          </div>
         </div>
       ) : filteredTargets.length === 0 && !importing ? (
         <div className="text-center py-16 text-base-content/40 text-sm">
@@ -791,18 +813,22 @@ export default function ListDetailPage({
             {/* Step 1: pick source */}
             {importSource === "pick" && (
               <>
-                <h3 className="font-semibold text-base mb-1">Import leads</h3>
-                <p className="text-base-content/50 text-xs mb-4">Choose where these leads are coming from.</p>
+                <h3 className="font-semibold text-base mb-1">{t("lists.importLeads") || "Import leads"}</h3>
+                <p className="text-base-content/50 text-xs mb-4">{t("lists.importSourceDesc") || "Choose where these leads are coming from."}</p>
                 <div className="flex flex-col gap-2">
                   <button
                     type="button"
                     className="flex items-start gap-3 p-3 rounded-lg border border-base-300/60 hover:border-primary/50 hover:bg-base-300/30 transition-colors text-left"
                     onClick={() => setImportSource("sales_nav")}
                   >
-                    <RiSearchLine size={18} className="text-primary mt-0.5" />
+                    <div className="w-5 h-5 flex items-center justify-center rounded text-[#0a66c2] bg-[#0a66c2]/10 mt-0.5 shrink-0">
+                      <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                        <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z"/>
+                      </svg>
+                    </div>
                     <span>
-                      <span className="block text-sm font-medium">Sales Navigator search</span>
-                      <span className="block text-xs text-base-content/50 mt-0.5">Paste a Sales Nav list/search URL — InHubFlow scrapes it using a connected LinkedIn account.</span>
+                      <span className="block text-sm font-medium">{t("lists.salesNavSearch") || "Sales Navigator search"}</span>
+                      <span className="block text-xs text-base-content/50 mt-0.5">{t("lists.salesNavSearchDesc") || "Paste a Sales Nav list/search URL — InHubFlow scrapes it using a connected LinkedIn account."}</span>
                     </span>
                   </button>
                   <button
@@ -810,15 +836,15 @@ export default function ListDetailPage({
                     className="flex items-start gap-3 p-3 rounded-lg border border-base-300/60 hover:border-primary/50 hover:bg-base-300/30 transition-colors text-left"
                     onClick={() => setImportSource("csv")}
                   >
-                    <RiDownloadLine size={18} className="text-primary mt-0.5" />
+                    <RiDownloadLine size={18} className="text-primary mt-0.5 shrink-0" />
                     <span>
-                      <span className="block text-sm font-medium">CSV file</span>
-                      <span className="block text-xs text-base-content/50 mt-0.5">Upload leads you already have — from another export, or emails scraped from websites.</span>
+                      <span className="block text-sm font-medium">{t("lists.csvFile") || "CSV file"}</span>
+                      <span className="block text-xs text-base-content/50 mt-0.5">{t("lists.csvFileDesc") || "Upload leads you already have — from another export, or emails scraped from websites."}</span>
                     </span>
                   </button>
                 </div>
                 <div className="modal-action mt-4">
-                  <button type="button" className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors" onClick={closeImportModal}>Cancel</button>
+                  <button type="button" className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors" onClick={closeImportModal}>{t("common.cancel") || "Cancel"}</button>
                 </div>
               </>
             )}
@@ -826,20 +852,20 @@ export default function ListDetailPage({
             {/* Step 2a: Sales Navigator form (existing flow) */}
             {importSource === "sales_nav" && (
               <>
-                <h3 className="font-semibold text-base mb-1">Import from Sales Navigator</h3>
+                <h3 className="font-semibold text-base mb-1">{t("lists.importFromSalesNav") || "Import from Sales Navigator"}</h3>
                 <p className="text-base-content/50 text-xs mb-3">
-                  Paste a Sales Navigator people list URL. The selected account must be authenticated.
+                  {t("lists.salesNavDescDetail") || "Paste a Sales Navigator people list URL. The selected account must be authenticated."}
                 </p>
                 <div className="bg-base-300/40 border border-base-300/60 rounded-lg p-3 mb-4 space-y-1.5 text-xs text-base-content/50">
-                  <p className="font-medium text-base-content/70">What gets fetched and when</p>
-                  <p><span className="text-base-content/60">Now —</span> Basic profile data only (name, title, company, location). One page load per 25 contacts with ~90s gaps.</p>
-                  <p><span className="text-base-content/60">When a run starts —</span> LinkedIn URL resolved per contact right before first action.</p>
-                  <p><span className="text-base-content/60">Before message —</span> Full Sales Nav profile (headline, positions) fetched for AI context.</p>
-                  <p><span className="text-base-content/60">Before email —</span> Apollo enrichment runs to get email address + company data.</p>
+                  <p className="font-medium text-base-content/70">{t("lists.salesNavHelpWhat") || "What gets fetched and when"}</p>
+                  <p><span className="text-base-content/60">{t("lists.salesNavHelpNow") || "Now — Basic profile data only (name, title, company, location). One page load per 25 contacts with ~90s gaps."}</span></p>
+                  <p><span className="text-base-content/60">{t("lists.salesNavHelpRun") || "When a run starts — LinkedIn URL resolved per contact right before first action."}</span></p>
+                  <p><span className="text-base-content/60">{t("lists.salesNavHelpMsg") || "Before message — Full Sales Nav profile (headline, positions) fetched for AI context."}</span></p>
+                  <p><span className="text-base-content/60">{t("lists.salesNavHelpEmail") || "Before email — Apollo enrichment runs to get email address + company data."}</span></p>
                 </div>
                 <form onSubmit={runImport} className="flex flex-col gap-3">
                   <div>
-                    <label className="label text-xs text-base-content/50 pb-1">Sales Navigator URL</label>
+                    <label className="label text-xs text-base-content/50 pb-1">{t("lists.salesNavUrl") || "Sales Navigator URL"}</label>
                     <input
                       className="input input-bordered input-sm w-full bg-base-300/50 font-mono text-xs"
                       placeholder="https://www.linkedin.com/sales/lists/people/..."
@@ -849,25 +875,25 @@ export default function ListDetailPage({
                     />
                   </div>
                   <div>
-                    <label className="label text-xs text-base-content/50 pb-1">Account to use</label>
+                    <label className="label text-xs text-base-content/50 pb-1">{t("lists.accountToUse") || "Account to use"}</label>
                     <select
                       className="w-full px-3 py-1.5 rounded-lg text-sm bg-base-300 border border-base-300/80 text-base-content focus:outline-none focus:border-primary/50 cursor-pointer"
                       value={importForm.account_id}
                       onChange={(e) => setImportForm({ ...importForm, account_id: e.target.value })}
                       required
                     >
-                      <option value="">Select account...</option>
+                      <option value="">{t("lists.selectAccount") || "Select account..."}</option>
                       {accounts.map((a) => (
                         <option key={a.id} value={a.id} disabled={!a.is_authenticated}>
-                          {a.name} {!a.is_authenticated ? "(not authenticated)" : ""}
+                          {a.name} {!a.is_authenticated ? `(${t("lists.notAuthenticated") || "not authenticated"})` : ""}
                         </option>
                       ))}
                     </select>
                   </div>
                   <div className="modal-action mt-1">
-                    <button type="button" className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors" onClick={() => setImportSource("pick")} disabled={importing}>Back</button>
+                    <button type="button" className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors" onClick={() => setImportSource("pick")} disabled={importing}>{t("common.back") || "Back"}</button>
                     <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-50" disabled={importing}>
-                      {importing ? <><span className="loading loading-spinner loading-xs" /> Importing...</> : "Start Import"}
+                      {importing ? <><span className="loading loading-spinner loading-xs" /> {t("lists.importing") || "Importing..."}</> : (t("lists.startImport") || "Start Import")}
                     </button>
                   </div>
                 </form>
@@ -877,13 +903,13 @@ export default function ListDetailPage({
             {/* Step 2b: CSV import */}
             {importSource === "csv" && (
               <>
-                <h3 className="font-semibold text-base mb-1">Import from CSV</h3>
+                <h3 className="font-semibold text-base mb-1">{t("lists.importFromCsv") || "Import from CSV"}</h3>
                 <p className="text-base-content/50 text-xs mb-3">
-                  One template for everything — leads you already have, whether that&apos;s a LinkedIn export, an email list, or both.
+                  {t("lists.csvSubtitle") || "One template for everything — leads you already have, whether that's a LinkedIn export, an email list, or both."}
                 </p>
 
                 <div className="bg-base-300/40 border border-base-300/60 rounded-lg p-3 mb-4 space-y-1.5 text-xs text-base-content/50">
-                  <p className="font-medium text-base-content/70">Rules</p>
+                  <p className="font-medium text-base-content/70">{t("lists.csvRules") || "Rules"}</p>
                   <p>• Each row needs a <span className="text-base-content/60">linkedin_url</span> and/or an <span className="text-base-content/60">email</span> — fill in whichever you have, or both.</p>
                   <p>• <span className="text-base-content/60">linkedin_url</span> must be a real linkedin.com/in/ profile URL — used for connect/message/visit steps.</p>
                   <p>• <span className="text-base-content/60">sales_nav_url</span> is optional — speeds up enrichment and InMail if you have it.</p>
@@ -898,10 +924,10 @@ export default function ListDetailPage({
                     className="inline-flex items-center gap-1.5 self-start text-xs font-medium text-primary hover:underline"
                     onClick={downloadCsvTemplate}
                   >
-                    <RiDownloadLine size={13} /> Download template
+                    <RiDownloadLine size={13} /> {t("lists.downloadTemplate") || "Download template"}
                   </button>
                   <div>
-                    <label className="label text-xs text-base-content/50 pb-1">CSV file</label>
+                    <label className="label text-xs text-base-content/50 pb-1">{t("lists.csvFile") || "CSV file"}</label>
                     <input
                       type="file"
                       accept=".csv,text/csv"
@@ -924,12 +950,12 @@ export default function ListDetailPage({
                   )}
 
                   <div className="modal-action mt-1">
-                    <button type="button" className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors" onClick={() => setImportSource("pick")} disabled={csvImporting}>Back</button>
+                    <button type="button" className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors" onClick={() => setImportSource("pick")} disabled={csvImporting}>{t("common.back") || "Back"}</button>
                     {csvResult ? (
-                      <button type="button" className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors" onClick={closeImportModal}>Done</button>
+                      <button type="button" className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors" onClick={closeImportModal}>{t("common.done") || "Done"}</button>
                     ) : (
                       <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-50" disabled={csvImporting}>
-                        {csvImporting ? <><span className="loading loading-spinner loading-xs" /> Importing...</> : "Import CSV"}
+                        {csvImporting ? <><span className="loading loading-spinner loading-xs" /> {t("lists.importing") || "Importing..."}</> : (t("lists.importLeads") || "Import CSV")}
                       </button>
                     )}
                   </div>
