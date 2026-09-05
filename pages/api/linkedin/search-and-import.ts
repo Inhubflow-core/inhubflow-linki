@@ -18,6 +18,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     accountId,
     title,
     location,
+    country,
+    city,
     company,
     keywords,
     limit = 25,
@@ -25,14 +27,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     stream = true,
   } = req.body || {};
 
-  if (!title && !location && !company && !keywords) {
+  const effectiveLocation = location || [city?.trim(), country?.trim()].filter(Boolean).join(", ");
+
+  if (!title && !effectiveLocation && !company && !keywords) {
     return res.status(400).json({
       error: "Debes ingresar al menos un criterio de búsqueda (Cargo, Ubicación, Empresa o Palabras Clave).",
     });
   }
 
   const numericLimit = Math.min(Math.max(parseInt(String(limit), 10) || 25, 5), 100);
-  const parts = [title?.trim(), location?.trim(), company?.trim()].filter(Boolean);
+  const parts = [title?.trim(), effectiveLocation?.trim(), company?.trim()].filter(Boolean);
   const cleanListName =
     listName?.trim() ||
     `${parts.length > 0 ? parts.join(" - ") : "Prospectos"} (${new Date().toLocaleDateString("es-ES", {
@@ -75,7 +79,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         profiles = await searchLinkedInWithXRay(
           {
             title,
-            location,
+            location: effectiveLocation,
+            country,
+            city,
             company,
             keywords,
             limit: numericLimit,
@@ -144,7 +150,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       profiles = await searchLinkedInWithXRay({
         title,
-        location,
+        location: effectiveLocation,
+        country,
+        city,
         company,
         keywords,
         limit: numericLimit,

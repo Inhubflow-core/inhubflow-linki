@@ -117,6 +117,8 @@ export const XRAY_TITLE_SYNONYMS: Record<string, string[]> = {
 export interface XRaySearchOptions {
   title?: string;
   location?: string;
+  country?: string;
+  city?: string;
   company?: string;
   keywords?: string;
   limit?: number;
@@ -142,8 +144,9 @@ export function resolveSubdomain(locationText?: string): { code: string; name: s
  * site:cl.linkedin.com/in/ ("CEO" OR "Chief Executive Officer" OR "Director General") "Mineria" "Santiago" -intitle:"profiles" -inurl:"dir/"
  */
 export function buildXRayQuery(options: XRaySearchOptions): { query: string; subdomain: string; countryName: string } {
-  const { title = "", location = "", company = "", keywords = "" } = options;
-  const { code: subCode, name: countryName } = resolveSubdomain(location);
+  const { title = "", location = "", country = "", city = "", company = "", keywords = "" } = options;
+  const countryInput = country.trim() || location;
+  const { code: subCode, name: countryName } = resolveSubdomain(countryInput);
 
   const siteClause = subCode === "www"
     ? `(site:linkedin.com/in/ OR site:www.linkedin.com/in/)`
@@ -183,14 +186,18 @@ export function buildXRayQuery(options: XRaySearchOptions): { query: string; sub
     }
   }
 
-  // City / Specific location clause (extract city if present)
+  // City / Specific location clause
   let cityClause = "";
-  const locLower = location.toLowerCase();
-  for (const [cityKey, mapping] of Object.entries(COUNTRY_SUBDOMAINS)) {
-    if (cityKey !== mapping.name.toLowerCase() && locLower.includes(cityKey)) {
-      const capCity = cityKey.charAt(0).toUpperCase() + cityKey.slice(1);
-      cityClause = `"${capCity}"`;
-      break;
+  if (city.trim()) {
+    cityClause = `"${city.trim()}"`;
+  } else if (location.trim()) {
+    const locLower = location.toLowerCase();
+    for (const [cityKey, mapping] of Object.entries(COUNTRY_SUBDOMAINS)) {
+      if (cityKey !== mapping.name.toLowerCase() && locLower.includes(cityKey)) {
+        const capCity = cityKey.charAt(0).toUpperCase() + cityKey.slice(1);
+        cityClause = `"${capCity}"`;
+        break;
+      }
     }
   }
 
@@ -480,6 +487,8 @@ export async function searchLinkedInWithXRay(
           continue;
         }
 
+        const leadLoc = [options.city?.trim(), options.country?.trim() || countryName].filter(Boolean).join(", ") || location || countryName;
+
         const lead: SearchLead = {
           linkedinUrl: cleanUrl,
           fullName,
@@ -487,7 +496,7 @@ export async function searchLinkedInWithXRay(
           lastName,
           title: parsedTitle,
           company: parsedCompany,
-          location: location || countryName,
+          location: leadLoc,
           email: foundEmail,
           phone: foundPhone,
           profileImageUrl: null,

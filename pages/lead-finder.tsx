@@ -72,11 +72,26 @@ const SAMPLE_TITLES = [
   "Founder",
 ];
 
-const SAMPLE_LOCATIONS = [
-  "Chile",
-  "Santiago, Chile",
-  "São Paulo, Brasil",
-  "Lima, Perú",
+export interface CountryOption {
+  code: string;
+  name: string;
+  flag: string;
+  popularCities: string[];
+}
+
+export const COUNTRIES_LIST: CountryOption[] = [
+  { code: "cl", name: "Chile", flag: "🇨🇱", popularCities: ["Santiago", "Valparaíso", "Concepción", "Antofagasta"] },
+  { code: "br", name: "Brasil", flag: "🇧🇷", popularCities: ["São Paulo", "Rio de Janeiro", "Belo Horizonte", "Curitiba"] },
+  { code: "mx", name: "México", flag: "🇲🇽", popularCities: ["Ciudad de México", "Monterrey", "Guadalajara", "Querétaro"] },
+  { code: "co", name: "Colombia", flag: "🇨🇴", popularCities: ["Bogotá", "Medellín", "Cali", "Barranquilla"] },
+  { code: "es", name: "España", flag: "🇪🇸", popularCities: ["Madrid", "Barcelona", "Valencia", "Sevilla"] },
+  { code: "pe", name: "Perú", flag: "🇵🇪", popularCities: ["Lima", "Arequipa", "Trujillo", "Cusco"] },
+  { code: "ar", name: "Argentina", flag: "🇦🇷", popularCities: ["Buenos Aires", "Córdoba", "Rosario", "Mendoza"] },
+  { code: "uy", name: "Uruguay", flag: "🇺🇾", popularCities: ["Montevideo", "Punta del Este"] },
+  { code: "ec", name: "Ecuador", flag: "🇪🇨", popularCities: ["Quito", "Guayaquil", "Cuenca"] },
+  { code: "pa", name: "Panamá", flag: "🇵🇦", popularCities: ["Ciudad de Panamá"] },
+  { code: "us", name: "Estados Unidos", flag: "🇺🇸", popularCities: ["Miami", "New York", "San Francisco", "Austin"] },
+  { code: "www", name: "Global / Todos", flag: "🌐", popularCities: [] },
 ];
 
 const SAMPLE_INDUSTRIES = [
@@ -124,7 +139,8 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
   );
 
   const [title, setTitle] = useState("");
-  const [location, setLocation] = useState("");
+  const [country, setCountry] = useState("Chile");
+  const [city, setCity] = useState("");
   const [company, setCompany] = useState("");
   const [limit, setLimit] = useState(25);
   const [listName, setListName] = useState("");
@@ -147,10 +163,13 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
   const abortControllerRef = useRef<AbortController | null>(null);
   const resultsEndRef = useRef<HTMLDivElement>(null);
 
+  const selectedCountryOption = COUNTRIES_LIST.find((c) => c.name === country) || COUNTRIES_LIST[0];
+
   // Auto-generate a list name based on filters if user hasn't explicitly customized it
   useEffect(() => {
     if (!customListName) {
-      const parts = [title.trim(), location.trim(), company.trim()].filter(Boolean);
+      const locDisplay = [city.trim(), country !== "Global / Todos" ? country : ""].filter(Boolean).join(", ");
+      const parts = [title.trim(), locDisplay, company.trim()].filter(Boolean);
       const dateLocale = locale === "en" ? "en-US" : locale === "pt-BR" ? "pt-BR" : "es-ES";
       const dateStr = new Date().toLocaleDateString(dateLocale, { month: "short", year: "numeric" });
       if (parts.length > 0) {
@@ -159,7 +178,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
         setListName(t("leadFinder.defaultListName", { date: dateStr }));
       }
     }
-  }, [title, location, company, customListName, locale, t]);
+  }, [title, country, city, company, customListName, locale, t]);
 
   // Keep accounts updated if user authenticated elsewhere
   useEffect(() => {
@@ -180,7 +199,9 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
   async function handleStartSearch(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!title.trim() && !location.trim() && !company.trim()) {
+    const effectiveLoc = [city.trim(), country !== "Global / Todos" ? country : ""].filter(Boolean).join(", ");
+
+    if (!title.trim() && !effectiveLoc && !company.trim()) {
       toast.error(t("leadFinder.toastFillFields"));
       return;
     }
@@ -206,7 +227,9 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
         body: JSON.stringify({
           accountId: selectedAccountId,
           title: title.trim(),
-          location: location.trim(),
+          country: country !== "Global / Todos" ? country : "",
+          city: city.trim(),
+          location: effectiveLoc,
           company: company.trim(),
           limit,
           listName: listName.trim() || undefined,
@@ -427,43 +450,74 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                 </div>
               </div>
 
-              {/* Location */}
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                  🏙️ {t("leadFinder.locationLabel")} <span className="text-brand-500">*</span>
-                </label>
-                <div className="relative">
-                  <RiMapPinLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
-                  <input
-                    type="text"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    disabled={isSearching}
-                    placeholder={t("leadFinder.locationPlaceholder")}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
-                  />
-                </div>
-                {/* Suggestions (Max 4, Multi-select) */}
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {SAMPLE_LOCATIONS.map((sl) => {
-                    const active = isPillActive(location, sl);
-                    return (
-                      <button
-                        key={sl}
-                        type="button"
-                        onClick={() => setLocation(toggleOrAppendPill(location, sl))}
+              {/* Location: Country and City Filter */}
+              <div className="space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Country Selector */}
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                      🌎 País
+                    </label>
+                    <select
+                      value={country}
+                      onChange={(e) => {
+                        setCountry(e.target.value);
+                        setCity("");
+                      }}
+                      disabled={isSearching}
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 transition-all focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
+                    >
+                      {COUNTRIES_LIST.map((c) => (
+                        <option key={c.name} value={c.name}>
+                          {c.flag} {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* City Input */}
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                      🏙️ Ciudad <span className="text-gray-400 font-normal">(Opcional)</span>
+                    </label>
+                    <div className="relative">
+                      <RiMapPinLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
+                      <input
+                        type="text"
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
                         disabled={isSearching}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                          active
-                            ? "bg-brand-500 text-white shadow-xs"
-                            : "bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
-                        }`}
-                      >
-                        {active ? `✓ ${sl}` : `+${sl}`}
-                      </button>
-                    );
-                  })}
+                        placeholder="Ej: Santiago, Antofagasta..."
+                        className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
+                      />
+                    </div>
+                  </div>
                 </div>
+
+                {/* Popular City Suggestions */}
+                {selectedCountryOption && selectedCountryOption.popularCities.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                    <span className="text-[11px] text-gray-400 dark:text-gray-500 mr-1 font-medium">Ciudades clave:</span>
+                    {selectedCountryOption.popularCities.map((cName) => {
+                      const active = city.toLowerCase() === cName.toLowerCase();
+                      return (
+                        <button
+                          key={cName}
+                          type="button"
+                          onClick={() => setCity(active ? "" : cName)}
+                          disabled={isSearching}
+                          className={`px-2.5 py-0.5 rounded-lg text-xs font-medium transition-all ${
+                            active
+                              ? "bg-brand-500 text-white shadow-xs"
+                              : "bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
+                          }`}
+                        >
+                          {active ? `✓ ${cName}` : `+${cName}`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Company / Industry (Optional) */}
@@ -555,7 +609,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                 {!isSearching ? (
                   <button
                     type="submit"
-                    disabled={!title.trim() && !location.trim() && !company.trim()}
+                    disabled={!title.trim() && !city.trim() && !company.trim() && country === "Global / Todos"}
                     className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold !text-white bg-brand-500 hover:bg-brand-600 shadow-md shadow-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform active:scale-[0.99]"
                   >
                     <RiFlashlightLine size={18} /> {t("leadFinder.searchButton")}

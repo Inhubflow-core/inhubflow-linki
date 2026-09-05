@@ -61,6 +61,14 @@ assert.equal(
   true
 );
 assert.equal(qGlobal.subdomain, "www");
+
+console.log("▶ [Test 2b] Query building with explicit country & custom city");
+const qCustomCity = buildXRayQuery({ title: "Director", country: "Chile", city: "Antofagasta" });
+assert.equal(qCustomCity.query.includes("site:cl.linkedin.com/in/"), true);
+assert.equal(qCustomCity.query.includes('"Antofagasta"'), true);
+assert.equal(qCustomCity.subdomain, "cl");
+assert.equal(qCustomCity.countryName, "Chile");
+console.log("  ✔ Custom city and country query building validated");
 console.log("  ✔ Query structure and boolean clauses validated");
 
 console.log("▶ [Test 3] Synonyms expansion & industry OR groups");
