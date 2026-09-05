@@ -15,6 +15,7 @@
     "test:sdr-authorization": "node scripts/test-sdr-authorization.cjs",
     "test:linkedin-connection-sync": "node scripts/test-linkedin-connection-sync.cjs",
     "test:linkedin-campaign-inbox": "node scripts/test-linkedin-campaign-inbox.cjs",
+    "test:xray": "node scripts/test-xray.cjs",
     "mirror:ee": "node scripts/mirror-ee.js"
   },
   "dependencies": {

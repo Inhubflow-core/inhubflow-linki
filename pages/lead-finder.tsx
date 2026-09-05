@@ -253,60 +253,63 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
 
           if (!dataStr) continue;
 
+          let parsedData: any;
           try {
-            const parsedData = JSON.parse(dataStr);
+            parsedData = JSON.parse(dataStr);
+          } catch (parseErr) {
+            console.error("Error parsing SSE block:", parseErr);
+            continue;
+          }
 
-            if (eventName === "init") {
-              setProgressMessage(parsedData.message || t("leadFinder.scanningRealtime"));
-            } else if (eventName === "progress") {
-              if (parsedData.message) setProgressMessage(parsedData.message);
-              if (parsedData.page) setCurrentPage(parsedData.page);
-              if (parsedData.totalPages) setTotalPages(parsedData.totalPages);
+          if (eventName === "error") {
+            throw new Error(parsedData?.error || "Ocurrió un error en la búsqueda con Google X-Ray.");
+          }
 
-              const estPages = parsedData.totalPages || Math.ceil(limit / 10);
-              const curP = parsedData.page || 1;
-              const found = parsedData.totalFound || 0;
-              const calcPct = Math.min(
-                Math.round((found / limit) * 85 + (curP / estPages) * 10),
-                95
+          if (eventName === "init") {
+            setProgressMessage(parsedData.message || t("leadFinder.scanningRealtime"));
+          } else if (eventName === "progress") {
+            if (parsedData.message) setProgressMessage(parsedData.message);
+            if (parsedData.page) setCurrentPage(parsedData.page);
+            if (parsedData.totalPages) setTotalPages(parsedData.totalPages);
+
+            const estPages = parsedData.totalPages || Math.ceil(limit / 10);
+            const curP = parsedData.page || 1;
+            const found = parsedData.totalFound || 0;
+            const calcPct = Math.min(
+              Math.round((found / limit) * 85 + (curP / estPages) * 10),
+              95
+            );
+            setProgressPercent(Math.max(calcPct, 15));
+          } else if (eventName === "lead") {
+            const newLead = parsedData as Lead;
+            setLeads((prev) => {
+              if (prev.some((l) => l.linkedinUrl === newLead.linkedinUrl)) return prev;
+              return [...prev, newLead];
+            });
+          } else if (eventName === "saving") {
+            setProgressMessage(parsedData.message || "Guardando...");
+            setProgressPercent(95);
+          } else if (eventName === "complete") {
+            setProgressPercent(100);
+            const foundCount = parsedData.totalFound || leads.length;
+            setProgressMessage(
+              parsedData.message ||
+                (foundCount > 0 ? t("leadFinder.extractionFinished") : t("leadFinder.noResultsTitle"))
+            );
+            setCompletedResult({
+              listId: parsedData.listId,
+              listName: parsedData.listName,
+              totalFound: foundCount,
+              importedCount: parsedData.importedCount || 0,
+              updatedCount: parsedData.updatedCount || 0,
+            });
+            if (foundCount > 0) {
+              toast.success(
+                t("leadFinder.toastSuccess", { name: parsedData.listName, count: String(foundCount) })
               );
-              setProgressPercent(Math.max(calcPct, 15));
-            } else if (eventName === "lead") {
-              const newLead = parsedData as Lead;
-              setLeads((prev) => {
-                if (prev.some((l) => l.linkedinUrl === newLead.linkedinUrl)) return prev;
-                return [...prev, newLead];
-              });
-            } else if (eventName === "saving") {
-              setProgressMessage(parsedData.message || "Guardando...");
-              setProgressPercent(95);
-            } else if (eventName === "complete") {
-              setProgressPercent(100);
-              const foundCount = parsedData.totalFound || leads.length;
-              setProgressMessage(
-                parsedData.message ||
-                  (foundCount > 0 ? t("leadFinder.extractionFinished") : t("leadFinder.noResultsTitle"))
-              );
-              setCompletedResult({
-                listId: parsedData.listId,
-                listName: parsedData.listName,
-                totalFound: foundCount,
-                importedCount: parsedData.importedCount || 0,
-                updatedCount: parsedData.updatedCount || 0,
-              });
-              if (foundCount > 0) {
-                toast.success(
-                  t("leadFinder.toastSuccess", { name: parsedData.listName, count: String(foundCount) })
-                );
-              } else {
-                toast.info(t("leadFinder.toastNoResults"));
-              }
-            } else if (eventName === "error") {
-              throw new Error(parsedData.error || "Ocurrió un error en la búsqueda de LinkedIn.");
+            } else {
+              toast.info(t("leadFinder.toastNoResults"));
             }
-          } catch (e: unknown) {
-            if (e instanceof Error && e.name === "AbortError") throw e;
-            console.error("Error parsing SSE block:", e);
           }
         }
       }
@@ -552,7 +555,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                 {!isSearching ? (
                   <button
                     type="submit"
-                    disabled={!hasAuthAccount}
+                    disabled={!title.trim() && !location.trim() && !company.trim()}
                     className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold !text-white bg-brand-500 hover:bg-brand-600 shadow-md shadow-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform active:scale-[0.99]"
                   >
                     <RiFlashlightLine size={18} /> {t("leadFinder.searchButton")}

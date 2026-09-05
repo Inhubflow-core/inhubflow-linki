@@ -6,7 +6,7 @@ import {
   SearchProgressEvent,
   SearchLead,
 } from "@/lib/linkedin/search";
-import { searchLinkedInWithXRay } from "@/lib/linkedin/xray";
+import { searchLinkedInWithXRay, XRaySearchError } from "@/lib/linkedin/xray";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -87,8 +87,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
           }
         );
-      } catch (xrayErr) {
-        console.warn("[search-and-import] Google X-Ray notice:", xrayErr);
+      } catch (xrayErr: unknown) {
+        console.error("[search-and-import] Google X-Ray error:", xrayErr);
+        const message = xrayErr instanceof Error ? xrayErr.message : "Error durante la búsqueda con Google X-Ray.";
+        const code = xrayErr instanceof XRaySearchError ? xrayErr.code : "provider_error";
+        sendEvent("error", { error: message, code });
+        res.end();
+        return;
       }
 
       // Note: We deliberately DO NOT fallback to internal LinkedIn search session
@@ -144,14 +149,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         keywords,
         limit: numericLimit,
       });
-    } catch {
-      if (accountId) {
-        profiles = await searchLinkedInProfiles({
-          accountId,
-          filters: { title, location, company, keywords },
-          limit: numericLimit,
-        });
-      }
+    } catch (xrayErr: unknown) {
+      console.error("[search-and-import] Google X-Ray non-streaming error:", xrayErr);
+      const message = xrayErr instanceof Error ? xrayErr.message : "Error durante la búsqueda de prospectos.";
+      const code = xrayErr instanceof XRaySearchError ? xrayErr.code : "provider_error";
+      return res.status(500).json({ error: message, code });
     }
 
     let saveResult = { listId: "", listName: cleanListName, importedCount: 0, updatedCount: 0 };

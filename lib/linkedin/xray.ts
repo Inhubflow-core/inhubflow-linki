@@ -7,6 +7,22 @@ chromium.use(StealthPlugin());
 const HEADLESS = process.env.HEADLESS !== "false";
 const CHROMIUM_PATH = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 
+export type XRayErrorCode =
+  | "browser_unavailable"
+  | "google_blocked"
+  | "timeout"
+  | "no_results"
+  | "provider_error";
+
+export class XRaySearchError extends Error {
+  code: XRayErrorCode;
+  constructor(message: string, code: XRayErrorCode) {
+    super(message);
+    this.name = "XRaySearchError";
+    this.code = code;
+  }
+}
+
 const LAUNCH_ARGS = [
   "--no-sandbox",
   "--disable-setuid-sandbox",
@@ -131,7 +147,7 @@ export function buildXRayQuery(options: XRaySearchOptions): { query: string; sub
 
   const siteClause = subCode === "www"
     ? `(site:linkedin.com/in/ OR site:www.linkedin.com/in/)`
-    : `(site:${subCode}.linkedin.com/in/ OR site:${subCode}.linkedin.com/pub/)`;
+    : `(site:${subCode}.linkedin.com/in/ OR site:linkedin.com/in/ OR site:www.linkedin.com/in/)`;
 
   // Build title boolean group
   const rawTitleTokens = title.split(/[,;/|]+/).map((s) => s.trim()).filter(Boolean);
@@ -202,7 +218,7 @@ export function buildXRayQuery(options: XRaySearchOptions): { query: string; sub
 /**
  * Normalizes LinkedIn profile URL extracted from Google search results.
  */
-function normalizeXRayUrl(rawUrl: string): string | null {
+export function normalizeXRayUrl(rawUrl: string): string | null {
   if (!rawUrl || !rawUrl.includes("linkedin.com/in/")) return null;
   try {
     let target = rawUrl;
@@ -300,7 +316,8 @@ export async function searchLinkedInWithXRay(
   const { limit = 25, location = "", company = "" } = options;
   const { query, countryName } = buildXRayQuery(options);
 
-  const estimatedPages = Math.min(Math.ceil(limit / 10), 5);
+  const pageSize = 20;
+  const estimatedPages = Math.min(Math.ceil(limit / pageSize), 5);
   const collectedLeads: SearchLead[] = [];
   const seenUrls = new Set<string>();
 
@@ -312,27 +329,39 @@ export async function searchLinkedInWithXRay(
     message: `Iniciando Google X-Ray para ${countryName}: "${options.title || "Directivos"}"...`,
   });
 
-  const browser = await chromium.launch({
-    headless: HEADLESS,
-    executablePath: CHROMIUM_PATH,
-    args: LAUNCH_ARGS,
-  });
+  let browser;
+  try {
+    browser = await chromium.launch({
+      headless: HEADLESS,
+      executablePath: CHROMIUM_PATH,
+      args: LAUNCH_ARGS,
+    });
+  } catch (launchErr: any) {
+    console.error("[xray] Error al iniciar Chromium:", launchErr);
+    throw new XRaySearchError(
+      `No se pudo iniciar el navegador Chromium en el servidor (${launchErr?.message || "error desconocido"}). Verifica la instalación de Chromium o configura PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH.`,
+      "browser_unavailable"
+    );
+  }
 
-  const context = await browser.newContext({
-    viewport: { width: 1920, height: 1080 },
-    userAgent:
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-    locale: "es-ES",
-  });
-
-  const page = await context.newPage();
+  let context;
+  let page;
 
   try {
+    context = await browser.newContext({
+      viewport: { width: 1920, height: 1080 },
+      userAgent:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      locale: "es-ES",
+    });
+
+    page = await context.newPage();
+
     for (let pageIdx = 0; pageIdx < estimatedPages; pageIdx++) {
       if (collectedLeads.length >= limit) break;
 
-      const startOffset = pageIdx * 10;
-      const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&start=${startOffset}&num=30&hl=es`;
+      const startOffset = pageIdx * pageSize;
+      const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&start=${startOffset}&num=${pageSize}&hl=es`;
 
       onProgress?.({
         phase: "navigating",
@@ -342,8 +371,55 @@ export async function searchLinkedInWithXRay(
         message: `Buscando perfiles verificados en Google (${countryName})...`,
       });
 
-      await page.goto(googleUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
-      await page.waitForTimeout(1500 + Math.random() * 800);
+      try {
+        await page.goto(googleUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+      } catch (navErr: any) {
+        if (navErr?.name === "TimeoutError" || navErr?.message?.includes("Timeout") || navErr?.message?.includes("timeout")) {
+          throw new XRaySearchError("Tiempo de espera agotado al conectar con Google.", "timeout");
+        }
+        throw new XRaySearchError(`Fallo de red al conectar con Google: ${navErr?.message || "error desconocido"}`, "provider_error");
+      }
+
+      await page.waitForTimeout(1200 + Math.random() * 800);
+
+      // Dismiss Google consent banner if present
+      try {
+        const consentBtn = page.locator('button:has-text("Aceptar todo"), button:has-text("Acepto"), button:has-text("Aceptar"), button:has-text("I agree"), button:has-text("Accept all")').first();
+        if (await consentBtn.isVisible({ timeout: 1200 }).catch(() => false)) {
+          await consentBtn.click().catch(() => {});
+          await page.waitForTimeout(800);
+        }
+      } catch {
+        /* ignore */
+      }
+
+      // Detect Google CAPTCHA / unusual traffic blocking
+      const isBlocked = await page.evaluate(() => {
+        const href = window.location.href.toLowerCase();
+        const title = document.title.toLowerCase();
+        const text = document.body?.innerText?.toLowerCase() || "";
+
+        if (
+          href.includes("/sorry/") ||
+          title.includes("unusual traffic") ||
+          title.includes("tráfico inusual") ||
+          text.includes("unusual traffic from your computer network") ||
+          text.includes("demuestra que no eres un robot") ||
+          text.includes("nuestros sistemas han detectado tráfico inusual") ||
+          !!document.querySelector("form[action*='sorry']") ||
+          !!document.querySelector("#captcha-form")
+        ) {
+          return true;
+        }
+        return false;
+      });
+
+      if (isBlocked) {
+        throw new XRaySearchError(
+          "Google ha presentado un desafío de verificación (CAPTCHA) o detección de tráfico inusual desde la IP del servidor. Intenta de nuevo en unos minutos o reduce la frecuencia de búsquedas.",
+          "google_blocked"
+        );
+      }
 
       // Extract results from Google search page
       const googleResults = await page.evaluate(() => {
@@ -444,8 +520,8 @@ export async function searchLinkedInWithXRay(
 
     return collectedLeads;
   } finally {
-    try { await page.close(); } catch { /* ignore */ }
-    try { await context.close(); } catch { /* ignore */ }
-    try { await browser.close(); } catch { /* ignore */ }
+    try { if (page) await page.close(); } catch { /* ignore */ }
+    try { if (context) await context.close(); } catch { /* ignore */ }
+    try { if (browser) await browser.close(); } catch { /* ignore */ }
   }
 }
