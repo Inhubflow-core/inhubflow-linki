@@ -398,10 +398,10 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
           </div>
         </div>
 
-        {/* 2-Column Grid: Form & Results */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left Column: Search Form (5 cols on lg) */}
-          <div className="lg:col-span-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 md:p-6 shadow-theme-xs space-y-5">
+        {/* 2-Column Grid: Form & Results (50% / 50%) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          {/* Left Column: Search Form (50% on lg) */}
+          <div className="w-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 md:p-6 shadow-theme-xs space-y-5">
             <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
               <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                 <RiSearchLine className="text-brand-500" /> {t("leadFinder.searchCriteria")}
@@ -637,8 +637,8 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
             </form>
           </div>
 
-          {/* Right Column: Radar & Results (7 cols on lg) */}
-          <div className="lg:col-span-7 space-y-6">
+          {/* Right Column: Radar & Results (50% on lg) */}
+          <div className="w-full space-y-6">
             {/* Live Progress Card (Visible when searching or completed) */}
             {(isSearching || completedResult) && (
               <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 md:p-6 shadow-theme-xs space-y-4">
