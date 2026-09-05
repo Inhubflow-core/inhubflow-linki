@@ -7,6 +7,7 @@ export * from "./runtime";
 export * from "./worker";
 export * from "./orchestrator";
 export * from "./handoff";
+export * from "./dispatcher";
 export { createDisabledSdrBridge, type DisabledSdrBridgeOptions } from "./noop";
 export { createSdrBridge, type SdrBridgeOptions } from "./bridge";
 

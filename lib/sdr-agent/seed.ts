@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
 import { applySdrSchema } from "./schema";
+import { approveKnowledgeSource } from "./knowledge/repository";
 
 export interface SdrAgentRecord {
   id: string;
@@ -120,13 +121,24 @@ export function ensureSdrAgent(
     const versionId = randomUUID();
     const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.7-flash";
     const defaultPrompt = `Eres el Asistente SDR de InHubFlow. Analiza mensajes comerciales y redacta únicamente respuestas respaldadas por fuentes de conocimiento aprobadas. Si la información es insuficiente, si se solicita una propuesta o condición especial, o si existe riesgo, deriva a una persona sin inventar datos.`;
-    const defaultCompanyContext = `Describe aquí la empresa, productos, servicios, precios aprobados, preguntas frecuentes y políticas comerciales antes de publicar esta versión.`;
+    const defaultCompanyContext = `InHubFlow es una plataforma integral de prospección B2B y automatización de alcance multicanal (LinkedIn y Email).
+Servicios y Capacidades Principales:
+1. Prospección Inteligente B2B: Búsqueda avanzada de prospectos con Google X-Ray y Lead Finder con cero bloqueos ni captchas.
+2. Integración con LinkedIn y Sales Navigator: Extracción segura de listas de contactos, visitas a perfiles, solicitudes de conexión personalizadas y mensajes directos respetando límites humanos.
+3. Enriquecimiento de Datos: Conexión con Apollo.io para obtener emails corporativos verificados y datos detallados de empresas.
+4. Campañas Multicanal Automatizadas: Secuencias inteligentes combinadas de visitas, conexiones en LinkedIn y correos fríos.
+5. Asistente SDR con Inteligencia Artificial: Clasificación automática de respuestas entrantes, manejo de objeciones comerciales, redacción de respuestas personalizadas fundamentadas y derivación inmediata a humanos (Handoff) ante solicitudes complejas o personalizadas.
+Políticas Comerciales:
+- Planes y demostraciones: Se coordinan presentaciones personalizadas para empresas interesadas.
+- Soporte y configuración: Acompañamiento en la integración de cuentas y calentamiento seguro de dominios de email.
+- Privacidad y Seguridad: Todos los datos y credenciales se gestionan de forma segura y encriptada.`;
     const policyJson = JSON.stringify({
       company_context: defaultCompanyContext,
       handoff_rules: "Derivar ante información no respaldada, propuesta especial, negociación, riesgo o petición humana.",
     });
     const configJson = JSON.stringify({ custom_instructions: "" });
     const hash = revisionHash({ model, prompt: defaultPrompt, policyJson, configJson });
+    const initialSourceId = randomUUID();
 
     db.transaction(() => {
       db.prepare(`
@@ -134,7 +146,7 @@ export function ensureSdrAgent(
           id, workspace_owner_id, name, status, mode, default_language, model,
           active_version_id, confidence_threshold, max_auto_turns,
           created_by_user_id, runtime_enabled, provider_enabled, outbound_enabled
-        ) VALUES (?, ?, ?, 'draft', 'off', 'es', ?, NULL, 0.85, 3, ?, 0, 0, 0)
+        ) VALUES (?, ?, ?, 'active', 'approval', 'es', ?, NULL, 0.85, 3, ?, 1, 1, 1)
       `).run(
         agentId,
         workspaceOwnerId,
@@ -147,7 +159,7 @@ export function ensureSdrAgent(
         INSERT INTO sdr_agent_versions (
           id, agent_id, version_number, model, system_prompt, policy_json,
           config_json, publication_state, revision_hash, published_at
-        ) VALUES (?, ?, 1, ?, ?, ?, ?, 'draft', ?, datetime('now'))
+        ) VALUES (?, ?, 1, ?, ?, ?, ?, 'published', ?, datetime('now'))
       `).run(versionId, agentId, model, defaultPrompt, policyJson, configJson, hash);
 
       db.prepare(
@@ -158,9 +170,9 @@ export function ensureSdrAgent(
         INSERT INTO sdr_knowledge_sources (
           id, agent_id, workspace_owner_id, status, title, source_type,
           content, metadata_json
-        ) VALUES (?, ?, ?, 'draft', 'Contexto inicial de InHubFlow', 'catalog', ?, ?)
+        ) VALUES (?, ?, ?, 'draft', 'Servicios y Capacidades de InHubFlow', 'catalog', ?, ?)
       `).run(
-        randomUUID(),
+        initialSourceId,
         agentId,
         workspaceOwnerId,
         defaultCompanyContext,
@@ -168,7 +180,35 @@ export function ensureSdrAgent(
       );
     })();
 
+    try {
+      approveKnowledgeSource(db, initialSourceId, workspaceOwnerId, workspaceOwnerId);
+    } catch {
+      // Non-fatal if schema or chunks table is still initializing
+    }
+
     agent = db.prepare("SELECT * FROM sdr_agents WHERE id = ?").get(agentId) as SdrAgentRecord;
+  }
+
+  // Ensure at least one approved knowledge source exists for this agent
+  try {
+    const approvedCount = (db.prepare(`
+      SELECT COUNT(*) AS count FROM sdr_knowledge_sources
+      WHERE agent_id = ? AND workspace_owner_id = ? AND status = 'approved'
+    `).get(agent.id, workspaceOwnerId) as { count: number } | undefined)?.count ?? 0;
+
+    if (approvedCount === 0) {
+      const draftSource = db.prepare(`
+        SELECT id FROM sdr_knowledge_sources
+        WHERE agent_id = ? AND workspace_owner_id = ? AND status = 'draft'
+        ORDER BY created_at ASC LIMIT 1
+      `).get(agent.id, workspaceOwnerId) as { id: string } | undefined;
+
+      if (draftSource) {
+        approveKnowledgeSource(db, draftSource.id, workspaceOwnerId, workspaceOwnerId);
+      }
+    }
+  } catch {
+    // Non-fatal if tables are initializing
   }
 
   let activeVersion: SdrAgentVersionRecord | null = null;

@@ -260,12 +260,16 @@ function ChatPanel({ reply, onActionDone }: ChatPanelProps) {
   const [autopilot, setAutopilot] = useState(reply.sdr_autopilot === 1);
   const [togglingAutopilot, setTogglingAutopilot] = useState(false);
   const [changingControl, setChangingControl] = useState(false);
+  const [approvingAction, setApprovingAction] = useState(false);
+  const [rejectingAction, setRejectingAction] = useState(false);
+  const [actionDismissed, setActionDismissed] = useState(false);
   const threadEndRef = useRef<HTMLDivElement>(null);
 
   // Sync autopilot state when reply prop updates
   useEffect(() => {
     setAutopilot(reply.sdr_autopilot === 1);
-  }, [reply.sdr_autopilot, reply.id]);
+    setActionDismissed(false);
+  }, [reply.sdr_autopilot, reply.id, reply.sdr_action_id]);
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -606,6 +610,48 @@ function ChatPanel({ reply, onActionDone }: ChatPanelProps) {
     }
   }
 
+  async function handleApproveSdrAction(actionId: string, customBody?: string) {
+    setApprovingAction(true);
+    try {
+      const response = await fetch(`/api/sdr/actions/${encodeURIComponent(actionId)}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ editedBody: customBody }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo aprobar la respuesta del SDR.");
+
+      toast.success("¡Respuesta del SDR IA aprobada y enviada!");
+      setActionDismissed(true);
+      onActionDone();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error al aprobar la acción");
+    } finally {
+      setApprovingAction(false);
+    }
+  }
+
+  async function handleRejectSdrAction(actionId: string) {
+    setRejectingAction(true);
+    try {
+      const response = await fetch(`/api/sdr/actions/${encodeURIComponent(actionId)}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "descartado_por_usuario" }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo descartar la propuesta.");
+
+      toast.info("Propuesta de SDR IA descartada.");
+      setActionDismissed(true);
+      onActionDone();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error al descartar");
+    } finally {
+      setRejectingAction(false);
+    }
+  }
+
   async function handleToggleAutopilot() {
     setTogglingAutopilot(true);
     try {
@@ -871,6 +917,78 @@ function ChatPanel({ reply, onActionDone }: ChatPanelProps) {
 
       {/* ── Composer Box ── */}
       <div className="p-4 border-t border-base-300/60 bg-base-100 shrink-0 space-y-2.5 relative">
+        {/* SDR AI Pending Approval / Proposed Draft Card */}
+        {!actionDismissed && reply.sdr_action_id && ["waiting_approval", "proposed"].includes(reply.sdr_action_state || "") && reply.sdr_reply_draft && (
+          <div className="rounded-2xl border border-primary/30 bg-primary/5 p-3.5 space-y-2.5 animate-fadeIn shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-primary/20 text-primary flex items-center justify-center font-bold text-xs">
+                  <RiRobotLine size={15} />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-base-content flex items-center gap-1.5">
+                    Respuesta preparada por SDR IA
+                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-primary/20 text-primary font-semibold">
+                      Listo para enviar
+                    </span>
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleRejectSdrAction(reply.sdr_action_id!)}
+                disabled={rejectingAction || approvingAction}
+                className="text-base-content/40 hover:text-error p-1 rounded transition-colors text-xs flex items-center gap-1 disabled:opacity-50"
+                title="Descartar propuesta"
+              >
+                <RiCloseLine size={14} />
+                <span className="text-[11px]">{rejectingAction ? "Descartando..." : "Descartar"}</span>
+              </button>
+            </div>
+
+            <div className="text-xs text-base-content/90 bg-base-100 p-3 rounded-xl border border-base-300/60 font-normal leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto shadow-inner">
+              {reply.sdr_reply_draft}
+            </div>
+
+            <div className="flex items-center justify-between gap-2 pt-0.5 flex-wrap">
+              <span className="text-[11px] text-base-content/50">
+                Canal: <strong className="text-base-content/80 uppercase">{activeChannelTab}</strong>
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReplyText(reply.sdr_reply_draft || "");
+                    toast.success("Borrador copiado al editor para que puedas personalizarlo.");
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-base-200 hover:bg-base-300 text-base-content transition-colors"
+                >
+                  <RiFileTextLine size={13} />
+                  <span>Editar en compositor</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleApproveSdrAction(reply.sdr_action_id!)}
+                  disabled={approvingAction || rejectingAction}
+                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold bg-primary text-primary-content hover:bg-primary/90 transition-all shadow-md disabled:opacity-50"
+                >
+                  {approvingAction ? (
+                    <>
+                      <span className="loading loading-spinner loading-xs" />
+                      <span>Enviando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <RiSendPlaneLine size={13} />
+                      <span>Aprobar y Enviar Ahora</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* AI Suggestion Card preview */}
         {aiSuggestionMeta && (
           <div className="flex items-center justify-between bg-primary/10 border border-primary/25 rounded-xl px-3 py-2 text-xs text-primary animate-fadeIn">
