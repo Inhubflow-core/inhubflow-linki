@@ -96,7 +96,7 @@ interface SdrSimulationResponse extends SdrSimulationResult {
 }
 
 export default function SdrPage() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -212,10 +212,10 @@ export default function SdrPage() {
         throw new Error(err.error || "Error al guardar");
       }
 
-      toast.success("Configuración del Asistente SDR guardada correctamente");
+      toast.success(t("sdr.toastConfigSaved"));
       loadConfig();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error al guardar cambios");
+      toast.error(error instanceof Error ? error.message : t("sdr.toastGenericError"));
     } finally {
       setSaving(false);
     }
@@ -224,7 +224,7 @@ export default function SdrPage() {
   const handleAddKnowledge = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSourceTitle.trim() || !newSourceContent.trim()) {
-      toast.error("Por favor completa el título y el contenido");
+      toast.error(t("sdr.toastFillRequired"));
       return;
     }
 
@@ -245,12 +245,12 @@ export default function SdrPage() {
         const errJson = await res.json().catch(() => ({}));
         throw new Error(errJson.error || "Error al agregar fuente de conocimiento");
       }
-      toast.success("Documento añadido a la base de conocimiento");
+      toast.success(t("sdr.toastDocAdded"));
       setNewSourceTitle("");
       setNewSourceContent("");
       loadKnowledge();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error al agregar fuente de conocimiento");
+      toast.error(error instanceof Error ? error.message : t("sdr.toastGenericError"));
     } finally {
       setAddingSource(false);
     }
@@ -265,28 +265,28 @@ export default function SdrPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "No se pudo aprobar la fuente");
-      toast.success("Fuente aprobada y disponible para respuestas fundamentadas");
+      toast.success(t("sdr.toastDocApproved"));
       loadKnowledge();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo aprobar la fuente");
+      toast.error(error instanceof Error ? error.message : t("sdr.toastGenericError"));
     }
   };
 
   const handleDeleteKnowledge = async (id: string) => {
-    if (!confirm("¿Seguro que deseas eliminar este documento de la base de conocimiento?")) return;
+    if (!confirm(t("sdr.confirmDeleteDoc"))) return;
     try {
       const res = await fetch(`/api/sdr/knowledge?id=${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Error al eliminar");
-      toast.success("Documento eliminado");
+      toast.success(t("sdr.toastDocDeleted"));
       loadKnowledge();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error al eliminar");
+      toast.error(error instanceof Error ? error.message : t("sdr.toastGenericError"));
     }
   };
 
   const handleSimulate = async () => {
     if (!simMessage.trim()) {
-      toast.error("Por favor ingresa un mensaje para probar");
+      toast.error(t("sdr.toastEnterSimMessage"));
       return;
     }
 
@@ -310,9 +310,9 @@ export default function SdrPage() {
       if (!res.ok) throw new Error(json.error || "Error en la simulación");
 
       setSimResult(json as SdrSimulationResponse);
-      toast.success("Simulación completada con Gemini");
+      toast.success(t("sdr.toastSimCompleted"));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error en la simulación");
+      toast.error(error instanceof Error ? error.message : t("sdr.toastGenericError"));
     } finally {
       setSimLoading(false);
     }
@@ -371,17 +371,17 @@ export default function SdrPage() {
                 type="button"
                 onClick={handlePublish}
                 disabled={publishing}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2 text-xs font-semibold text-emerald-600 disabled:opacity-50 md:text-sm dark:text-emerald-400"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2 text-xs font-semibold text-emerald-600 disabled:opacity-50 md:text-sm dark:text-emerald-400 cursor-pointer"
               >
                 <RiCheckLine size={16} />
-                {publishing ? "Publicando…" : "Publicar versión"}
+                {publishing ? t("sdr.publishing") : t("sdr.publishVersion")}
               </button>
             )}
             <button
               type="button"
               onClick={handleSaveConfig}
               disabled={saving}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-all shadow-xs disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-all shadow-xs disabled:opacity-50 cursor-pointer"
             >
               <RiSaveLine size={16} />
               {saving ? t("common.saving") : t("common.saveChanges")}
@@ -399,14 +399,27 @@ export default function SdrPage() {
               {data.runtime.available ? <RiShieldCheckLine className="mt-0.5 text-emerald-500" size={19} /> : <RiAlertLine className="mt-0.5 text-amber-500" size={19} />}
               <div>
                 <p className="text-sm font-semibold text-base-content">
-                  Runtime efectivo: {data.runtime.effectiveMode.toUpperCase()} · Configurado: {data.runtime.requestedMode.toUpperCase()}
+                  {t("sdr.runtimeEffective", {
+                    effective: data.runtime.effectiveMode.toUpperCase(),
+                    requested: data.runtime.requestedMode.toUpperCase(),
+                  })}
                 </p>
                 <p className="mt-1 text-xs text-base-content/60">
-                  Provider {data.runtime.providerEnabled ? "habilitado" : "bloqueado"} · Envíos {data.runtime.outboundEnabled ? "habilitados" : "bloqueados"}
+                  {t("sdr.providerStatus", {
+                    status: data.runtime.providerEnabled ? t("sdr.statusEnabled") : t("sdr.statusBlocked"),
+                    outbound: data.runtime.outboundEnabled ? t("sdr.statusEnabled") : t("sdr.statusBlocked"),
+                  })}
                 </p>
                 {data.runtime.blockers.length > 0 && (
                   <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
-                    Bloqueos: {data.runtime.blockers.join(", ")}
+                    {t("sdr.runtimeBlockers", {
+                      list: data.runtime.blockers
+                        .map((b) => {
+                          const translated = t(`sdr.blocker_${b}`);
+                          return translated && translated !== `sdr.blocker_${b}` ? translated : b;
+                        })
+                        .join(", "),
+                    })}
                   </p>
                 )}
               </div>
@@ -820,15 +833,15 @@ export default function SdrPage() {
                               <button
                                 type="button"
                                 onClick={() => handleApproveKnowledge(s.id)}
-                                className="rounded-lg px-2 py-1 text-[10px] font-semibold text-emerald-500 hover:bg-emerald-500/10"
+                                className="rounded-lg px-2 py-1 text-[10px] font-semibold text-emerald-500 hover:bg-emerald-500/10 cursor-pointer"
                               >
-                                Aprobar
+                                {t("sdr.approve")}
                               </button>
                             )}
                             <button
                               type="button"
                               onClick={() => handleDeleteKnowledge(s.id)}
-                              className="p-1.5 rounded-lg text-base-content/40 hover:text-error hover:bg-error/10 transition-colors"
+                              className="p-1.5 rounded-lg text-base-content/40 hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
                             >
                               <RiDeleteBinLine size={15} />
                             </button>
@@ -838,7 +851,7 @@ export default function SdrPage() {
                         <p className="text-xs text-base-content/60 line-clamp-3 leading-relaxed">{s.content}</p>
                       </div>
                       <div className="text-[10px] text-base-content/30 mt-3">
-                        {new Date(s.created_at).toLocaleDateString()}
+                        {new Date(s.created_at).toLocaleDateString(locale)}
                       </div>
                     </div>
                   ))}

@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import { toast } from "sonner";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 import {
   RiTeamLine,
   RiUserAddLine,
@@ -61,6 +62,7 @@ interface Capacity {
 }
 
 export default function TeamManagementPage() {
+  const { t, locale } = useTranslation();
   const { data: session, status } = useSession();
   const router = useRouter();
 
@@ -96,11 +98,11 @@ export default function TeamManagementPage() {
       const res = await fetch("/api/team");
       if (!res.ok) {
         if (res.status === 403) {
-          toast.error("No tienes permisos para ver esta sección.");
+          toast.error(t("team.toastNoPermission"));
           router.push("/");
           return;
         }
-        throw new Error("Error al consultar datos de equipo.");
+        throw new Error(t("team.toastLoadError"));
       }
       const data = await res.json();
       setMembers(data.members || []);
@@ -108,7 +110,7 @@ export default function TeamManagementPage() {
       setAccounts(data.accounts || []);
       setCapacity(data.capacity || { totalSlots: 1, usedSlots: 1, availableSlots: 0 });
     } catch (err: any) {
-      toast.error(err.message || "Error al cargar miembros de equipo.");
+      toast.error(err.message || t("team.toastLoadError"));
     } finally {
       setLoading(false);
     }
@@ -123,7 +125,7 @@ export default function TeamManagementPage() {
   const handleCreateInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteEmail.trim() || !inviteEmail.includes("@")) {
-      toast.error("Por favor ingresa un correo electrónico válido.");
+      toast.error(t("team.toastInvalidEmail"));
       return;
     }
 
@@ -141,10 +143,10 @@ export default function TeamManagementPage() {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "No se pudo crear la invitación.");
+        throw new Error(data.error || t("team.toastInviteError"));
       }
 
-      toast.success("¡Invitación creada exitosamente!");
+      toast.success(t("team.toastInviteSuccess"));
       setGeneratedInviteUrl(data.invitation.invite_url);
       loadTeamData();
     } catch (err: any) {
@@ -155,16 +157,16 @@ export default function TeamManagementPage() {
   };
 
   const handleRevoke = async (id: string, nameOrEmail: string) => {
-    if (!confirm(`¿Estás seguro de que deseas revocar el acceso de ${nameOrEmail}? El slot quedará libre de inmediato.`)) {
+    if (!confirm(t("team.toastRevokeConfirm", { name: nameOrEmail }))) {
       return;
     }
 
     try {
       const res = await fetch(`/api/team/${id}`, { method: "DELETE" });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error al revocar.");
+      if (!res.ok) throw new Error(data.error || t("team.toastRevokeError"));
 
-      toast.success(data.message || "Acceso revocado.");
+      toast.success(data.message || t("team.toastRevokeSuccess"));
       loadTeamData();
     } catch (err: any) {
       toast.error(err.message);
@@ -174,7 +176,7 @@ export default function TeamManagementPage() {
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
-    toast.success("Enlace de invitación copiado al portapapeles.");
+    toast.success(t("team.toastCopied"));
     setTimeout(() => setCopiedId(null), 3000);
   };
 
@@ -216,7 +218,7 @@ export default function TeamManagementPage() {
   return (
     <>
       <Head>
-        <title>Equipo Comercial & Embajadores — InHubFlow</title>
+        <title>{t("team.title")} — InHubFlow</title>
       </Head>
 
       <div className="space-y-6">
@@ -228,18 +230,18 @@ export default function TeamManagementPage() {
                 <RiTeamLine size={24} />
               </span>
               <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                Equipo Comercial & Embajadores
+                {t("team.title")}
               </h1>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Asigna slots dedicados de LinkedIn a tus vendedores o promotores oficiales. Cada miembro tiene su propia bandeja de entrada privada y únicamente ve sus conversaciones asignadas.
+              {t("team.subtitle")}
             </p>
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={loadTeamData}
-              title="Refrescar datos"
+              title={t("team.refresh")}
               className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors shadow-xs cursor-pointer"
             >
               <RiRefreshLine className={loading ? "animate-spin" : ""} size={18} />
@@ -260,7 +262,7 @@ export default function TeamManagementPage() {
               }`}
             >
               <RiUserAddLine size={18} />
-              <span>+ Invitar Vendedor</span>
+              <span>{t("team.inviteRep")}</span>
             </button>
           </div>
         </div>
@@ -276,7 +278,7 @@ export default function TeamManagementPage() {
             }`}
           >
             <RiUserFollowLine size={18} />
-            <span>Miembros del Equipo</span>
+            <span>{t("team.tabMembers")}</span>
             <span className="px-2 py-0.5 text-xs rounded-full bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
               {members.length + 1}
             </span>
@@ -291,7 +293,7 @@ export default function TeamManagementPage() {
             }`}
           >
             <RiMailSendLine size={18} />
-            <span>Invitaciones Pendientes</span>
+            <span>{t("team.tabInvitations")}</span>
             <span className="px-2 py-0.5 text-xs rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold">
               {invitations.length}
             </span>
@@ -302,7 +304,7 @@ export default function TeamManagementPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
             <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider">Slots Contratados</span>
+              <span className="text-xs font-semibold uppercase tracking-wider">{t("team.statContractedSlots")}</span>
               <span className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
                 <RiCpuLine size={18} />
               </span>
@@ -310,12 +312,12 @@ export default function TeamManagementPage() {
             <div className="text-3xl font-extrabold text-gray-900 dark:text-white">
               {capacity.totalSlots}
             </div>
-            <div className="text-xs text-gray-400 mt-1">Capacidad total contratada</div>
+            <div className="text-xs text-gray-400 mt-1">{t("team.statContractedDesc")}</div>
           </div>
 
           <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
             <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider">Slots Asignados</span>
+              <span className="text-xs font-semibold uppercase tracking-wider">{t("team.statAssignedSlots")}</span>
               <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                 <RiUserFollowLine size={18} />
               </span>
@@ -323,12 +325,12 @@ export default function TeamManagementPage() {
             <div className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">
               {capacity.usedSlots}
             </div>
-            <div className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1">En uso activo</div>
+            <div className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1">{t("team.statAssignedDesc")}</div>
           </div>
 
           <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
             <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider">Slots Disponibles</span>
+              <span className="text-xs font-semibold uppercase tracking-wider">{t("team.statAvailableSlots")}</span>
               <span className="p-2 rounded-xl bg-indigo-500/10 text-brand-600 dark:text-brand-400">
                 <RiUserAddLine size={18} />
               </span>
@@ -336,12 +338,12 @@ export default function TeamManagementPage() {
             <div className="text-3xl font-extrabold text-brand-600 dark:text-brand-400">
               {capacity.availableSlots}
             </div>
-            <div className="text-xs text-gray-400 mt-1">Para invitar o asignar</div>
+            <div className="text-xs text-gray-400 mt-1">{t("team.statAvailableDesc")}</div>
           </div>
 
           <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
             <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider">Invitaciones Pendientes</span>
+              <span className="text-xs font-semibold uppercase tracking-wider">{t("team.statPendingInvites")}</span>
               <span className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
                 <RiMailSendLine size={18} />
               </span>
@@ -349,7 +351,7 @@ export default function TeamManagementPage() {
             <div className="text-3xl font-extrabold text-amber-600 dark:text-amber-400">
               {invitations.length}
             </div>
-            <div className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-1">Por registrarse</div>
+            <div className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-1">{t("team.statPendingDesc")}</div>
           </div>
         </div>
 
@@ -361,14 +363,14 @@ export default function TeamManagementPage() {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder={activeTab === "members" ? "Buscar por usuario, email o cuenta..." : "Buscar por email o código..."}
+              placeholder={activeTab === "members" ? t("team.searchPlaceholderMembers") : t("team.searchPlaceholderInvites")}
               className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
             />
           </div>
 
           {activeTab === "members" && (
             <div className="flex items-center gap-1.5 text-xs">
-              <span className="text-gray-400 mr-1">Filtrar:</span>
+              <span className="text-gray-400 mr-1">{t("team.filter")}</span>
               <button
                 onClick={() => setRoleFilter("all")}
                 className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
@@ -377,7 +379,7 @@ export default function TeamManagementPage() {
                     : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                 }`}
               >
-                Todos
+                {t("team.filterAll")}
               </button>
               <button
                 onClick={() => setRoleFilter("owner")}
@@ -387,7 +389,7 @@ export default function TeamManagementPage() {
                     : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                 }`}
               >
-                Owner
+                {t("team.filterOwner")}
               </button>
               <button
                 onClick={() => setRoleFilter("admin")}
@@ -397,7 +399,7 @@ export default function TeamManagementPage() {
                     : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                 }`}
               >
-                Admins
+                {t("team.filterAdmins")}
               </button>
               <button
                 onClick={() => setRoleFilter("member")}
@@ -407,7 +409,7 @@ export default function TeamManagementPage() {
                     : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                 }`}
               >
-                Vendedores
+                {t("team.filterMembers")}
               </button>
             </div>
           )}
@@ -419,10 +421,10 @@ export default function TeamManagementPage() {
             <div className="p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold text-gray-900 dark:text-white">
-                  Miembros del Equipo Activos
+                  {t("team.activeMembersTitle")}
                 </h2>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  Usuarios con acceso individual y slots de prospección asignados.
+                  {t("team.activeMembersDesc")}
                 </p>
               </div>
             </div>
@@ -431,11 +433,11 @@ export default function TeamManagementPage() {
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="bg-gray-50/50 dark:bg-gray-800/40 border-b border-gray-100 dark:border-gray-800 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    <th className="py-3 px-5">Usuario / Vendedor</th>
-                    <th className="py-3 px-5">Rol</th>
-                    <th className="py-3 px-5">Cuenta de LinkedIn Asignada</th>
-                    <th className="py-3 px-5">Fecha Registro</th>
-                    <th className="py-3 px-5 text-right">Acciones</th>
+                    <th className="py-3 px-5">{t("team.colUser")}</th>
+                    <th className="py-3 px-5">{t("team.colRole")}</th>
+                    <th className="py-3 px-5">{t("team.colAccount")}</th>
+                    <th className="py-3 px-5">{t("team.colDate")}</th>
+                    <th className="py-3 px-5 text-right">{t("team.colActions")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800/60">
@@ -449,7 +451,7 @@ export default function TeamManagementPage() {
                           </div>
                           <div>
                             <p className="font-bold text-gray-900 dark:text-white leading-tight">
-                              {currentUser?.name || "Tú (Administrador Master)"}
+                              {currentUser?.name || t("team.youOwner")}
                             </p>
                             <p className="text-xs text-gray-400">{currentUser?.email}</p>
                           </div>
@@ -458,15 +460,15 @@ export default function TeamManagementPage() {
                       <td className="py-4 px-5">
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
                           <RiShieldUserLine size={13} />
-                          Workspace Owner
+                          {t("team.workspaceOwner")}
                         </span>
                       </td>
                       <td className="py-4 px-5">
-                        <span className="text-xs text-gray-500 dark:text-gray-400">Acceso a todas las cuentas</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{t("team.allAccountsAccess")}</span>
                       </td>
                       <td className="py-4 px-5 text-xs text-gray-400">-</td>
                       <td className="py-4 px-5 text-right">
-                        <span className="text-xs text-gray-400 font-semibold italic">Principal</span>
+                        <span className="text-xs text-gray-400 font-semibold italic">{t("team.primary")}</span>
                       </td>
                     </tr>
                   )}
@@ -480,7 +482,7 @@ export default function TeamManagementPage() {
                             {m.name ? m.name[0].toUpperCase() : "V"}
                           </div>
                           <div>
-                            <p className="font-bold text-gray-900 dark:text-white leading-tight">{m.name || "Vendedor"}</p>
+                            <p className="font-bold text-gray-900 dark:text-white leading-tight">{m.name || t("team.salesRep")}</p>
                             <p className="text-xs text-gray-400">{m.email}</p>
                           </div>
                         </div>
@@ -492,7 +494,7 @@ export default function TeamManagementPage() {
                             : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
                         }`}>
                           <RiUserLine size={13} />
-                          {m.role === "admin" ? "Co-Admin" : "Vendedor / SDR"}
+                          {m.role === "admin" ? t("team.coAdmin") : t("team.repRole")}
                         </span>
                       </td>
                       <td className="py-4 px-5">
@@ -501,26 +503,26 @@ export default function TeamManagementPage() {
                             <RiLinkedinBoxLine size={16} className="text-[#0A66C2] shrink-0" />
                             <span className="font-semibold">{m.account_name}</span>
                             {m.account_authenticated ? (
-                              <span className="w-2 h-2 rounded-full bg-emerald-500" title="Conectado" />
+                              <span className="w-2 h-2 rounded-full bg-emerald-500" title={t("team.connected")} />
                             ) : (
-                              <span className="w-2 h-2 rounded-full bg-amber-500" title="Pendiente autenticar" />
+                              <span className="w-2 h-2 rounded-full bg-amber-500" title={t("team.pendingAuth")} />
                             )}
                           </div>
                         ) : (
-                          <span className="text-xs text-amber-500 font-medium">Sin cuenta vinculada</span>
+                          <span className="text-xs text-amber-500 font-medium">{t("team.noLinkedAccount")}</span>
                         )}
                       </td>
                       <td className="py-4 px-5 text-xs text-gray-400">
-                        {m.created_at ? new Date(m.created_at).toLocaleDateString() : "-"}
+                        {m.created_at ? new Date(m.created_at).toLocaleDateString(locale) : "-"}
                       </td>
                       <td className="py-4 px-5 text-right">
                         <button
                           onClick={() => handleRevoke(m.id, m.name || m.email)}
                           className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-colors cursor-pointer inline-flex items-center gap-1 text-xs font-medium"
-                          title="Revocar acceso y liberar slot"
+                          title={t("team.revokeTitle")}
                         >
                           <RiDeleteBinLine size={16} />
-                          <span className="hidden sm:inline">Revocar</span>
+                          <span className="hidden sm:inline">{t("team.revoke")}</span>
                         </button>
                       </td>
                     </tr>
@@ -529,7 +531,7 @@ export default function TeamManagementPage() {
                   {!showOwnerRow && filteredMembers.length === 0 && (
                     <tr>
                       <td colSpan={5} className="py-12 text-center text-xs text-gray-400">
-                        No se encontraron miembros con los filtros aplicados.
+                        {t("team.noMembersFound")}
                       </td>
                     </tr>
                   )}
@@ -545,10 +547,10 @@ export default function TeamManagementPage() {
             <div className="p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold text-gray-900 dark:text-white">
-                  Invitaciones Pendientes de Registro
+                  {t("team.pendingInvitesTitle")}
                 </h2>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  Enlaces de activación enviados que aún no han sido reclamados por los vendedores.
+                  {t("team.pendingInvitesDesc")}
                 </p>
               </div>
             </div>
@@ -557,11 +559,11 @@ export default function TeamManagementPage() {
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="bg-gray-50/50 dark:bg-gray-800/40 border-b border-gray-100 dark:border-gray-800 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    <th className="py-3 px-5">Correo Invitado</th>
-                    <th className="py-3 px-5">Código / Enlace</th>
-                    <th className="py-3 px-5">Cuenta Asignada</th>
-                    <th className="py-3 px-5">Válido Hasta</th>
-                    <th className="py-3 px-5 text-right">Acciones</th>
+                    <th className="py-3 px-5">{t("team.colInvitedEmail")}</th>
+                    <th className="py-3 px-5">{t("team.colCodeLink")}</th>
+                    <th className="py-3 px-5">{t("team.colAccount")}</th>
+                    <th className="py-3 px-5">{t("team.colValidUntil")}</th>
+                    <th className="py-3 px-5 text-right">{t("team.colActions")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800/60">
@@ -581,7 +583,7 @@ export default function TeamManagementPage() {
                           <button
                             onClick={() => copyToClipboard(inv.invite_url, inv.id)}
                             className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors cursor-pointer"
-                            title="Copiar enlace de invitación"
+                            title={t("team.copyInviteLink")}
                           >
                             {copiedId === inv.id ? (
                               <RiCheckLine size={14} className="text-emerald-500" />
@@ -595,23 +597,23 @@ export default function TeamManagementPage() {
                         {inv.account_name ? (
                           <span className="font-semibold text-gray-800 dark:text-gray-200">{inv.account_name}</span>
                         ) : (
-                          <span className="text-gray-400 italic">Sin pre-asignar</span>
+                          <span className="text-gray-400 italic">{t("team.unassigned")}</span>
                         )}
                       </td>
                       <td className="py-4 px-5 text-xs text-gray-400">
                         <div className="flex items-center gap-1.5">
                           <RiTimeLine size={14} className="shrink-0" />
-                          <span>{new Date(inv.expires_at).toLocaleDateString()}</span>
+                          <span>{new Date(inv.expires_at).toLocaleDateString(locale)}</span>
                         </div>
                       </td>
                       <td className="py-4 px-5 text-right">
                         <button
                           onClick={() => handleRevoke(inv.id, inv.email)}
                           className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-colors cursor-pointer inline-flex items-center gap-1 text-xs font-medium"
-                          title="Cancelar invitación"
+                          title={t("team.cancelInvite")}
                         >
                           <RiDeleteBinLine size={16} />
-                          <span className="hidden sm:inline">Cancelar</span>
+                          <span className="hidden sm:inline">{t("team.cancel")}</span>
                         </button>
                       </td>
                     </tr>
@@ -620,7 +622,7 @@ export default function TeamManagementPage() {
                   {filteredInvitations.length === 0 && (
                     <tr>
                       <td colSpan={5} className="py-12 text-center text-xs text-gray-400">
-                        No hay invitaciones pendientes actualmente.
+                        {t("team.noPendingInvites")}
                       </td>
                     </tr>
                   )}
@@ -634,7 +636,7 @@ export default function TeamManagementPage() {
         <div className="flex items-start gap-3 p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 text-xs text-blue-800 dark:text-blue-300">
           <RiInformationLine size={18} className="shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" />
           <div className="leading-relaxed">
-            <span className="font-bold">Privacidad y Aislamiento de Slots Multi-Seat:</span> Cada vendedor o embajador invitado dispone de su propio acceso individual privado y únicamente tiene visibilidad sobre la cuenta de LinkedIn que le haya sido vinculada, con su bandeja de mensajes aislada. El Workspace Owner mantiene acceso y control total.
+            {t("team.multiSeatBanner")}
           </div>
         </div>
       </div>
@@ -649,7 +651,7 @@ export default function TeamManagementPage() {
                   <RiUserAddLine size={18} />
                 </span>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                  Invitar Vendedor o Embajador
+                  {t("team.inviteModalTitle")}
                 </h3>
               </div>
               <button
@@ -664,10 +666,10 @@ export default function TeamManagementPage() {
               <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-2xl space-y-3 animate-in fade-in">
                 <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300 font-bold text-sm">
                   <RiCheckLine size={20} />
-                  <span>¡Invitación lista para enviar!</span>
+                  <span>{t("team.readyToSend")}</span>
                 </div>
                 <p className="text-xs text-gray-600 dark:text-gray-300">
-                  Comparte este enlace seguro con tu colaborador para que defina su contraseña e ingrese directamente:
+                  {t("team.shareLinkHelp")}
                 </p>
                 <div className="flex items-center gap-2 bg-white dark:bg-gray-900 p-2.5 rounded-xl border border-emerald-300 dark:border-emerald-800">
                   <input
@@ -680,7 +682,7 @@ export default function TeamManagementPage() {
                     onClick={() => copyToClipboard(generatedInviteUrl, "modal")}
                     className="px-3 py-1.5 rounded-lg bg-brand-600 text-white font-bold text-xs hover:bg-brand-500 transition-all cursor-pointer shrink-0"
                   >
-                    {copiedId === "modal" ? "¡Copiado!" : "Copiar"}
+                    {copiedId === "modal" ? t("team.copied") : t("team.copy")}
                   </button>
                 </div>
                 <button
@@ -688,19 +690,19 @@ export default function TeamManagementPage() {
                   onClick={() => setIsInviteModalOpen(false)}
                   className="w-full py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-xs font-bold text-gray-700 dark:text-gray-300 transition-colors cursor-pointer"
                 >
-                  Cerrar
+                  {t("team.close")}
                 </button>
               </div>
             ) : (
               <form onSubmit={handleCreateInvite} className="space-y-4 text-sm">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Correo Electrónico del Vendedor / Embajador *
+                    {t("team.inputEmailLabel")}
                   </label>
                   <input
                     type="email"
                     required
-                    placeholder="vendedor@tuempresa.com"
+                    placeholder={t("team.inputEmailPlaceholder")}
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-white"
@@ -709,29 +711,29 @@ export default function TeamManagementPage() {
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Rol en el Workspace
+                    {t("team.inputRoleLabel")}
                   </label>
                   <select
                     value={inviteRole}
                     onChange={(e) => setInviteRole(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-white"
                   >
-                    <option value="member">Vendedor / SDR (Solo ve su cuenta e inbox)</option>
-                    <option value="admin">Co-Administrador (Puede ver todas las cuentas)</option>
+                    <option value="member">{t("team.roleOptionMember")}</option>
+                    <option value="admin">{t("team.roleOptionAdmin")}</option>
                   </select>
                 </div>
 
                 {accounts.length > 0 && (
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                      Vincular a Cuenta de LinkedIn Existente (Opcional)
+                      {t("team.inputAccountLabel")}
                     </label>
                     <select
                       value={inviteAccount}
                       onChange={(e) => setInviteAccount(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-white"
                     >
-                      <option value="">Dejar que el vendedor conecte su propia cuenta</option>
+                      <option value="">{t("team.accountOptionNone")}</option>
                       {accounts.map((acc) => (
                         <option key={acc.id} value={acc.id}>
                           {acc.name} ({acc.email})
@@ -744,7 +746,7 @@ export default function TeamManagementPage() {
                 <div className="p-3 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 rounded-xl flex items-start gap-2 text-xs text-blue-700 dark:text-blue-300">
                   <RiInformationLine size={16} className="shrink-0 mt-0.5" />
                   <span>
-                    El vendedor recibirá un link seguro válido por 7 días para definir su contraseña e ingresar directamente a su espacio individual.
+                    {t("team.inviteExpiryNotice")}
                   </span>
                 </div>
 
@@ -754,14 +756,14 @@ export default function TeamManagementPage() {
                     onClick={() => setIsInviteModalOpen(false)}
                     className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-800 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
                   >
-                    Cancelar
+                    {t("team.cancel")}
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
                     className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-medium text-xs shadow-xs transition-all cursor-pointer active:scale-98 disabled:opacity-50"
                   >
-                    {isSubmitting ? "Generando..." : "Generar Enlace de Invitación"}
+                    {isSubmitting ? t("team.generating") : t("team.generateLinkBtn")}
                   </button>
                 </div>
               </form>

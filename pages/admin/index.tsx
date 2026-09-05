@@ -24,6 +24,7 @@ import {
   RiMailSendLine,
 } from "react-icons/ri";
 import { toast } from "sonner";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 
 interface Subscriber {
   id: string;
@@ -79,6 +80,7 @@ interface PartnerSummary {
 }
 
 export default function AdminSubscribersPage() {
+  const { t, locale } = useTranslation();
   const { data: session, status } = useSession();
   const router = useRouter();
 
@@ -252,7 +254,7 @@ export default function AdminSubscribersPage() {
         setNewPassword("");
         setNewCompany("");
         setNewSlots(1);
-        toast.success(`¡Cliente creado y accesos enviados a ${createdEmail}! Recuérdale revisar su carpeta de Spam y marcarlo como "No es Spam".`, { duration: 7000 });
+        toast.success(t("admin.toastClientCreated", { email: createdEmail }), { duration: 7000 });
         loadData();
       } else {
         const err = await res.json();
@@ -309,6 +311,7 @@ export default function AdminSubscribersPage() {
         setNewPartnerPayoutAccount("");
         setNewPartnerCustomCode("");
         setNewPartnerNotes("");
+        toast.success(t("admin.toastPartnerCreated"));
         loadPartners();
       } else {
         const err = await res.json();
@@ -346,6 +349,7 @@ export default function AdminSubscribersPage() {
 
       if (res.ok) {
         setIsPayoutModalOpen(false);
+        toast.success(t("admin.toastPayoutSuccess"));
         loadPartners();
       } else {
         const err = await res.json();
@@ -387,7 +391,7 @@ export default function AdminSubscribersPage() {
   return (
     <>
       <Head>
-        <title>Panel SuperAdmin — InHubFlow</title>
+        <title>{t("admin.pageTitle")}</title>
         <meta name="robots" content="noindex, nofollow" />
       </Head>
 
@@ -400,13 +404,13 @@ export default function AdminSubscribersPage() {
                 <RiShieldCheckLine size={24} />
               </span>
               <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                {adminSection === "subscribers" ? "SuperAdmin: Suscripciones y Clientes" : "SuperAdmin: Partners Oficiales (50% Recurrente)"}
+                {adminSection === "subscribers" ? t("admin.subscribersTitle") : t("admin.partnersTitle")}
               </h1>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               {adminSection === "subscribers"
-                ? "Gestiona límites de slots, planes de clientes y sincronización automática con Lemon Squeezy by Stripe."
-                : "Programa de Embajadores & Agencias B2B con Links de Descuento exclusivos (?20-OFF=CODIGO)."}
+                ? t("admin.subscribersSubtitle")
+                : t("admin.partnersSubtitle")}
             </p>
           </div>
 
@@ -416,7 +420,7 @@ export default function AdminSubscribersPage() {
                 if (adminSection === "subscribers") loadData();
                 else loadPartners();
               }}
-              title="Refrescar datos"
+              title={t("admin.refresh")}
               className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors shadow-xs"
             >
               <RiRefreshLine className={loading || partnersLoading ? "animate-spin" : ""} size={18} />
@@ -424,10 +428,10 @@ export default function AdminSubscribersPage() {
             {adminSection === "subscribers" ? (
               <button
                 onClick={() => setIsCreateModalOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm shadow-xs transition-all"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm shadow-xs transition-all cursor-pointer"
               >
                 <RiUserAddLine size={18} />
-                <span>Nuevo Cliente Manual</span>
+                <span>{t("admin.newManualClient")}</span>
               </button>
             ) : (
               <button
@@ -435,7 +439,7 @@ export default function AdminSubscribersPage() {
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-sm shadow-xs transition-all cursor-pointer"
               >
                 <RiHandHeartLine size={18} />
-                <span>+ Nuevo Partner Oficial</span>
+                <span>{t("admin.newPartner")}</span>
               </button>
             )}
           </div>
@@ -452,7 +456,7 @@ export default function AdminSubscribersPage() {
             }`}
           >
             <RiUserFollowLine size={18} />
-            <span>Suscripciones & Clientes</span>
+            <span>{t("admin.tabSubscribers")}</span>
             <span className="px-2 py-0.5 text-xs rounded-full bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
               {stats.totalSubscribers}
             </span>
@@ -467,7 +471,7 @@ export default function AdminSubscribersPage() {
             }`}
           >
             <RiHandHeartLine size={18} />
-            <span>Partners Oficiales (50% Recurrente)</span>
+            <span>{t("admin.tabPartners")}</span>
             <span className="px-2 py-0.5 text-xs rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold">
               {partners.length}
             </span>
@@ -481,7 +485,7 @@ export default function AdminSubscribersPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
                 <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider">Total Clientes</span>
+                  <span className="text-xs font-semibold uppercase tracking-wider">{t("admin.statTotalClients")}</span>
                   <span className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
                     <RiUserFollowLine size={18} />
                   </span>
@@ -489,12 +493,12 @@ export default function AdminSubscribersPage() {
                 <div className="text-3xl font-extrabold text-gray-900 dark:text-white">
                   {stats.totalSubscribers}
                 </div>
-                <div className="text-xs text-gray-400 mt-1">Cuentas registradas en la app</div>
+                <div className="text-xs text-gray-400 mt-1">{t("admin.statTotalClientsDesc")}</div>
               </div>
 
               <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
                 <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider">Suscripciones Activas</span>
+                  <span className="text-xs font-semibold uppercase tracking-wider">{t("admin.statActiveSubs")}</span>
                   <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                     <RiVipCrownLine size={18} />
                   </span>
@@ -502,12 +506,12 @@ export default function AdminSubscribersPage() {
                 <div className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">
                   {stats.activeSubscriptions}
                 </div>
-                <div className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1">Facturando activamente</div>
+                <div className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1">{t("admin.statActiveSubsDesc")}</div>
               </div>
 
               <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
                 <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider">Slots Asignados</span>
+                  <span className="text-xs font-semibold uppercase tracking-wider">{t("admin.statAllocatedSlots")}</span>
                   <span className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
                     <RiCpuLine size={18} />
                   </span>
@@ -515,12 +519,12 @@ export default function AdminSubscribersPage() {
                 <div className="text-3xl font-extrabold text-gray-900 dark:text-white">
                   {stats.totalSlotsAllocated}
                 </div>
-                <div className="text-xs text-gray-400 mt-1">Capacidad total vendida</div>
+                <div className="text-xs text-gray-400 mt-1">{t("admin.statAllocatedSlotsDesc")}</div>
               </div>
 
               <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
                 <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider">Cuentas LinkedIn</span>
+                  <span className="text-xs font-semibold uppercase tracking-wider">{t("admin.statLinkedInAccounts")}</span>
                   <span className="p-2 rounded-xl bg-blue-600/10 text-[#0a66c2]">
                     <RiLinkedinBoxFill size={18} />
                   </span>
@@ -528,7 +532,7 @@ export default function AdminSubscribersPage() {
                 <div className="text-3xl font-extrabold text-[#0a66c2]">
                   {stats.totalConnectedAccounts}
                 </div>
-                <div className="text-xs text-gray-400 mt-1">Conectadas en ejecución</div>
+                <div className="text-xs text-gray-400 mt-1">{t("admin.statLinkedInAccountsDesc")}</div>
               </div>
             </div>
 
@@ -538,7 +542,7 @@ export default function AdminSubscribersPage() {
                 <RiSearchLine className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input
                   type="text"
-                  placeholder="Buscar por email o empresa..."
+                  placeholder={t("admin.searchSubscribersPlaceholder")}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -546,19 +550,19 @@ export default function AdminSubscribersPage() {
               </div>
 
               <div className="flex items-center gap-2 w-full sm:w-auto">
-                <span className="text-xs text-gray-400">Filtrar:</span>
+                <span className="text-xs text-gray-400">{t("admin.filterLabel")}</span>
                 <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-1 text-xs">
                   {[
-                    { id: "all", label: "Todos" },
-                    { id: "active", label: "Activos" },
-                    { id: "trial", label: "Prueba" },
-                    { id: "past_due", label: "Pendiente" },
-                    { id: "canceled", label: "Cancelados" },
+                    { id: "all", label: t("admin.filterAll") },
+                    { id: "active", label: t("admin.filterActive") },
+                    { id: "trial", label: t("admin.filterTrial") },
+                    { id: "past_due", label: t("admin.filterPastDue") },
+                    { id: "canceled", label: t("admin.filterCanceled") },
                   ].map((tab) => (
                     <button
                       key={tab.id}
                       onClick={() => setStatusFilter(tab.id)}
-                      className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                      className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
                         statusFilter === tab.id
                           ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs"
                           : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-300"
@@ -577,12 +581,12 @@ export default function AdminSubscribersPage() {
                 <table className="w-full text-left text-sm">
                   <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 text-xs uppercase font-semibold border-b border-gray-200 dark:border-gray-800">
                     <tr>
-                      <th className="px-6 py-4">Usuario / Empresa</th>
-                      <th className="px-6 py-4">Plan Actual</th>
-                      <th className="px-6 py-4">Slots Permitidos</th>
-                      <th className="px-6 py-4">Estado</th>
-                      <th className="px-6 py-4">Fecha Registro</th>
-                      <th className="px-6 py-4 text-right">Acciones</th>
+                      <th className="px-6 py-4">{t("admin.colUserCompany")}</th>
+                      <th className="px-6 py-4">{t("admin.colCurrentPlan")}</th>
+                      <th className="px-6 py-4">{t("admin.colSlotsAllowed")}</th>
+                      <th className="px-6 py-4">{t("admin.colStatus")}</th>
+                      <th className="px-6 py-4">{t("admin.colRegisterDate")}</th>
+                      <th className="px-6 py-4 text-right">{t("admin.colActions")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
@@ -590,13 +594,13 @@ export default function AdminSubscribersPage() {
                       <tr>
                         <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
                           <RiRefreshLine className="animate-spin inline-block mr-2" size={20} />
-                          Cargando clientes...
+                          {t("admin.loadingClients")}
                         </td>
                       </tr>
                     ) : filteredSubscribers.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
-                          No se encontraron clientes con los filtros aplicados.
+                          {t("admin.noClientsFound")}
                         </td>
                       </tr>
                     ) : (
@@ -608,7 +612,7 @@ export default function AdminSubscribersPage() {
                                 {sub.email}
                               </div>
                               <div className="text-xs text-gray-400">
-                                {sub.company_name || "Sin empresa"} • Rol: {sub.role}
+                                {sub.company_name || t("admin.noCompany")} • {t("admin.role", { role: sub.role })}
                               </div>
                             </td>
 
@@ -621,7 +625,7 @@ export default function AdminSubscribersPage() {
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-1.5 font-bold text-gray-800 dark:text-gray-200">
                                 <RiCpuLine size={16} className="text-gray-400" />
-                                <span>{sub.slots_limit} {sub.slots_limit === 1 ? "Slot" : "Slots"}</span>
+                                <span>{sub.slots_limit === 1 ? t("admin.slotSingle") : t("admin.slotPlural", { count: sub.slots_limit })}</span>
                               </div>
                             </td>
 
@@ -648,24 +652,24 @@ export default function AdminSubscribersPage() {
                                       : "bg-rose-500"
                                   }`}
                                 />
-                                {sub.subscription_status === "active" && "Activa"}
-                                {sub.subscription_status === "trial" && "En Prueba"}
-                                {sub.subscription_status === "past_due" && "Pago Pendiente"}
-                                {sub.subscription_status === "canceled" && "Cancelada"}
+                                {sub.subscription_status === "active" && t("admin.statusActive")}
+                                {sub.subscription_status === "trial" && t("admin.statusTrial")}
+                                {sub.subscription_status === "past_due" && t("admin.statusPastDue")}
+                                {sub.subscription_status === "canceled" && t("admin.statusCanceled")}
                               </span>
                             </td>
 
                             <td className="px-6 py-4 text-xs text-gray-400">
-                              {new Date(sub.created_at).toLocaleDateString()}
+                              {new Date(sub.created_at).toLocaleDateString(locale)}
                             </td>
 
                             <td className="px-6 py-4 text-right">
                               <button
                                 onClick={() => openEditModal(sub)}
-                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-300 transition-colors"
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-300 transition-colors cursor-pointer"
                               >
                                 <RiEditLine size={14} />
-                                <span>Gestionar</span>
+                                <span>{t("admin.manage")}</span>
                               </button>
                             </td>
                           </tr>
@@ -682,11 +686,10 @@ export default function AdminSubscribersPage() {
               <RiInformationLine className="text-brand-500 shrink-0 mt-0.5" size={20} />
               <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
                 <div className="font-semibold text-gray-900 dark:text-white">
-                  Sincronización Automática con Lemon Squeezy by Stripe (Merchant of Record)
+                  {t("admin.webhookCalloutTitle")}
                 </div>
                 <div>
-                  Tu endpoint de webhook activo es: <code className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 font-mono text-brand-600 dark:text-brand-400">/api/webhooks/lemonsqueezy</code>.
-                  Cuando un cliente compra en tu landing page, Lemon Squeezy by Stripe envía la confirmación y los slots se asignan al instante.
+                  {t("admin.webhookCalloutDesc", { endpoint: "/api/webhooks/lemonsqueezy" })}
                 </div>
               </div>
             </div>
@@ -700,7 +703,7 @@ export default function AdminSubscribersPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
                 <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider">Total Partners</span>
+                  <span className="text-xs font-semibold uppercase tracking-wider">{t("admin.statTotalPartners")}</span>
                   <span className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
                     <RiHandHeartLine size={18} />
                   </span>
@@ -708,12 +711,12 @@ export default function AdminSubscribersPage() {
                 <div className="text-3xl font-extrabold text-gray-900 dark:text-white">
                   {partnerSummary.total_partners}
                 </div>
-                <div className="text-xs text-gray-400 mt-1">Agencias & Promotores activos</div>
+                <div className="text-xs text-gray-400 mt-1">{t("admin.statTotalPartnersDesc")}</div>
               </div>
 
               <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
                 <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider">Clientes Referidos</span>
+                  <span className="text-xs font-semibold uppercase tracking-wider">{t("admin.statReferredClients")}</span>
                   <span className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
                     <RiUserFollowLine size={18} />
                   </span>
@@ -721,12 +724,12 @@ export default function AdminSubscribersPage() {
                 <div className="text-3xl font-extrabold text-blue-600 dark:text-blue-400">
                   {partnerSummary.total_referrals}
                 </div>
-                <div className="text-xs text-gray-400 mt-1">Suscripciones B2B traídas</div>
+                <div className="text-xs text-gray-400 mt-1">{t("admin.statReferredClientsDesc")}</div>
               </div>
 
               <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
                 <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider">Comisiones Pendientes</span>
+                  <span className="text-xs font-semibold uppercase tracking-wider">{t("admin.statPendingCommissions")}</span>
                   <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                     <RiMoneyDollarCircleLine size={18} />
                   </span>
@@ -734,12 +737,12 @@ export default function AdminSubscribersPage() {
                 <div className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">
                   ${partnerSummary.total_balance_due.toFixed(2)} USD
                 </div>
-                <div className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1">Por liquidar a Partners (25%)</div>
+                <div className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1">{t("admin.statPendingCommissionsDesc")}</div>
               </div>
 
               <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
                 <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider">Total Liquidado</span>
+                  <span className="text-xs font-semibold uppercase tracking-wider">{t("admin.statTotalPaidOut")}</span>
                   <span className="p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
                     <RiBankCardLine size={18} />
                   </span>
@@ -747,7 +750,7 @@ export default function AdminSubscribersPage() {
                 <div className="text-3xl font-extrabold text-purple-600 dark:text-purple-400">
                   ${partnerSummary.total_paid_out.toFixed(2)} USD
                 </div>
-                <div className="text-xs text-gray-400 mt-1">Pagado históricamente</div>
+                <div className="text-xs text-gray-400 mt-1">{t("admin.statTotalPaidOutDesc")}</div>
               </div>
             </div>
 
@@ -757,7 +760,7 @@ export default function AdminSubscribersPage() {
                 <RiSearchLine className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input
                   type="text"
-                  placeholder="Buscar partner por nombre, email o código..."
+                  placeholder={t("admin.searchPartnersPlaceholder")}
                   value={partnerSearch}
                   onChange={(e) => setPartnerSearch(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -765,7 +768,7 @@ export default function AdminSubscribersPage() {
               </div>
 
               <div className="text-xs text-gray-500">
-                Mostrando <strong className="text-gray-900 dark:text-white">{filteredPartners.length}</strong> de {partners.length} Partners Oficiales
+                {t("admin.showingPartnersCount", { filtered: filteredPartners.length, total: partners.length })}
               </div>
             </div>
 
@@ -775,13 +778,13 @@ export default function AdminSubscribersPage() {
                 <table className="w-full text-left text-sm">
                   <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 text-xs uppercase font-semibold border-b border-gray-200 dark:border-gray-800">
                     <tr>
-                      <th className="px-6 py-4">Partner / Contacto</th>
-                      <th className="px-6 py-4">Link de Descuento Oficial</th>
-                      <th className="px-6 py-4">Comisión</th>
-                      <th className="px-6 py-4">Método de Cobro</th>
-                      <th className="px-6 py-4">Clientes Activos</th>
-                      <th className="px-6 py-4">Saldo Pendiente</th>
-                      <th className="px-6 py-4 text-right">Acciones</th>
+                      <th className="px-6 py-4">{t("admin.colPartnerContact")}</th>
+                      <th className="px-6 py-4">{t("admin.colDiscountLink")}</th>
+                      <th className="px-6 py-4">{t("admin.colCommission")}</th>
+                      <th className="px-6 py-4">{t("admin.colPayoutMethod")}</th>
+                      <th className="px-6 py-4">{t("admin.colActiveClients")}</th>
+                      <th className="px-6 py-4">{t("admin.colPendingBalance")}</th>
+                      <th className="px-6 py-4 text-right">{t("admin.colActions")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
@@ -789,7 +792,7 @@ export default function AdminSubscribersPage() {
                       <tr>
                         <td colSpan={7} className="px-6 py-12 text-center text-gray-400">
                           <RiRefreshLine className="animate-spin inline-block mr-2" size={20} />
-                          Cargando Partners Oficiales...
+                          {t("admin.loadingPartners")}
                         </td>
                       </tr>
                     ) : filteredPartners.length === 0 ? (
@@ -797,17 +800,17 @@ export default function AdminSubscribersPage() {
                         <td colSpan={7} className="px-6 py-12 text-center text-gray-400">
                           {partners.length === 0 ? (
                             <div className="space-y-3">
-                              <p>Aún no has registrado ningún Partner Oficial.</p>
+                              <p>{t("admin.noPartnersYet")}</p>
                               <button
                                 onClick={() => setIsCreatePartnerModalOpen(true)}
-                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs shadow-xs"
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs shadow-xs cursor-pointer"
                               >
                                 <RiHandHeartLine size={16} />
-                                <span>Dar de alta el Primer Partner</span>
+                                <span>{t("admin.createFirstPartner")}</span>
                               </button>
                             </div>
                           ) : (
-                            "No se encontraron Partners con ese criterio de búsqueda."
+                            t("admin.noPartnersFound")
                           )}
                         </td>
                       </tr>
@@ -835,8 +838,8 @@ export default function AdminSubscribersPage() {
                                 </code>
                                 <button
                                   onClick={() => copyDiscountLink(p.discount_link, p.code)}
-                                  title="Copiar link de descuento"
-                                  className={`p-1.5 rounded-lg border transition-all ${
+                                  title={t("admin.copyDiscountLink")}
+                                  className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
                                     isCopied
                                       ? "bg-emerald-500 text-white border-emerald-600"
                                       : "border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300"
@@ -847,14 +850,14 @@ export default function AdminSubscribersPage() {
                               </div>
                               {isCopied && (
                                 <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                                  ¡Link de Descuento copiado!
+                                  {t("admin.linkCopied")}
                                 </span>
                               )}
                             </td>
 
                             <td className="px-6 py-4">
                               <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
-                                {p.commission_pct}% Recurrente
+                                {t("admin.recurringCommission", { pct: p.commission_pct })}
                               </span>
                             </td>
 
@@ -863,7 +866,7 @@ export default function AdminSubscribersPage() {
                                 {p.payout_method || "PayPal"}
                               </div>
                               <div className="text-[11px] text-gray-400 truncate max-w-[180px]">
-                                {p.payout_account || "No especificada"}
+                                {p.payout_account || t("admin.notSpecified")}
                               </div>
                             </td>
 
@@ -872,7 +875,7 @@ export default function AdminSubscribersPage() {
                                 {p.active_referrals || 0}
                               </div>
                               <div className="text-[11px] text-gray-400">
-                                ${((p.total_revenue_generated || 0)).toFixed(2)} facturados
+                                {t("admin.billedRevenue", { amount: ((p.total_revenue_generated || 0)).toFixed(2) })}
                               </div>
                             </td>
 
@@ -881,7 +884,7 @@ export default function AdminSubscribersPage() {
                                 ${p.balance.toFixed(2)} USD
                               </div>
                               <div className="text-[11px] text-gray-400">
-                                Pagado: ${p.total_paid.toFixed(2)}
+                                {t("admin.paidHistorical", { amount: p.total_paid.toFixed(2) })}
                               </div>
                             </td>
 
@@ -889,10 +892,10 @@ export default function AdminSubscribersPage() {
                               <button
                                 onClick={() => openPayoutModal(p)}
                                 disabled={p.balance <= 0}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white font-semibold text-xs transition-colors shadow-xs"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white font-semibold text-xs transition-colors shadow-xs cursor-pointer"
                               >
                                 <RiMoneyDollarCircleLine size={14} />
-                                <span>Liquidar</span>
+                                <span>{t("admin.payout")}</span>
                               </button>
                             </td>
                           </tr>
@@ -909,11 +912,10 @@ export default function AdminSubscribersPage() {
               <RiHandHeartLine className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" size={20} />
               <div className="text-xs text-gray-700 dark:text-gray-300 space-y-1">
                 <div className="font-bold text-gray-900 dark:text-white">
-                  ¿Cómo funciona el Link de Descuento de Embajadores (?25-OFF=CODIGO)?
+                  {t("admin.partnerCalloutTitle")}
                 </div>
                 <div>
-                  Cada Partner Oficial recibe un link como <code className="px-1.5 py-0.5 rounded bg-white dark:bg-gray-800 font-mono text-amber-700 dark:text-amber-400 font-bold">https://inhubflow.online?25-OFF=SE7GH</code>.
-                  Cuando su cliente entra con ese link, el sistema guarda la atribución por 60 días y le acredita automáticamente el <strong>25% recurrente mes a mes</strong> cada vez que se renueva la suscripción en Lemon Squeezy.
+                  {t("admin.partnerCalloutDesc", { sampleUrl: "https://inhubflow.online?25-OFF=SE7GH" })}
                 </div>
               </div>
             </div>
@@ -927,30 +929,30 @@ export default function AdminSubscribersPage() {
           <div className="w-full max-w-md rounded-3xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-6 shadow-xl space-y-5 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                Gestionar Suscripción
+                {t("admin.modalManageSub")}
               </h3>
               <button
                 onClick={() => setIsEditModalOpen(false)}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-white"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-white cursor-pointer"
               >
                 <RiCloseLine size={20} />
               </button>
             </div>
 
             <div className="text-xs text-gray-500 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl">
-              Editando a: <strong className="text-gray-900 dark:text-white">{selectedSub.email}</strong>
+              {t("admin.editingTo", { email: selectedSub.email })}
             </div>
 
             <form onSubmit={handleSaveEdit} className="space-y-4 text-sm">
               <div>
                 <label htmlFor={editSlotsInputId} className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                  Límite de Slots (Cuentas permitidas)
+                  {t("admin.labelSlotsLimit")}
                 </label>
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
                     onClick={() => setEditSlots((s) => Math.max(1, s - 1))}
-                    className="h-10 w-10 rounded-xl border border-gray-200 dark:border-gray-700 flex items-center justify-center font-bold text-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="h-10 w-10 rounded-xl border border-gray-200 dark:border-gray-700 flex items-center justify-center font-bold text-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
                   >
                     -
                   </button>
@@ -966,7 +968,7 @@ export default function AdminSubscribersPage() {
                   <button
                     type="button"
                     onClick={() => setEditSlots((s) => s + 1)}
-                    className="h-10 w-10 rounded-xl border border-gray-200 dark:border-gray-700 flex items-center justify-center font-bold text-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="h-10 w-10 rounded-xl border border-gray-200 dark:border-gray-700 flex items-center justify-center font-bold text-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
                   >
                     +
                   </button>
@@ -975,7 +977,7 @@ export default function AdminSubscribersPage() {
 
               <div>
                 <label htmlFor={editPlanSelectId} className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                  Plan Comercial
+                  {t("admin.labelPlanTier")}
                 </label>
                 <select
                   id={editPlanSelectId}
@@ -983,16 +985,16 @@ export default function AdminSubscribersPage() {
                   onChange={(e) => setEditPlan(e.target.value as "starter" | "growth" | "business" | "custom")}
                   className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm"
                 >
-                  <option value="starter">Starter (1 cuenta - $49/mes)</option>
-                  <option value="growth">Growth (5 cuentas - $199/mes)</option>
-                  <option value="business">Business (10 cuentas - $349/mes)</option>
-                  <option value="custom">Personalizado / Cortesía</option>
+                  <option value="starter">{t("admin.planStarter")}</option>
+                  <option value="growth">{t("admin.planGrowth")}</option>
+                  <option value="business">{t("admin.planBusiness")}</option>
+                  <option value="custom">{t("admin.planCustom")}</option>
                 </select>
               </div>
 
               <div>
                 <label htmlFor={editStatusSelectId} className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                  Estado de Suscripción
+                  {t("admin.labelSubStatus")}
                 </label>
                 <select
                   id={editStatusSelectId}
@@ -1000,23 +1002,23 @@ export default function AdminSubscribersPage() {
                   onChange={(e) => setEditStatus(e.target.value as "active" | "trial" | "past_due" | "canceled")}
                   className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm"
                 >
-                  <option value="active">Activa (Acceso completo)</option>
-                  <option value="trial">Periodo de Prueba</option>
-                  <option value="past_due">Pendiente de Pago</option>
-                  <option value="canceled">Cancelada (Bloquear acceso)</option>
+                  <option value="active">{t("admin.statusOptActive")}</option>
+                  <option value="trial">{t("admin.statusOptTrial")}</option>
+                  <option value="past_due">{t("admin.statusOptPastDue")}</option>
+                  <option value="canceled">{t("admin.statusOptCanceled")}</option>
                 </select>
               </div>
 
               <div>
                 <label htmlFor={editCompanyInputId} className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                  Empresa / Organización
+                  {t("admin.labelCompany")}
                 </label>
                 <input
                   id={editCompanyInputId}
                   type="text"
                   value={editCompany}
                   onChange={(e) => setEditCompany(e.target.value)}
-                  placeholder="Ej. Acme Corp"
+                  placeholder={t("admin.placeholderCompany")}
                   className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm"
                 />
               </div>
@@ -1040,12 +1042,12 @@ export default function AdminSubscribersPage() {
                       });
                       const data = await res.json();
                       if (res.ok) {
-                        toast.success(`¡Email con credenciales enviado a ${selectedSub.email}! Recuérdale revisar su carpeta de Spam y marcarlo como "No es Spam".`, { duration: 7000 });
+                        toast.success(t("admin.toastCredentialsSent", { email: selectedSub.email }), { duration: 7000 });
                       } else {
-                        toast.error(data.error || "No se pudo enviar el correo");
+                        toast.error(data.error || t("admin.toastCredentialsError"));
                       }
                     } catch {
-                      toast.error("Error al conectar con el servidor de correo");
+                      toast.error(t("admin.toastCredentialsError"));
                     } finally {
                       setSendingEmail(false);
                     }
@@ -1055,7 +1057,7 @@ export default function AdminSubscribersPage() {
                   title="Reenviar correo de bienvenida con credenciales vía Resend"
                 >
                   <RiMailSendLine size={15} />
-                  <span>{sendingEmail ? "Enviando..." : "Enviar Email de Acceso"}</span>
+                  <span>{sendingEmail ? t("admin.sending") : t("admin.sendAccessEmail")}</span>
                 </button>
 
                 <div className="flex items-center gap-2">
@@ -1064,7 +1066,7 @@ export default function AdminSubscribersPage() {
                     onClick={() => setIsEditModalOpen(false)}
                     className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium text-xs hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
                   >
-                    Cancelar
+                    {t("admin.cancel")}
                   </button>
                   <button
                     type="submit"
@@ -1072,7 +1074,7 @@ export default function AdminSubscribersPage() {
                     className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-medium text-xs shadow-xs disabled:opacity-50 cursor-pointer"
                   >
                     <RiCheckLine size={16} />
-                    <span>{saving ? "Guardando..." : "Guardar Cambios"}</span>
+                    <span>{saving ? t("admin.saving") : t("admin.saveChanges")}</span>
                   </button>
                 </div>
               </div>
@@ -1087,11 +1089,11 @@ export default function AdminSubscribersPage() {
           <div className="w-full max-w-md rounded-3xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-6 shadow-xl space-y-5 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                Alta Manual de Cliente
+                {t("admin.modalNewClient")}
               </h3>
               <button
                 onClick={() => setIsCreateModalOpen(false)}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-white"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-white cursor-pointer"
               >
                 <RiCloseLine size={20} />
               </button>
@@ -1106,10 +1108,10 @@ export default function AdminSubscribersPage() {
             <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-300 text-xs flex items-start gap-2.5">
               <RiMailSendLine size={16} className="shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
               <div className="space-y-1">
-                <strong className="block font-semibold">Envío de credenciales automático:</strong>
-                <span>Al crear el cliente, recibirá de inmediato un correo oficial de bienvenida desde <strong>info@inhubflow.online</strong> con su link de login y contraseña.</span>
+                <strong className="block font-semibold">{t("admin.credNoticeTitle")}</strong>
+                <span>{t("admin.credNoticeDesc")}</span>
                 <span className="block text-[11px] text-amber-700 dark:text-amber-300 font-medium pt-1 border-t border-blue-500/20">
-                  💡 Sugerencia: Indícale al cliente que si no ve el correo en su bandeja de entrada, revise su carpeta de <strong>Spam</strong> y haga clic en <strong>&quot;No es Spam&quot;</strong>.
+                  {t("admin.credNoticeSpamHint")}
                 </span>
               </div>
             </div>
@@ -1117,7 +1119,7 @@ export default function AdminSubscribersPage() {
             <form onSubmit={handleCreateUser} className="space-y-4 text-sm">
               <div>
                 <label htmlFor={newEmailInputId} className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                  Email del Cliente *
+                  {t("admin.labelClientEmail")}
                 </label>
                 <input
                   id={newEmailInputId}
@@ -1125,14 +1127,14 @@ export default function AdminSubscribersPage() {
                   required
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
-                  placeholder="cliente@empresa.com"
+                  placeholder={t("admin.placeholderClientEmail")}
                   className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
               </div>
 
               <div>
                 <label htmlFor={newPasswordInputId} className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                  Contraseña Inicial *
+                  {t("admin.labelInitialPassword")}
                 </label>
                 <input
                   id={newPasswordInputId}
@@ -1141,21 +1143,21 @@ export default function AdminSubscribersPage() {
                   minLength={8}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Mínimo 8 caracteres"
+                  placeholder={t("admin.placeholderPassword")}
                   className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
               </div>
 
               <div>
                 <label htmlFor={newCompanyInputId} className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                  Empresa / Negocio
+                  {t("admin.labelCompany")}
                 </label>
                 <input
                   id={newCompanyInputId}
                   type="text"
                   value={newCompany}
                   onChange={(e) => setNewCompany(e.target.value)}
-                  placeholder="Ej. Acme Corp"
+                  placeholder={t("admin.placeholderCompany")}
                   className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm"
                 />
               </div>
@@ -1163,7 +1165,7 @@ export default function AdminSubscribersPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label htmlFor={newSlotsInputId} className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Slots Autorizados
+                    {t("admin.labelAuthorizedSlots")}
                   </label>
                   <input
                     id={newSlotsInputId}
@@ -1178,7 +1180,7 @@ export default function AdminSubscribersPage() {
 
                 <div>
                   <label htmlFor={newPlanSelectId} className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Plan
+                    {t("admin.labelPlan")}
                   </label>
                   <select
                     id={newPlanSelectId}
@@ -1192,10 +1194,10 @@ export default function AdminSubscribersPage() {
                     }}
                     className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm"
                   >
-                    <option value="starter">Starter (1 Slot)</option>
-                    <option value="growth">Growth (5 Slots)</option>
-                    <option value="business">Business (10 Slots)</option>
-                    <option value="custom">Custom</option>
+                    <option value="starter">{t("admin.planOptStarter")}</option>
+                    <option value="growth">{t("admin.planOptGrowth")}</option>
+                    <option value="business">{t("admin.planOptBusiness")}</option>
+                    <option value="custom">{t("admin.planOptCustom")}</option>
                   </select>
                 </div>
               </div>
@@ -1204,17 +1206,17 @@ export default function AdminSubscribersPage() {
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium text-xs hover:bg-gray-100 dark:hover:bg-gray-800"
+                  className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium text-xs hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
                 >
-                  Cancelar
+                  {t("admin.cancel")}
                 </button>
                 <button
                   type="submit"
                   disabled={creating}
-                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-medium text-xs shadow-xs disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-medium text-xs shadow-xs disabled:opacity-50 cursor-pointer"
                 >
                   <RiUserAddLine size={16} />
-                  <span>{creating ? "Creando..." : "Crear Cliente"}</span>
+                  <span>{creating ? t("admin.creating") : t("admin.createClient")}</span>
                 </button>
               </div>
             </form>
@@ -1232,7 +1234,7 @@ export default function AdminSubscribersPage() {
                   <RiHandHeartLine size={20} />
                 </span>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                  Nuevo Partner Oficial de InHubFlow
+                  {t("admin.modalNewPartner")}
                 </h3>
               </div>
               <button
@@ -1244,7 +1246,7 @@ export default function AdminSubscribersPage() {
             </div>
 
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Registra una agencia o embajador para generar su Link de Descuento exclusivo y atribuirle el 25% de comisión mensual recurrente.
+              {t("admin.modalNewPartnerDesc")}
             </p>
 
             {partnerFormError && (
@@ -1257,28 +1259,28 @@ export default function AdminSubscribersPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Nombre o Agencia *
+                    {t("admin.labelAgencyName")}
                   </label>
                   <input
                     type="text"
                     required
                     value={newPartnerName}
                     onChange={(e) => setNewPartnerName(e.target.value)}
-                    placeholder="Ej. Agencia Growth B2B"
+                    placeholder={t("admin.placeholderAgencyName")}
                     className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Email de Contacto *
+                    {t("admin.labelContactEmail")}
                   </label>
                   <input
                     type="email"
                     required
                     value={newPartnerEmail}
                     onChange={(e) => setNewPartnerEmail(e.target.value)}
-                    placeholder="partner@agencia.com"
+                    placeholder={t("admin.placeholderContactEmail")}
                     className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
@@ -1287,7 +1289,7 @@ export default function AdminSubscribersPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Teléfono / WhatsApp
+                    {t("admin.labelPhone")}
                   </label>
                   <input
                     type="tel"
@@ -1300,13 +1302,13 @@ export default function AdminSubscribersPage() {
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Código Alfanumérico (Opcional)
+                    {t("admin.labelCustomCode")}
                   </label>
                   <input
                     type="text"
                     value={newPartnerCustomCode}
                     onChange={(e) => setNewPartnerCustomCode(e.target.value.toUpperCase())}
-                    placeholder="Ej. SE7GH (Auto si vacío)"
+                    placeholder={t("admin.placeholderCode")}
                     maxLength={10}
                     className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm uppercase font-mono"
                   />
@@ -1316,23 +1318,23 @@ export default function AdminSubscribersPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Método de Liquidación
+                    {t("admin.labelPayoutMethod")}
                   </label>
                   <select
                     value={newPartnerPayoutMethod}
                     onChange={(e) => setNewPartnerPayoutMethod(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm"
                   >
-                    <option value="PayPal">PayPal</option>
-                    <option value="Transferencia Bancaria">Transferencia Bancaria</option>
-                    <option value="USDT / Crypto">USDT / Cripto</option>
-                    <option value="Wise">Wise</option>
+                    <option value="PayPal">{t("admin.payoutPayPal")}</option>
+                    <option value="Transferencia Bancaria">{t("admin.payoutBank")}</option>
+                    <option value="USDT / Crypto">{t("admin.payoutCrypto")}</option>
+                    <option value="Wise">{t("admin.payoutWise")}</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Comisión Recurrente (%)
+                    {t("admin.labelCommissionPct")}
                   </label>
                   <input
                     type="number"
@@ -1347,26 +1349,26 @@ export default function AdminSubscribersPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                  Cuenta / Datos de Pago (Email PayPal o Cuenta Bancaria)
+                  {t("admin.labelPayoutAccount")}
                 </label>
                 <input
                   type="text"
                   value={newPartnerPayoutAccount}
                   onChange={(e) => setNewPartnerPayoutAccount(e.target.value)}
-                  placeholder="ej: pagos@agencia.com o Banco BCI Cta Cte..."
+                  placeholder={t("admin.placeholderPayoutAccount")}
                   className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                  Notas Internas
+                  {t("admin.labelNotes")}
                 </label>
                 <input
                   type="text"
                   value={newPartnerNotes}
                   onChange={(e) => setNewPartnerNotes(e.target.value)}
-                  placeholder="Acuerdos específicos, canal de contacto, etc."
+                  placeholder={t("admin.placeholderNotes")}
                   className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm"
                 />
               </div>
@@ -1377,7 +1379,7 @@ export default function AdminSubscribersPage() {
                   onClick={() => setIsCreatePartnerModalOpen(false)}
                   className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium text-xs hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
                 >
-                  Cancelar
+                  {t("admin.cancel")}
                 </button>
                 <button
                   type="submit"
@@ -1385,7 +1387,7 @@ export default function AdminSubscribersPage() {
                   className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs shadow-xs disabled:opacity-50 cursor-pointer"
                 >
                   <RiHandHeartLine size={16} />
-                  <span>{partnerCreating ? "Guardando..." : "Guardar y Generar Link"}</span>
+                  <span>{partnerCreating ? t("admin.saving") : t("admin.saveAndGenerateLink")}</span>
                 </button>
               </div>
             </form>
@@ -1403,7 +1405,7 @@ export default function AdminSubscribersPage() {
                   <RiMoneyDollarCircleLine size={20} />
                 </span>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                  Liquidar Comisiones
+                  {t("admin.modalPayoutTitle")}
                 </h3>
               </div>
               <button
@@ -1415,22 +1417,25 @@ export default function AdminSubscribersPage() {
             </div>
 
             <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/50 space-y-1">
-              <div className="text-xs text-gray-500 dark:text-gray-400">Liquidando a:</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">{t("admin.payingTo")}</div>
               <div className="font-bold text-gray-900 dark:text-white text-sm">
                 {selectedPartnerForPayout.name} ({selectedPartnerForPayout.code})
               </div>
               <div className="text-xs text-emerald-700 dark:text-emerald-400 font-semibold pt-1">
-                Saldo acumulado actual: ${selectedPartnerForPayout.balance.toFixed(2)} USD
+                {t("admin.currentBalance", { amount: selectedPartnerForPayout.balance.toFixed(2) })}
               </div>
               <div className="text-[11px] text-gray-500">
-                Cobro vía: <strong>{selectedPartnerForPayout.payout_method}</strong> ({selectedPartnerForPayout.payout_account || "No especificada"})
+                {t("admin.payoutVia", {
+                  method: selectedPartnerForPayout.payout_method,
+                  account: selectedPartnerForPayout.payout_account || t("admin.notSpecified"),
+                })}
               </div>
             </div>
 
             <form onSubmit={handleConfirmPayout} className="space-y-4 text-sm">
               <div>
                 <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                  Monto a Liquidar ($ USD) *
+                  {t("admin.labelPayoutAmount")}
                 </label>
                 <input
                   type="number"
@@ -1446,26 +1451,26 @@ export default function AdminSubscribersPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                  Referencia de Pago (ID Transacción / Voucher)
+                  {t("admin.labelPayoutRef")}
                 </label>
                 <input
                   type="text"
                   value={payoutRef}
                   onChange={(e) => setPayoutRef(e.target.value)}
-                  placeholder="ej: PAYPAL-TXN-98428 o Transf 129384"
+                  placeholder={t("admin.placeholderPayoutRef")}
                   className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                  Notas de Liquidación
+                  {t("admin.labelPayoutNotes")}
                 </label>
                 <input
                   type="text"
                   value={payoutNotes}
                   onChange={(e) => setPayoutNotes(e.target.value)}
-                  placeholder="Comisiones periodo marzo, etc."
+                  placeholder={t("admin.placeholderPayoutNotes")}
                   className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm"
                 />
               </div>
@@ -1476,7 +1481,7 @@ export default function AdminSubscribersPage() {
                   onClick={() => setIsPayoutModalOpen(false)}
                   className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium text-xs hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
                 >
-                  Cancelar
+                  {t("admin.cancel")}
                 </button>
                 <button
                   type="submit"
@@ -1484,7 +1489,7 @@ export default function AdminSubscribersPage() {
                   className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs disabled:opacity-50 cursor-pointer"
                 >
                   <RiCheckLine size={16} />
-                  <span>{payoutSaving ? "Registrando..." : "Confirmar Pago"}</span>
+                  <span>{payoutSaving ? t("admin.recording") : t("admin.confirmPayout")}</span>
                 </button>
               </div>
             </form>
