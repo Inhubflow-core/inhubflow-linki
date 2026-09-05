@@ -313,13 +313,165 @@ export function parseXRaySnippet(
 }
 
 /**
- * Executes a high-precision Google X-Ray Search for LinkedIn profiles using Playwright Stealth.
- * Bypasses LinkedIn account limits, Commercial Use Limits, and guarantees 100% geographical accuracy.
+ * Executes a fast, reliable Google X-Ray Search using Serper.dev API.
+ * Completely immune to datacenter IP blocks, zero CAPTCHAs, requires no headless browser.
+ */
+export async function searchLinkedInWithSerper(
+  options: XRaySearchOptions,
+  onProgress?: SearchProgressCallback,
+  apiKey?: string
+): Promise<SearchLead[]> {
+  const serperKey = apiKey || process.env.SERPER_API_KEY;
+  if (!serperKey) {
+    throw new XRaySearchError(
+      "No se ha configurado la variable SERPER_API_KEY en el servidor.",
+      "provider_error"
+    );
+  }
+
+  const { limit = 25, location = "", company = "", country = "", city = "" } = options;
+  const { query, subdomain, countryName } = buildXRayQuery(options);
+
+  const collectedLeads: SearchLead[] = [];
+  const seenUrls = new Set<string>();
+
+  // Free accounts on Serper must use num: 10
+  const pageSize = 10;
+  const maxPages = Math.min(Math.ceil(limit / pageSize), 10);
+
+  const gl = subdomain === "www" ? "us" : subdomain;
+  const hl = subdomain === "br" ? "pt" : "es";
+
+  onProgress?.({
+    phase: "starting",
+    page: 1,
+    totalPages: maxPages,
+    totalFound: 0,
+    message: `Iniciando Google X-Ray con Serper.dev para ${countryName}...`,
+  });
+
+  for (let pageIdx = 1; pageIdx <= maxPages; pageIdx++) {
+    if (collectedLeads.length >= limit) break;
+
+    onProgress?.({
+      phase: "navigating",
+      page: pageIdx,
+      totalPages: maxPages,
+      totalFound: collectedLeads.length,
+      message: `Consultando prospectos en Google X-Ray (Página ${pageIdx} de ${maxPages})...`,
+    });
+
+    let res: Response;
+    try {
+      res = await fetch("https://google.serper.dev/search", {
+        method: "POST",
+        headers: {
+          "X-API-KEY": serperKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          q: query,
+          gl,
+          hl,
+          num: pageSize,
+          page: pageIdx,
+        }),
+      });
+    } catch (err: any) {
+      throw new XRaySearchError(
+        `Fallo al conectar con Serper.dev: ${err?.message || "error de red"}`,
+        "provider_error"
+      );
+    }
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      const msg = errJson?.message || `HTTP ${res.status}`;
+      if (res.status === 403 || msg.toLowerCase().includes("unauthorized")) {
+        throw new XRaySearchError(
+          "La API key de Serper.dev no es válida o fue revocada. Revisa SERPER_API_KEY.",
+          "provider_error"
+        );
+      }
+      if (msg.toLowerCase().includes("credit")) {
+        throw new XRaySearchError(
+          "Se han agotado los créditos de búsqueda en tu cuenta de Serper.dev.",
+          "provider_error"
+        );
+      }
+      throw new XRaySearchError(
+        `Error de Serper.dev: ${msg}`,
+        "provider_error"
+      );
+    }
+
+    const data: any = await res.json();
+    const organic = data.organic || [];
+
+    if (organic.length === 0 && pageIdx === 1) {
+      break;
+    }
+
+    for (let idx = 0; idx < organic.length; idx++) {
+      if (collectedLeads.length >= limit) break;
+      const item = organic[idx];
+      const cleanUrl = normalizeXRayUrl(item.link || "");
+      if (!cleanUrl || seenUrls.has(cleanUrl)) continue;
+      seenUrls.add(cleanUrl);
+
+      const parsed = parseXRaySnippet(item.title || "", item.snippet || "", company);
+      const effectiveLocation =
+        [city, countryName].filter(Boolean).join(", ") || location || countryName;
+
+      const lead: SearchLead = {
+        linkedinUrl: cleanUrl,
+        fullName: parsed.fullName,
+        firstName: parsed.firstName,
+        lastName: parsed.lastName,
+        title: parsed.title || options.title || null,
+        company: parsed.company || company || null,
+        location: effectiveLocation,
+        profileImageUrl: null,
+        degree: null,
+        email: parsed.email,
+        phone: parsed.phone,
+        summary: item.snippet || null,
+      };
+
+      collectedLeads.push(lead);
+    }
+
+    onProgress?.({
+      phase: "extracting",
+      page: pageIdx,
+      totalPages: maxPages,
+      totalFound: collectedLeads.length,
+      message: `Encontrados ${collectedLeads.length} de ${limit} prospectos verificados...`,
+    });
+
+    if (organic.length < pageSize) {
+      // Reached the end of available Google results
+      break;
+    }
+  }
+
+  return collectedLeads;
+}
+
+/**
+ * Executes a high-precision Google X-Ray Search for LinkedIn profiles.
+ * If SERPER_API_KEY is configured, uses Serper.dev (fast, 0 CAPTCHAs, no server browser).
+ * Otherwise, falls back to Playwright Chromium scraping.
  */
 export async function searchLinkedInWithXRay(
   options: XRaySearchOptions,
   onProgress?: SearchProgressCallback
 ): Promise<SearchLead[]> {
+  // If Serper API key is set, use Serper.dev for zero CAPTCHA and fast execution
+  if (process.env.SERPER_API_KEY) {
+    return searchLinkedInWithSerper(options, onProgress);
+  }
+
   const { limit = 25, location = "", company = "" } = options;
   const { query, countryName } = buildXRayQuery(options);
 

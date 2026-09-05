@@ -26,6 +26,7 @@ const {
   buildXRayQuery,
   normalizeXRayUrl,
   parseXRaySnippet,
+  searchLinkedInWithSerper,
 } = require("../lib/linkedin/xray.ts");
 
 console.log("▶ [Test 1] Resolving national subdomains");
@@ -122,4 +123,19 @@ const errTimeout = new XRaySearchError("Timeout", "timeout");
 assert.equal(errTimeout.code, "timeout");
 console.log("  ✔ XRaySearchError correctly instantiated and classified");
 
-console.log("\n✅ ALL GOOGLE X-RAY TESTS PASSED CLEANLY!");
+console.log("▶ [Test 7] Serper.dev integration validation");
+assert.equal(typeof searchLinkedInWithSerper, "function");
+
+// Test that missing key throws expected error
+(async () => {
+  try {
+    await searchLinkedInWithSerper({ title: "CEO" }, undefined, "");
+    assert.fail("Should have thrown without key");
+  } catch (err) {
+    assert.equal(err.name, "XRaySearchError");
+    assert.equal(err.code, "provider_error");
+    console.log("  ✔ searchLinkedInWithSerper correctly handles missing/invalid API key");
+  }
+
+  console.log("\n✅ ALL GOOGLE X-RAY & SERPER TESTS PASSED CLEANLY!");
+})();

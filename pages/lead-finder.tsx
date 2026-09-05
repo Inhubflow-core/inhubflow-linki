@@ -27,6 +27,8 @@ import {
   RiSettings4Line,
   RiMailLine,
   RiPhoneLine,
+  RiFileCopyLine,
+  RiGoogleLine,
 } from "react-icons/ri";
 
 interface Account {
@@ -356,6 +358,60 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
     }
   }
 
+  const getDirectQuery = () => {
+    const selectedC = COUNTRIES_LIST.find((c) => c.name === country);
+    const subCode = selectedC ? selectedC.code : "www";
+    const siteClause =
+      subCode === "www"
+        ? `(site:linkedin.com/in/ OR site:www.linkedin.com/in/)`
+        : `(site:${subCode}.linkedin.com/in/ OR site:linkedin.com/in/ OR site:www.linkedin.com/in/)`;
+
+    const rawTitleTokens = title
+      .split(/[,;/|]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const titleClause =
+      rawTitleTokens.length > 0
+        ? rawTitleTokens.length === 1
+          ? `"${rawTitleTokens[0]}"`
+          : `(${rawTitleTokens.map((t) => `"${t}"`).join(" OR ")})`
+        : "";
+
+    const cityClause = city.trim() ? `"${city.trim()}"` : "";
+    const compClause = company.trim() ? `"${company.trim()}"` : "";
+
+    return [
+      siteClause,
+      titleClause,
+      compClause,
+      cityClause,
+      `-intitle:"profiles"`,
+      `-inurl:"dir/"`,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  };
+
+  const canPerformDirectSearch = Boolean(
+    title.trim() || city.trim() || company.trim() || country !== "Global / Todos"
+  );
+
+  const handleOpenGoogle = () => {
+    const q = getDirectQuery();
+    window.open(`https://www.google.com/search?q=${encodeURIComponent(q)}`, "_blank");
+  };
+
+  const handleOpenBing = () => {
+    const q = getDirectQuery();
+    window.open(`https://www.bing.com/search?q=${encodeURIComponent(q)}`, "_blank");
+  };
+
+  const handleCopyQuery = () => {
+    const q = getDirectQuery();
+    navigator.clipboard.writeText(q);
+    toast.success("Fórmula booleana copiada al portapapeles");
+  };
+
   const hasAuthAccount = authenticatedAccounts.length > 0;
 
   return (
@@ -627,12 +683,55 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     <button
                       type="button"
                       onClick={handleCancelSearch}
-                      className="py-3 px-4 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                      className="py-3 px-4 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-750 transition-colors"
                     >
                       {t("leadFinder.stopButton")}
                     </button>
                   </div>
                 )}
+              </div>
+
+              {/* Quick X-Ray Query Actions (Recruitin Style) */}
+              <div className="pt-3 border-t border-gray-100 dark:border-gray-800 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <RiSparklingLine className="text-brand-500" size={14} /> Consulta X-Ray Directa
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCopyQuery}
+                    disabled={!canPerformDirectSearch}
+                    className="text-xs text-brand-500 hover:text-brand-600 flex items-center gap-1 font-medium disabled:opacity-40"
+                  >
+                    <RiFileCopyLine size={13} /> Copiar fórmula
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleOpenGoogle}
+                    disabled={!canPerformDirectSearch}
+                    className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-750 transition-colors disabled:opacity-40"
+                    title="Abrir la búsqueda directamente en Google en una pestaña nueva"
+                  >
+                    <RiGoogleLine size={14} className="text-blue-500" /> Abrir en Google
+                    <RiExternalLinkLine size={12} className="text-gray-400 ml-auto" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenBing}
+                    disabled={!canPerformDirectSearch}
+                    className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-750 transition-colors disabled:opacity-40"
+                    title="Abrir la búsqueda directamente en Bing en una pestaña nueva"
+                  >
+                    <RiSearchLine size={14} className="text-teal-500" /> Abrir en Bing
+                    <RiExternalLinkLine size={12} className="text-gray-400 ml-auto" />
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-400 dark:text-gray-500 leading-snug">
+                  💡 Al estilo Recruitin, puedes abrir la consulta en tu navegador o usar <strong>{t("leadFinder.searchButton")}</strong> para importarlos automáticamente a tu lista con Serper.
+                </p>
               </div>
             </form>
           </div>
