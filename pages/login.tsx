@@ -291,9 +291,28 @@ export default function LoginPage() {
             </form>
           </div>
 
-          <p className="mt-6 text-center text-xs text-gray-400 dark:text-gray-500">
-            InHubFlow Suite &copy; 2026
-          </p>
+          <div className="mt-6 flex flex-col items-center gap-2 text-center text-xs text-gray-400 dark:text-gray-500">
+            <div className="flex items-center gap-3">
+              <a
+                href="https://inhubflow.online/terms"
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-gray-600 dark:hover:text-gray-300 transition underline underline-offset-2"
+              >
+                {locale === 'pt-BR' ? 'Termos de Serviço' : locale === 'en' ? 'Terms of Service' : 'Términos y Condiciones'}
+              </a>
+              <span>•</span>
+              <a
+                href="https://inhubflow.online/privacy"
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-gray-600 dark:hover:text-gray-300 transition underline underline-offset-2"
+              >
+                {locale === 'pt-BR' ? 'Política de Privacidade' : locale === 'en' ? 'Privacy Policy' : 'Política de Privacidad'}
+              </a>
+            </div>
+            <p>InHubFlow Suite &copy; 2026</p>
+          </div>
         </div>
       </div>
     </>
