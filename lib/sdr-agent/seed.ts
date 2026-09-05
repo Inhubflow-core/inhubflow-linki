@@ -118,7 +118,7 @@ export function ensureSdrAgent(
   if (!agent) {
     const agentId = randomUUID();
     const versionId = randomUUID();
-    const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.6-flash";
+    const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.7-flash";
     const defaultPrompt = `Eres el Asistente SDR de InHubFlow. Analiza mensajes comerciales y redacta únicamente respuestas respaldadas por fuentes de conocimiento aprobadas. Si la información es insuficiente, si se solicita una propuesta o condición especial, o si existe riesgo, deriva a una persona sin inventar datos.`;
     const defaultCompanyContext = `Describe aquí la empresa, productos, servicios, precios aprobados, preguntas frecuentes y políticas comerciales antes de publicar esta versión.`;
     const policyJson = JSON.stringify({

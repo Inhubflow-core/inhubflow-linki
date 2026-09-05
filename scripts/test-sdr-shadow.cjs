@@ -16,6 +16,13 @@ const Module = require("node:module");
 const ts = require("typescript");
 const Database = require("better-sqlite3");
 
+const root = path.resolve(__dirname, "..");
+const originalResolve = Module._resolveFilename;
+Module._resolveFilename = function resolve(request, parent, isMain, options) {
+  if (request.startsWith("@/")) request = path.join(root, request.slice(2));
+  return originalResolve.call(this, request, parent, isMain, options);
+};
+
 // Enable TypeScript execution in CommonJS without external runner
 Module._extensions[".ts"] = (module, filename) => {
   const source = fs.readFileSync(filename, "utf8");
@@ -59,8 +66,12 @@ function loadEnv() {
 
 loadEnv();
 
+process.env.SDR_RUNTIME_ENABLED = "true";
+process.env.SDR_PROVIDER_ENABLED = "true";
+process.env.SDR_OUTBOUND_ENABLED = "false";
+
 const apiKey = process.env.GEMINI_API_KEY;
-const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const modelName = process.env.GEMINI_MODEL || "gemini-3.7-flash";
 
 console.log("\n=======================================================");
 console.log(" 🚀 INHUBFLOW SDR AGENT — SMOKE TEST (SHADOW MODE)");
@@ -70,7 +81,7 @@ if (!apiKey) {
   console.error("❌ ERROR: GEMINI_API_KEY no encontrada.");
   console.error("\nPor favor configura tu API key en `.env.local`:");
   console.error("GEMINI_API_KEY=tu_api_key_aqui");
-  console.error("GEMINI_MODEL=gemini-2.5-flash\n");
+  console.error("GEMINI_MODEL=gemini-3.7-flash\n");
   process.exit(1);
 }
 
@@ -86,22 +97,38 @@ function createIsolatedDb() {
 
   // Core base tables required for foreign keys
   db.exec(`
-    CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT, name TEXT);
-    CREATE TABLE accounts (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL);
-    CREATE TABLE targets (id TEXT PRIMARY KEY, full_name TEXT, first_name TEXT, company_name TEXT, job_title TEXT, linkedin_url TEXT, messaging_urn TEXT);
-    CREATE TABLE email_accounts (id TEXT PRIMARY KEY, email TEXT NOT NULL);
+    CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT, name TEXT, role TEXT, owner_id TEXT);
+    CREATE TABLE accounts (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL, is_authenticated INTEGER DEFAULT 1, owner_id TEXT, assigned_user_id TEXT, sdr_enabled INTEGER DEFAULT 1, sdr_outbound_enabled INTEGER DEFAULT 0, sdr_canary_percentage INTEGER DEFAULT 0);
+    CREATE TABLE targets (id TEXT PRIMARY KEY, full_name TEXT, first_name TEXT, company TEXT, title TEXT, company_name TEXT, job_title TEXT, linkedin_url TEXT, messaging_urn TEXT, sdr_autopilot INTEGER DEFAULT 1);
+    CREATE TABLE email_accounts (id TEXT PRIMARY KEY, email TEXT NOT NULL, owner_id TEXT, sdr_enabled INTEGER DEFAULT 0, sdr_outbound_enabled INTEGER DEFAULT 0);
   `);
 
   // Load and apply SDR schema
-  const { SDR_SCHEMA_MIGRATIONS } = require("../lib/sdr-agent/schema.ts");
-  for (const sql of SDR_SCHEMA_MIGRATIONS) {
-    db.exec(sql);
-  }
+  const { applySdrSchema } = require("../lib/sdr-agent/schema.ts");
+  applySdrSchema(db);
 
-  // Seed sample account & target
-  db.prepare("INSERT INTO accounts (id, name, email) VALUES ('acc-1', 'InHubFlow Sales', 'sales@inhubflow.online')").run();
-  db.prepare("INSERT INTO targets (id, full_name, first_name, company_name, job_title, linkedin_url) VALUES ('tgt-1', 'Carlos Mendoza', 'Carlos', 'Apex Tech Solutions', 'Director Comercial', 'https://linkedin.com/in/carlos-mendoza')").run();
-  db.prepare("INSERT INTO targets (id, full_name, first_name, company_name, job_title, linkedin_url) VALUES ('tgt-2', 'Mariana Souza', 'Mariana', 'Vanguard Media', 'Head of Growth', 'https://linkedin.com/in/mariana-souza')").run();
+  // Seed user, account & targets
+  db.prepare("INSERT INTO users (id, email, name, role) VALUES ('owner-1', 'sales@inhubflow.online', 'Roberto', 'admin')").run();
+  db.prepare("INSERT INTO accounts (id, name, email, owner_id, assigned_user_id) VALUES ('acc-1', 'InHubFlow Sales', 'sales@inhubflow.online', 'owner-1', 'owner-1')").run();
+  db.prepare("INSERT INTO targets (id, full_name, first_name, company, title, company_name, job_title, linkedin_url) VALUES ('tgt-1', 'Carlos Mendoza', 'Carlos', 'Apex Tech Solutions', 'Director Comercial', 'Apex Tech Solutions', 'Director Comercial', 'https://linkedin.com/in/carlos-mendoza')").run();
+  db.prepare("INSERT INTO targets (id, full_name, first_name, company, title, company_name, job_title, linkedin_url) VALUES ('tgt-2', 'Mariana Souza', 'Mariana', 'Vanguard Media', 'Head of Growth', 'Vanguard Media', 'Head of Growth', 'https://linkedin.com/in/mariana-souza')").run();
+
+  const { ensureSdrAgent } = require("../lib/sdr-agent/seed.ts");
+  const { agent, activeVersion } = ensureSdrAgent(db, "owner-1");
+  db.prepare("UPDATE sdr_agents SET runtime_enabled = 1, provider_enabled = 1, status = 'active', mode = 'shadow' WHERE id = ?").run(agent.id);
+  db.prepare("UPDATE sdr_agent_versions SET publication_state = 'published' WHERE id = ?").run(activeVersion.id);
+
+  // Seed approved knowledge source
+  const sourceId = "src-inhubflow";
+  db.prepare(`
+    INSERT INTO sdr_knowledge_sources (id, workspace_owner_id, agent_id, title, source_type, content, status, revision, created_at, updated_at)
+    VALUES (?, 'owner-1', ?, 'InHubFlow Overview', 'catalog', 'InHubFlow es una plataforma B2B para automatizar prospección con IA en LinkedIn y correo. Permite conectar cuentas, encontrar leads con IA y gestionar el pipeline de ventas.', 'approved', 1, datetime('now'), datetime('now'))
+  `).run(sourceId, agent.id);
+
+  db.prepare(`
+    INSERT INTO sdr_knowledge_chunks (id, source_id, workspace_owner_id, revision, ordinal, content, checksum)
+    VALUES ('chk-1', ?, 'owner-1', 1, 0, 'InHubFlow es una plataforma B2B para automatizar prospección con IA en LinkedIn y correo. Permite conectar cuentas, encontrar leads con IA y gestionar el pipeline de ventas.', 'chunk-checksum')
+  `).run(sourceId);
 
   return db;
 }

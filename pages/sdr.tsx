@@ -106,7 +106,7 @@ export default function SdrPage() {
   // Form State
   const [agentName, setAgentName] = useState("");
   const [mode, setMode] = useState<"off" | "shadow" | "approval" | "auto">("shadow");
-  const [model, setModel] = useState("gemini-3.6-flash");
+  const [model, setModel] = useState("gemini-3.7-flash");
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.85);
   const [maxAutoTurns, setMaxAutoTurns] = useState(3);
   const [handoffEmail, setHandoffEmail] = useState("");
@@ -141,7 +141,7 @@ export default function SdrPage() {
       // Populate Form State
       setAgentName(json.agent.name || "Asistente SDR InHubFlow");
       setMode(json.agent.mode || "shadow");
-      setModel(json.agent.model || "gemini-3.6-flash");
+      setModel(json.agent.model || "gemini-3.7-flash");
       setConfidenceThreshold(json.agent.confidence_threshold || 0.85);
       setMaxAutoTurns(json.agent.max_auto_turns || 3);
       setHandoffEmail(json.agent.handoff_email || "");
@@ -623,8 +623,9 @@ export default function SdrPage() {
                     onChange={(e) => setModel(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl bg-base-100 border border-base-300/80 text-sm font-medium text-base-content focus:outline-none focus:border-violet-500"
                   >
-                    <option value="gemini-3.6-flash">{t("sdr.aiModelRecommended")}</option>
-                    <option value="gemini-3.7-flash">Google Gemini 3.7 Flash</option>
+                    <option value="gemini-3.7-flash">Google Gemini 3.7 Flash ({t("sdr.aiModelRecommended") || "Recomendado"})</option>
+                    <option value="gemini-3.8-flash">Google Gemini 3.8 Flash</option>
+                    <option value="gemini-3.6-flash">Google Gemini 3.6 Flash</option>
                   </select>
                   <p className="text-xs text-base-content/40 mt-1.5">
                     {t("sdr.aiModelDesc")}
