@@ -143,7 +143,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           INSERT INTO sdr_agent_versions (
             id, agent_id, version_number, model, system_prompt, policy_json,
             config_json, publication_state, published_by_user_id, published_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', ?, NULL)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', ?, datetime('now'))
         `).run(versionId, agent.id, nextVersion, model ?? activeVersion?.model ?? agent.model, systemPrompt ?? activeVersion?.system_prompt ?? "", JSON.stringify(nextPolicy), JSON.stringify(nextConfig), actor.id);
         db.prepare("UPDATE sdr_agents SET active_version_id = ?, updated_at = datetime('now') WHERE id = ?").run(versionId, agent.id);
       }

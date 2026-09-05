@@ -146,8 +146,8 @@ export function ensureSdrAgent(
       db.prepare(`
         INSERT INTO sdr_agent_versions (
           id, agent_id, version_number, model, system_prompt, policy_json,
-          config_json, publication_state, revision_hash
-        ) VALUES (?, ?, 1, ?, ?, ?, ?, 'draft', ?)
+          config_json, publication_state, revision_hash, published_at
+        ) VALUES (?, ?, 1, ?, ?, ?, ?, 'draft', ?, datetime('now'))
       `).run(versionId, agentId, model, defaultPrompt, policyJson, configJson, hash);
 
       db.prepare(
