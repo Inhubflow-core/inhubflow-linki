@@ -1578,10 +1578,10 @@ export default function InboxPage() {
         </div>
       </div>
 
-      {/* ── 2-COLUMN SPLIT VIEW CONTAINER (LinkedIn Style) ── */}
+      {/* ── 2-COLUMN SPLIT VIEW CONTAINER (50% / 50%) ── */}
       <div className="flex-1 flex min-h-[640px] h-[calc(100vh-7.5rem)] bg-base-100 rounded-2xl border border-base-300/70 shadow-xl overflow-hidden">
-        {/* ── LEFT COLUMN: Conversations List ── */}
-        <div className="w-full sm:w-80 md:w-96 lg:w-[410px] shrink-0 flex flex-col border-r border-base-300/70 bg-base-100/70 select-none">
+        {/* ── LEFT COLUMN: Conversations List (50%) ── */}
+        <div className="w-full md:w-1/2 md:basis-1/2 flex-1 flex flex-col border-r border-base-300/70 bg-base-100/70 select-none min-w-0">
           {/* Top Search & Filter Bar */}
           <div className="p-3.5 border-b border-base-300/60 space-y-2.5 bg-base-100">
             {/* Search input */}
@@ -1763,8 +1763,8 @@ export default function InboxPage() {
           </div>
         </div>
 
-        {/* ── RIGHT COLUMN: Selected Conversation Chat / Empty State ── */}
-        <div className="flex-1 flex flex-col min-w-0 bg-base-100/50">
+        {/* ── RIGHT COLUMN: Selected Conversation Chat / Empty State (50%) ── */}
+        <div className="w-full md:w-1/2 md:basis-1/2 flex-1 flex flex-col min-w-0 bg-base-100/50">
           {selectedReply ? (
             <ChatPanel
               key={selectedReply.id}
