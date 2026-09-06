@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getDb } from "@/lib/db";
 import { randomUUID } from "crypto";
+import { sendLiveChatPushNotification } from "@/lib/live-chat/push";
 
 function applyCors(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -68,6 +69,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       message,
       visitorName,
       visitorEmail,
+      visitorPhone,
       companyName,
       language = "es",
       pageUrl = "",
@@ -87,14 +89,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!session) {
       db.prepare(`
         INSERT INTO live_chat_sessions (
-          id, visitor_name, visitor_email, company_name, language, 
+          id, visitor_name, visitor_email, visitor_phone, company_name, language, 
           status, needs_human, human_notified, page_url, user_agent, 
           created_at, updated_at, last_visitor_message_at
-        ) VALUES (?, ?, ?, ?, ?, 'ai_active', 0, 0, ?, ?, datetime('now'), datetime('now'), datetime('now'))
+        ) VALUES (?, ?, ?, ?, ?, ?, 'ai_active', 0, 0, ?, ?, datetime('now'), datetime('now'), datetime('now'))
       `).run(
         cleanSessionId,
         visitorName || null,
         visitorEmail || null,
+        visitorPhone || null,
         companyName || null,
         language,
         pageUrl,
@@ -102,12 +105,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
       session = db.prepare("SELECT * FROM live_chat_sessions WHERE id = ?").get(cleanSessionId);
     } else {
-      // Update session activity
+      // Update session activity and phone/name if provided
       db.prepare(`
         UPDATE live_chat_sessions 
-        SET updated_at = datetime('now'), last_visitor_message_at = datetime('now')
+        SET updated_at = datetime('now'), 
+            last_visitor_message_at = datetime('now'),
+            visitor_name = COALESCE(visitor_name, ?),
+            visitor_phone = COALESCE(visitor_phone, ?)
         WHERE id = ?
-      `).run(cleanSessionId);
+      `).run(visitorName || null, visitorPhone || null, cleanSessionId);
     }
 
     // Save visitor message
@@ -159,13 +165,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (apiKey) {
       try {
         const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.7-flash";
+        const knowledgeRow = db.prepare("SELECT value FROM app_settings WHERE key = 'live_chat_ai_knowledge'").get() as { value?: string } | undefined;
+        const activeSystemPrompt = knowledgeRow?.value?.trim() || INHUBFLOW_KNOWLEDGE_SYSTEM_PROMPT;
+
         const prompt = `
 Historial de la conversación reciente:
 ${conversationContext}
 
 Nuevo mensaje del visitante: "${message.trim()}"
-
-Genera la respuesta del Asistente en JSON estricto siguiendo las instrucciones.`;
+`;
 
         const geminiRes = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
@@ -177,7 +185,7 @@ Genera la respuesta del Asistente en JSON estricto siguiendo las instrucciones.`
                 {
                   role: "user",
                   parts: [
-                    { text: INHUBFLOW_KNOWLEDGE_SYSTEM_PROMPT },
+                    { text: activeSystemPrompt },
                     { text: prompt },
                   ],
                 },
@@ -263,10 +271,13 @@ async function notifyAdminHandoff(db: any, sessionId: string, aiParsed: any, lat
     const clientName = session.visitor_name || aiParsed.extracted_name || "Prospecto Web";
     const clientCompany = session.company_name || aiParsed.extracted_company || "";
     const clientEmail = session.visitor_email || aiParsed.extracted_email || "";
+    const clientPhone = session.visitor_phone || "";
+    const cleanPhone = clientPhone.replace(/[^0-9]/g, "");
 
     const title = `🔥 Lead Caliente en la Web: ${clientName}`;
     const body = `"${latestMessage}" — Toca para responder desde tu PWA InHubFlow`;
     const chatUrl = `https://b2b.inhubflow.online/live-chat?session=${sessionId}`;
+    const waUrl = cleanPhone ? `https://wa.me/${cleanPhone}` : null;
 
     // 1. Email notification via Resend
     const resendKey = process.env.RESEND_API_KEY;
@@ -281,33 +292,53 @@ async function notifyAdminHandoff(db: any, sessionId: string, aiParsed: any, lat
         body: JSON.stringify({
           from: fromEmail,
           to: ["inhubflow@gmail.com"],
-          subject: `[LIVE CHAT] Lead Caliente: ${clientName} (${clientCompany || clientEmail || 'InHubFlow Web'})`,
+          subject: `[LIVE CHAT] Lead Caliente: ${clientName} (${clientPhone || clientEmail || 'InHubFlow Web'})`,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px;">
               <h2 style="color: #ef4444; margin-top: 0;">🔥 Prospecto Caliente en InHubFlow</h2>
               <p>Un visitante en el chat web de <strong>inhubflow.online</strong> requiere atención humana:</p>
               <p><strong>Cliente:</strong> ${clientName} ${clientCompany ? `(${clientCompany})` : ''}</p>
+              ${clientPhone ? `<p><strong>WhatsApp:</strong> <a href="${waUrl}" style="color: #25D366; font-weight: bold;">${clientPhone} (Abrir WhatsApp)</a></p>` : ''}
               ${clientEmail ? `<p><strong>Email:</strong> ${clientEmail}</p>` : ''}
               <p><strong>Último mensaje:</strong></p>
               <div style="background: #f3f4f6; padding: 12px; border-radius: 8px; font-style: italic;">
                 "${latestMessage}"
               </div>
-              <div style="margin-top: 24px;">
-                <a href="${chatUrl}" style="background: #4f46e5; color: #fff; padding: 12px 22px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px;">
+              <div style="margin-top: 24px; display: flex; gap: 12px;">
+                <a href="${chatUrl}" style="background: #4f46e5; color: #fff; padding: 12px 22px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px; display: inline-block;">
                   Abrir Chat y Responder en Vivo
                 </a>
+                ${waUrl ? `
+                <a href="${waUrl}" style="background: #25D366; color: #fff; padding: 12px 22px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px; display: inline-block; margin-left: 10px;">
+                  Chatear por WhatsApp
+                </a>` : ''}
               </div>
             </div>
           `,
         }),
       }).catch((e) => console.warn("[Live Chat Alert] Resend error:", e));
     }
+
+    // 2. Web Push Notification to mobile PWA (works even when app is closed / phone locked)
+    sendLiveChatPushNotification(db, {
+      title,
+      body: `"${latestMessage}"`,
+      sessionId,
+    }).catch((err) => console.warn("[Live Chat Push Alert] Error:", err));
   } catch (err) {
     console.warn("[Live Chat Alert] Failed to dispatch alert:", err);
   }
 }
 
 async function notifyAdminNewMessage(db: any, session: any, latestMessage: string) {
-  // Silent or quick notification when in takeover
-  console.log(`[Live Chat Takeover] Message from ${session.visitor_name || 'Visitor'}: ${latestMessage}`);
+  try {
+    const clientName = session.visitor_name || "Prospecto Web";
+    sendLiveChatPushNotification(db, {
+      title: `💬 ${clientName}`,
+      body: latestMessage,
+      sessionId: session.id,
+    }).catch((err) => console.warn("[Live Chat Push Message] Error:", err));
+  } catch (err) {
+    console.warn("[Live Chat Push] Error:", err);
+  }
 }

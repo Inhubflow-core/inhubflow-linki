@@ -29,7 +29,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === "GET") {
     try {
-      const { sessionId } = req.query;
+      const { sessionId, knowledge } = req.query;
+
+      if (knowledge === "true") {
+        const row = db.prepare("SELECT value FROM app_settings WHERE key = 'live_chat_ai_knowledge'").get() as { value?: string } | undefined;
+        return res.status(200).json({ knowledge: row?.value || "" });
+      }
 
       if (sessionId && typeof sessionId === "string") {
         const chatSession = db.prepare("SELECT * FROM live_chat_sessions WHERE id = ?").get(sessionId) as any;
@@ -37,11 +42,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return res.status(404).json({ error: "Sesión no encontrada" });
         }
 
+        const isVisitorTyping = db.prepare(`
+          SELECT 1 FROM live_chat_sessions 
+          WHERE id = ? AND visitor_typing_until IS NOT NULL AND visitor_typing_until > datetime('now')
+        `).get(sessionId);
+
         const messages = db.prepare(`
           SELECT * FROM live_chat_messages WHERE session_id = ? ORDER BY created_at ASC
         `).all(sessionId);
 
-        return res.status(200).json({ session: chatSession, messages });
+        return res.status(200).json({ 
+          session: { 
+            ...chatSession, 
+            visitor_typing: Boolean(isVisitorTyping) 
+          }, 
+          messages 
+        });
       }
 
       // List all sessions
@@ -72,7 +88,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === "POST") {
     try {
-      const { action, sessionId, message } = req.body;
+      const { action, sessionId, message, knowledgePrompt } = req.body;
+
+      if (action === "update_knowledge") {
+        if (typeof knowledgePrompt !== "string") {
+          return res.status(400).json({ error: "Instrucciones de entrenamiento requeridas" });
+        }
+        db.prepare(`
+          INSERT INTO app_settings (key, value, updated_at) 
+          VALUES ('live_chat_ai_knowledge', ?, datetime('now'))
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+        `).run(knowledgePrompt.trim());
+
+        return res.status(200).json({ success: true, message: "Conocimiento de la IA actualizado" });
+      }
 
       if (!sessionId || typeof sessionId !== "string") {
         return res.status(400).json({ error: "sessionId es obligatorio" });
@@ -81,6 +110,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const chatSession = db.prepare("SELECT * FROM live_chat_sessions WHERE id = ?").get(sessionId) as any;
       if (!chatSession) {
         return res.status(404).json({ error: "Sesión no encontrada" });
+      }
+
+      if (action === "typing") {
+        db.prepare(`
+          UPDATE live_chat_sessions 
+          SET operator_typing_until = datetime('now', '+4 seconds') 
+          WHERE id = ?
+        `).run(sessionId);
+        return res.status(200).json({ success: true });
       }
 
       if (action === "takeover") {
@@ -128,10 +166,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             VALUES (?, ?, 'human_agent', ?, ?, datetime('now'))
           `).run(messageId, sessionId, senderName, message.trim());
 
-          // Automatically set status to human_takeover so AI doesn't interfere
+          // Automatically set status to human_takeover and clear operator typing
           db.prepare(`
             UPDATE live_chat_sessions 
-            SET status = 'human_takeover', needs_human = 0, updated_at = datetime('now')
+            SET status = 'human_takeover', needs_human = 0, operator_typing_until = NULL, updated_at = datetime('now')
             WHERE id = ?
           `).run(sessionId);
         });

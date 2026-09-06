@@ -660,6 +660,25 @@ function runMigrations(db: Database.Database) {
       created_at TEXT DEFAULT (datetime('now'))
     )`,
     "CREATE INDEX IF NOT EXISTS idx_live_chat_messages_session ON live_chat_messages(session_id, created_at ASC)",
+    // Typing indicators for WhatsApp-like real-time status
+    "ALTER TABLE live_chat_sessions ADD COLUMN operator_typing_until TEXT",
+    "ALTER TABLE live_chat_sessions ADD COLUMN visitor_typing_until TEXT",
+    "ALTER TABLE live_chat_sessions ADD COLUMN visitor_phone TEXT",
+    // Web Push subscriptions for mobile PWA push notifications (works when app is closed)
+    `CREATE TABLE IF NOT EXISTS live_chat_push_subscriptions (
+      id TEXT PRIMARY KEY,
+      endpoint TEXT NOT NULL UNIQUE,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      user_email TEXT,
+      user_agent TEXT,
+      active INTEGER NOT NULL DEFAULT 1,
+      last_success_at TEXT,
+      last_error TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )`,
+    "CREATE INDEX IF NOT EXISTS idx_live_chat_push_active ON live_chat_push_subscriptions(active)",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }

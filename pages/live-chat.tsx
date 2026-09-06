@@ -15,6 +15,8 @@ import {
   RiStopCircleLine,
   RiPlayCircleLine,
   RiNotification3Line,
+  RiWhatsappLine,
+  RiCheckLine,
 } from "react-icons/ri";
 import { toast } from "sonner";
 
@@ -22,6 +24,7 @@ interface ChatSession {
   id: string;
   visitor_name?: string;
   visitor_email?: string;
+  visitor_phone?: string;
   company_name?: string;
   language: string;
   status: "ai_active" | "human_takeover" | "resolved" | "closed";
@@ -42,6 +45,17 @@ interface ChatMessage {
   created_at: string;
 }
 
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/\-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
 export default function LiveChatMobileAdmin() {
   const { data: session, status: authStatus } = useSession();
   const router = useRouter();
@@ -54,14 +68,16 @@ export default function LiveChatMobileAdmin() {
   const [sending, setSending] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushTesting, setPushTesting] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prevSessionsCountRef = useRef<number>(0);
   const prevHotLeadsRef = useRef<number>(0);
-  const prevMessagesCountRef = useRef<number>(0);
+  const lastPlayedVisitorMsgIdRef = useRef<string>("");
+  const lastTypingPingRef = useRef<number>(0);
 
-  // Web Audio chime generator (double-tone bell/bip)
+  // Web Audio chime generator (double-tone bell/bip: 880Hz -> 1318.5Hz)
   const playNotificationSound = useCallback(() => {
     try {
       if (typeof window === "undefined") return;
@@ -86,7 +102,7 @@ export default function LiveChatMobileAdmin() {
       osc1.start(now);
       osc1.stop(now + 0.3);
 
-      // Note 2: 1318.5 Hz (E6) - bell chime harmonic
+      // Note 2: 1318.5 Hz (E6) - harmonic chime
       const osc2 = ctx.createOscillator();
       const gain2 = ctx.createGain();
       osc2.type = "sine";
@@ -100,7 +116,7 @@ export default function LiveChatMobileAdmin() {
 
       // Mobile vibration
       if ("vibrate" in navigator) {
-        navigator.vibrate([150, 80, 150]);
+        navigator.vibrate([200, 100, 200]);
       }
     } catch (e) {
       console.warn("Audio chime error:", e);
@@ -114,26 +130,98 @@ export default function LiveChatMobileAdmin() {
     }
   }, [router.query]);
 
-  // Request browser notification permission
+  // Check Service Worker & Web Push subscription status on mount
   useEffect(() => {
-    if (typeof window !== "undefined" && "Notification" in window) {
-      if (Notification.permission === "granted") {
-        setNotificationsEnabled(true);
-      }
+    if (typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window) {
+      navigator.serviceWorker.register("/sw.js").then((reg) => {
+        reg.pushManager.getSubscription().then((sub) => {
+          if (sub) {
+            setPushSubscribed(true);
+          }
+        });
+      }).catch((e) => console.warn("SW register warning:", e));
     }
   }, []);
 
-  const requestNotificationPerms = async () => {
-    if (typeof window !== "undefined" && "Notification" in window) {
+  // Web Push subscription handler (works with phone locked / app closed)
+  const subscribeToPush = async () => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+      toast.error("Tu navegador no soporta Notificaciones Push en segundo plano.");
+      return;
+    }
+
+    try {
       const perm = await Notification.requestPermission();
-      if (perm === "granted") {
-        setNotificationsEnabled(true);
-        playNotificationSound();
-        toast.success("🔔 Notificaciones y sonido BIP activados");
+      if (perm !== "granted") {
+        toast.error("Permiso de notificaciones denegado. Actívalo en la configuración del navegador.");
+        return;
       }
+
+      const reg = await navigator.serviceWorker.ready;
+
+      // 1. Fetch public VAPID key
+      const keyRes = await fetch("/api/live-chat/push");
+      if (!keyRes.ok) throw new Error("No se pudo obtener la clave VAPID");
+      const { publicKey } = await keyRes.json();
+
+      // 2. Subscribe via PushManager
+      const existingSub = await reg.pushManager.getSubscription();
+      const sub = existingSub || (await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      }));
+
+      // 3. Register subscription on backend
+      const subJson = sub.toJSON();
+      const saveRes = await fetch("/api/live-chat/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "subscribe",
+          subscription: {
+            endpoint: sub.endpoint,
+            keys: {
+              p256dh: subJson.keys?.p256dh,
+              auth: subJson.keys?.auth,
+            },
+          },
+          userEmail: session?.user?.email,
+        }),
+      });
+
+      if (saveRes.ok) {
+        setPushSubscribed(true);
+        playNotificationSound();
+        toast.success("🔔 ¡Notificaciones Push activadas! Recibirás alertas con la app cerrada y la pantalla apagada.");
+      }
+    } catch (err: any) {
+      console.error("Push subscribe error:", err);
+      toast.error("Error al activar notificaciones push: " + (err?.message || ""));
     }
   };
 
+  // Test push notification (so Roberto can verify with app closed)
+  const handleTestPush = async () => {
+    setPushTesting(true);
+    try {
+      const res = await fetch("/api/live-chat/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "test" }),
+      });
+      if (res.ok) {
+        toast.success("🔔 Notificación enviada. Minimiza la app o bloquea el teléfono para verla.");
+      } else {
+        toast.error("No se pudo enviar la prueba");
+      }
+    } catch {
+      toast.error("Error de conexión");
+    } finally {
+      setPushTesting(false);
+    }
+  };
+
+  // Load sessions list
   const loadSessions = useCallback(async () => {
     try {
       const res = await fetch("/api/live-chat/admin");
@@ -143,24 +231,15 @@ export default function LiveChatMobileAdmin() {
         setSessions(list);
 
         const hotLeads = list.filter((s: any) => s.needs_human === 1).length;
-        const totalMessages = list.reduce((acc: number, s: any) => acc + (s.total_messages || 0), 0);
 
-        // Play sound if new message arrived or a lead needs attention
-        if (prevSessionsCountRef.current > 0) {
-          if (hotLeads > prevHotLeadsRef.current || totalMessages > prevMessagesCountRef.current) {
-            playNotificationSound();
-            if (Notification.permission === "granted") {
-              new Notification("🔥 InHubFlow Live Chat", {
-                body: "Nuevo mensaje de prospecto web en la landing page",
-                icon: "/logo-icon.png",
-              });
-            }
-          }
+        // BEEP ONLY when a lead requires human attention (AI Traspaso / Handoff)
+        // NEVER on own messages or normal ongoing messages
+        if (prevSessionsCountRef.current > 0 && hotLeads > prevHotLeadsRef.current) {
+          playNotificationSound();
         }
 
         prevSessionsCountRef.current = list.length;
         prevHotLeadsRef.current = hotLeads;
-        prevMessagesCountRef.current = totalMessages;
       }
     } catch (err) {
       console.error("Error al cargar chats:", err);
@@ -169,19 +248,35 @@ export default function LiveChatMobileAdmin() {
     }
   }, [playNotificationSound]);
 
+  // Load messages for the selected session
   const loadMessages = useCallback(async (sessionId: string) => {
     try {
       const res = await fetch(`/api/live-chat/admin?sessionId=${sessionId}`);
       if (res.ok) {
         const data = await res.json();
         setCurrentSession(data.session);
-        const msgs = data.messages || [];
+        const msgs = (data.messages || []) as ChatMessage[];
+
+        // BEEP ONLY when a message from the VISITOR arrives that hasn't been beeped yet
+        // NEVER beep when Roberto sends a message or when AI responds
+        if (msgs.length > 0) {
+          const latestMsg = msgs[msgs.length - 1];
+          if (
+            latestMsg &&
+            latestMsg.sender_type === "visitor" &&
+            latestMsg.id !== lastPlayedVisitorMsgIdRef.current
+          ) {
+            lastPlayedVisitorMsgIdRef.current = latestMsg.id;
+            playNotificationSound();
+          }
+        }
+
         setMessages(msgs);
       }
     } catch (err) {
       console.error("Error al cargar mensajes:", err);
     }
-  }, []);
+  }, [playNotificationSound]);
 
   // Initial load and polling
   useEffect(() => {
@@ -217,6 +312,20 @@ export default function LiveChatMobileAdmin() {
     loadMessages(sessionId).finally(() => setLoadingDetail(false));
   };
 
+  // Ping typing indicator to backend when Roberto types
+  const handleReplyChange = (val: string) => {
+    setReplyText(val);
+    const now = Date.now();
+    if (selectedSessionId && now - lastTypingPingRef.current > 2500) {
+      lastTypingPingRef.current = now;
+      fetch("/api/live-chat/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "typing", sessionId: selectedSessionId }),
+      }).catch(() => {});
+    }
+  };
+
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!replyText.trim() || !selectedSessionId || sending) return;
@@ -235,6 +344,8 @@ export default function LiveChatMobileAdmin() {
 
       if (res.ok) {
         const data = await res.json();
+        // Record our own outgoing message ID so it never triggers a beep
+        lastPlayedVisitorMsgIdRef.current = data.message.id;
         setMessages((prev) => [...prev, data.message]);
         setReplyText("");
         if (currentSession) {
@@ -349,7 +460,7 @@ export default function LiveChatMobileAdmin() {
             <div>
               <h1 className="text-base font-bold text-gray-900 dark:text-white leading-tight">
                 {selectedSessionId && currentSession ? (
-                  currentSession.visitor_name || currentSession.visitor_email || "Prospecto Web"
+                  currentSession.visitor_name || "Prospecto Web"
                 ) : (
                   "Live Chat"
                 )}
@@ -366,22 +477,28 @@ export default function LiveChatMobileAdmin() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                requestNotificationPerms();
-                playNotificationSound();
-                toast.success("🔔 Alertas y sonido BIP activos");
-              }}
-              title={notificationsEnabled ? "Notificaciones y sonido activos" : "Toca para activar sonido y alertas"}
-              className={`p-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
-                notificationsEnabled
-                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
-                  : "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 animate-pulse"
-              }`}
-            >
-              <RiNotification3Line size={16} />
-              <span className="text-[11px]">{notificationsEnabled ? "Sonido ON" : "Activar Sonido"}</span>
-            </button>
+            {/* Push notification button / test button */}
+            {pushSubscribed ? (
+              <button
+                onClick={handleTestPush}
+                disabled={pushTesting}
+                title="Toca para enviar una notificación push de prueba a tu teléfono"
+                className="px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 transition cursor-pointer"
+              >
+                <RiCheckLine size={15} />
+                <span className="text-[11px]">{pushTesting ? "Enviando..." : "Push Activo"}</span>
+              </button>
+            ) : (
+              <button
+                onClick={subscribeToPush}
+                title="Activar notificaciones push para recibir alertas aunque cierres la app"
+                className="px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white transition cursor-pointer shadow-xs animate-pulse"
+              >
+                <RiNotification3Line size={15} />
+                <span className="text-[11px]">Activar Push</span>
+              </button>
+            )}
+
             <button
               onClick={loadSessions}
               className="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
@@ -393,7 +510,7 @@ export default function LiveChatMobileAdmin() {
 
         {/* Main Body */}
         <div className="flex-1 flex overflow-hidden">
-          {/* List of Chats (Visible on mobile when no chat is open, or on left side on desktop) */}
+          {/* List of Chats */}
           <div
             className={`w-full md:w-80 md:border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-y-auto ${
               selectedSessionId ? "hidden md:block" : "block"
@@ -439,12 +556,19 @@ export default function LiveChatMobileAdmin() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-1 mb-1">
                           <span className="font-bold text-xs text-gray-900 dark:text-white truncate">
-                            {s.visitor_name || s.visitor_email || "Prospecto"}
+                            {s.visitor_name || "Prospecto"}
                           </span>
                           <span className="text-[10px] text-gray-400 shrink-0 font-mono">
                             {new Date(s.updated_at).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
                           </span>
                         </div>
+
+                        {/* WhatsApp Phone if available */}
+                        {s.visitor_phone && (
+                          <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1 mb-0.5">
+                            <RiWhatsappLine size={12} /> {s.visitor_phone}
+                          </div>
+                        )}
 
                         {s.company_name && (
                           <div className="text-[11px] text-brand-600 dark:text-brand-400 font-semibold mb-0.5 truncate">
@@ -515,9 +639,18 @@ export default function LiveChatMobileAdmin() {
                     </button>
                   </div>
 
-                  <div className="text-[11px] text-gray-400">
-                    {currentSession.visitor_email ? `Email: ${currentSession.visitor_email}` : "Anónimo"}
-                  </div>
+                  {/* Direct WhatsApp link to customer */}
+                  {currentSession.visitor_phone && (
+                    <a
+                      href={`https://wa.me/${currentSession.visitor_phone.replace(/[^0-9]/g, "")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-xs"
+                    >
+                      <RiWhatsappLine size={14} />
+                      <span>{currentSession.visitor_phone}</span>
+                    </a>
+                  )}
                 </div>
               )}
 
@@ -530,7 +663,6 @@ export default function LiveChatMobileAdmin() {
                 ) : (
                   messages.map((m) => {
                     const isVisitor = m.sender_type === "visitor";
-                    const isAi = m.sender_type === "ai";
                     const isHuman = m.sender_type === "human_agent";
 
                     return (
@@ -539,7 +671,7 @@ export default function LiveChatMobileAdmin() {
                         className={`flex flex-col ${isVisitor ? "items-start" : "items-end"}`}
                       >
                         <div
-                          className={`max-w-[85%] sm:max-w-md p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-xs ${
+                          className={`max-w-[88%] sm:max-w-md p-4 rounded-2xl text-[15px] sm:text-base leading-relaxed shadow-xs ${
                             isVisitor
                               ? "bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700 rounded-tl-xs"
                               : isHuman
@@ -547,23 +679,23 @@ export default function LiveChatMobileAdmin() {
                               : "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-950 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800/80 rounded-tr-xs"
                           }`}
                         >
-                          <div className="flex items-center gap-1.5 mb-1 opacity-80 text-[10px] font-bold">
+                          <div className="flex items-center gap-1.5 mb-1.5 opacity-85 text-xs font-bold">
                             {isVisitor ? (
                               <span className="flex items-center gap-1">
-                                <RiUser3Line size={11} /> {m.sender_name || "Visitante"}
+                                <RiUser3Line size={13} /> {m.sender_name || "Visitante"}
                               </span>
                             ) : isHuman ? (
                               <span className="flex items-center gap-1 text-white">
-                                <RiShieldCheckLine size={11} /> Roberto (Tú)
+                                <RiShieldCheckLine size={13} /> Roberto (Tú)
                               </span>
                             ) : (
                               <span className="flex items-center gap-1 text-indigo-700 dark:text-indigo-400">
-                                <RiRobotLine size={11} /> Asistente IA InHubFlow
+                                <RiRobotLine size={13} /> Asistente IA InHubFlow
                               </span>
                             )}
                           </div>
-                          <div className="whitespace-pre-wrap">{m.message}</div>
-                          <div className="text-[9px] opacity-60 text-right mt-1 font-mono">
+                          <div className="whitespace-pre-wrap text-[15px] sm:text-base font-normal leading-relaxed">{m.message}</div>
+                          <div className="text-xs opacity-70 text-right mt-1.5 font-mono">
                             {new Date(m.created_at).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
                           </div>
                         </div>
@@ -577,21 +709,21 @@ export default function LiveChatMobileAdmin() {
               {/* Chat Input Bar */}
               <form
                 onSubmit={handleSendReply}
-                className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-2.5 px-4 flex items-center gap-2"
+                className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-3 px-4 flex items-center gap-2.5"
               >
                 <input
                   type="text"
                   value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  placeholder="Escribe como Roberto..."
-                  className="flex-1 py-2.5 px-4 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs sm:text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  onChange={(e) => handleReplyChange(e.target.value)}
+                  placeholder="Escribe tu mensaje a este cliente..."
+                  className="flex-1 py-3 px-4 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-base text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
                 <button
                   type="submit"
                   disabled={sending || !replyText.trim()}
-                  className="p-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white font-bold transition shadow-xs cursor-pointer shrink-0"
+                  className="p-3 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white font-bold transition shadow-xs cursor-pointer shrink-0"
                 >
-                  <RiSendPlaneFill size={18} />
+                  <RiSendPlaneFill size={20} />
                 </button>
               </form>
             </div>

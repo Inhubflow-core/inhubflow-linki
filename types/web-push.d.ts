@@ -7,5 +7,6 @@ declare module "web-push" {
     statusCode?: number;
   }
   export function setVapidDetails(subject: string, publicKey: string, privateKey: string): void;
-  export function sendNotification(subscription: PushSubscription, payload?: string): Promise<unknown>;
+  export function generateVAPIDKeys(): { publicKey: string; privateKey: string };
+  export function sendNotification(subscription: PushSubscription, payload?: string, options?: any): Promise<unknown>;
 }

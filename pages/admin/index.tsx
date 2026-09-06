@@ -1,4 +1,4 @@
-import { useState, useEffect, useId } from "react";
+import { useState, useEffect, useId, useRef } from "react";
 import Head from "next/head";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
@@ -31,6 +31,8 @@ import {
   RiFireFill,
   RiRobotLine,
   RiUser3Line,
+  RiBrainLine,
+  RiWhatsappLine,
 } from "react-icons/ri";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
@@ -120,6 +122,7 @@ interface AdminLiveChatSession {
   id: string;
   visitor_name?: string;
   visitor_email?: string;
+  visitor_phone?: string;
   company_name?: string;
   language: string;
   status: "ai_active" | "human_takeover" | "resolved" | "closed";
@@ -232,6 +235,13 @@ export default function AdminSubscribersPage() {
   const [liveChatActionLoading, setLiveChatActionLoading] = useState(false);
   const [liveChatFilter, setLiveChatFilter] = useState<"all" | "needs_human" | "active" | "resolved">("all");
   const [liveChatSearch, setLiveChatSearch] = useState("");
+
+  // Live Chat Knowledge & AI SDR Training
+  const [isKnowledgeModalOpen, setIsKnowledgeModalOpen] = useState(false);
+  const [knowledgePrompt, setKnowledgePrompt] = useState("");
+  const [loadingKnowledge, setLoadingKnowledge] = useState(false);
+  const [savingKnowledge, setSavingKnowledge] = useState(false);
+  const lastOperatorTypingPingRef = useRef<number>(0);
 
   // Partners State
   const [partners, setPartners] = useState<Partner[]>([]);
@@ -411,6 +421,103 @@ export default function AdminSubscribersPage() {
     } finally {
       setLiveChatSendingReply(false);
     }
+  }
+
+  function handleLiveChatReplyChange(val: string) {
+    setLiveChatReplyText(val);
+    const now = Date.now();
+    if (selectedLiveChatSession && now - lastOperatorTypingPingRef.current > 2500) {
+      lastOperatorTypingPingRef.current = now;
+      fetch("/api/live-chat/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "typing", sessionId: selectedLiveChatSession.id }),
+      }).catch(() => {});
+    }
+  }
+
+  async function openKnowledgeModal() {
+    setIsKnowledgeModalOpen(true);
+    setLoadingKnowledge(true);
+    try {
+      const res = await fetch("/api/live-chat/admin?knowledge=true");
+      if (res.ok) {
+        const data = await res.json();
+        setKnowledgePrompt(data.knowledge || "");
+      }
+    } catch {
+      toast.error("Error al cargar instrucciones del Asistente IA");
+    } finally {
+      setLoadingKnowledge(false);
+    }
+  }
+
+  async function handleSaveKnowledge(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingKnowledge(true);
+    try {
+      const res = await fetch("/api/live-chat/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update_knowledge",
+          knowledgePrompt: knowledgePrompt.trim(),
+        }),
+      });
+
+      if (res.ok) {
+        toast.success("🧠 ¡Instrucciones del Asistente IA actualizadas con éxito!");
+        setIsKnowledgeModalOpen(false);
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Error al guardar instrucciones");
+      }
+    } catch {
+      toast.error("Error de conexión al guardar");
+    } finally {
+      setSavingKnowledge(false);
+    }
+  }
+
+  function handleResetKnowledge() {
+    const DEFAULT_PROMPT = `Eres "InHubFlow Concierge", el Asistente SDR oficial de InHubFlow B2B Suite en el sitio web inhubflow.online.
+Tu objetivo es orientar a los visitantes, resolver dudas comerciales y técnicas frecuentes de forma concisa, educada y persuasiva, y pre-calificar al lead para el equipo humano.
+
+CONOCIMIENTO OFICIAL DE INHUBFLOW:
+1. ¿QUÉ ES INHUBFLOW?: Suite tecnológica empresarial SaaS para prospección comercial B2B multicanal (LinkedIn + Email), enriquecimiento con Google X-Ray y Asistente SDR con Inteligencia Artificial que pre-califica respuestas y agenda reuniones comerciales.
+2. SEGURIDAD EN LINKEDIN: InHubFlow opera con algoritmos de cadencia humana y respeta estrictamente el límite seguro recomendado de 20 invitaciones diarias por cuenta (hasta 100/semana por cuenta). Con una cuenta de 10 slots se contactan 4,000 personas al mes de manera segura sin riesgo de penalizaciones.
+3. PLANES Y PRECIOS:
+   - Plan Starter: $49/mes (1 cuenta de LinkedIn, 20 inv/día, secuencias multicanal, CRM).
+   - Plan Growth: $149/mes (5 cuentas de LinkedIn, Asistente SDR con IA, enriquecimiento de datos).
+   - Plan Business: $249/mes (10 cuentas de LinkedIn / multi-asiento, 1,000 inv/semana, soporte prioritario, reportes ejecutivos).
+   - Contratación anual: 20% de descuento.
+4. FACTURACIÓN Y CANCELACIÓN: Pagos procesados con Lemon Squeezy by Stripe y PayPal. Autonomía total: el cliente puede cancelar su suscripción en cualquier momento desde su panel sin penalizaciones.
+5. PROGRAMA DE PARTNERS: 50% de comisión recurrente mensual para agencias y consultores que recomienden InHubFlow, atribución de cookie de 60 días.
+
+REGLAS DE COMPORTAMIENTO:
+- Responde siempre en el idioma en que te hable el usuario (Español por defecto, Portugués o Inglés).
+- Sé conciso y directo: respuestas de 2 a 4 frases, profesionales y cálidas. No sueltes muros de texto.
+- DETECCIÓN DE ATENCIÓN HUMANA (HANDOFF):
+  Si el visitante:
+  a) Solicita hablar con una persona, asesor, el fundador (Roberto) o soporte.
+  b) Pide un plan empresarial a medida (más de 10 cuentas o franquicia).
+  c) Hace una pregunta técnica o de precios compleja que no esté en tu conocimiento.
+  d) Ya está listo para comprar o contratar y quiere atención guiada.
+  -> Responde cordialmente indicando que con mucho gusto lo conectas con Roberto de nuestro equipo.
+  -> Marca en el JSON que "needs_human" es true.
+
+FORMATO DE SALIDA OBLIGATORIO:
+Debes responder SIEMPRE un JSON válido con esta estructura exacta:
+{
+  "reply": "Tu mensaje para el visitante...",
+  "needs_human": false o true,
+  "lead_intent": "pricing" | "features" | "support" | "demo_request" | "partner" | "other",
+  "extracted_name": "Nombre si lo detectaste o null",
+  "extracted_email": "Email si lo detectaste o null",
+  "extracted_company": "Empresa si la detectaste o null"
+}`;
+    setKnowledgePrompt(DEFAULT_PROMPT);
+    toast.info("Plantilla predeterminada cargada en el editor. Haz clic en Guardar para aplicarla.");
   }
 
   async function loadAdminTickets() {
@@ -807,6 +914,14 @@ export default function AdminSubscribersPage() {
               >
                 <RiHandHeartLine size={18} />
                 <span>{t("admin.newPartner")}</span>
+              </button>
+            ) : adminSection === "live_chat" ? (
+              <button
+                onClick={openKnowledgeModal}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm shadow-xs transition-all cursor-pointer"
+              >
+                <RiBrainLine size={18} />
+                <span>🧠 Entrenar Asistente IA</span>
               </button>
             ) : null}
           </div>
@@ -1741,6 +1856,14 @@ export default function AdminSubscribersPage() {
                               </span>
                             </div>
 
+                            {/* Visitor Phone if registered */}
+                            {s.visitor_phone && (
+                              <div className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                                <RiWhatsappLine size={12} />
+                                <span>{s.visitor_phone}</span>
+                              </div>
+                            )}
+
                             {/* Status Badge */}
                             <div className="flex items-center gap-1.5 flex-wrap">
                               {isHot && (
@@ -1814,6 +1937,17 @@ export default function AdminSubscribersPage() {
                           )}
                         </div>
                         <div className="flex items-center gap-3 text-[11px] text-gray-400 mt-0.5 flex-wrap">
+                          {selectedLiveChatSession.visitor_phone && (
+                            <a
+                              href={`https://wa.me/${selectedLiveChatSession.visitor_phone.replace(/[^0-9]/g, "")}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-lg hover:underline transition"
+                            >
+                              <RiWhatsappLine size={13} />
+                              <span>{selectedLiveChatSession.visitor_phone} (Abrir en WhatsApp)</span>
+                            </a>
+                          )}
                           {selectedLiveChatSession.visitor_email && (
                             <span>✉️ {selectedLiveChatSession.visitor_email}</span>
                           )}
@@ -1920,7 +2054,7 @@ export default function AdminSubscribersPage() {
                         <input
                           type="text"
                           value={liveChatReplyText}
-                          onChange={(e) => setLiveChatReplyText(e.target.value)}
+                          onChange={(e) => handleLiveChatReplyChange(e.target.value)}
                           placeholder="Escribe tu mensaje en vivo al visitante (se enviará directamente a su pantalla)..."
                           className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-xs sm:text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         />
@@ -2684,6 +2818,97 @@ export default function AdminSubscribersPage() {
                   >
                     <RiSendPlaneFill size={14} />
                     <span>{adminSendingReply ? "Enviando..." : "Responder al Cliente"}</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── AI SDR KNOWLEDGE & TRAINING MODAL ── */}
+      {isKnowledgeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="w-full max-w-3xl max-h-[92vh] bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-gradient-to-r from-purple-500/10 via-indigo-500/5 to-transparent">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-purple-500/15 text-purple-600 dark:text-purple-400">
+                  <RiBrainLine size={24} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                    Entrenar Asistente SDR con IA
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Modifica el conocimiento del bot en la web: planes, precios, objeciones y reglas de atención.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsKnowledgeModalOpen(false)}
+                className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition cursor-pointer"
+              >
+                <RiCloseLine size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleSaveKnowledge} className="flex-1 flex flex-col p-5 overflow-hidden gap-4">
+              <div className="p-3.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800 text-xs text-indigo-950 dark:text-indigo-200 flex items-start gap-2.5">
+                <span className="text-base">💡</span>
+                <div className="leading-relaxed">
+                  <strong>Instrucciones directas:</strong> La IA leerá este texto en cada respuesta en vivo para visitantes de <code>inhubflow.online</code>. Puedes afinar los precios, agregar nuevas promociones, instrucciones para manejo de objeciones o cambiar el tono comercial.
+                </div>
+              </div>
+
+              <div className="flex-1 flex flex-col min-h-[300px]">
+                <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center justify-between">
+                  <span>Prompt del Sistema & Base de Conocimiento</span>
+                  {loadingKnowledge && (
+                    <span className="text-purple-600 text-xs font-normal">Cargando base de conocimiento...</span>
+                  )}
+                </label>
+                <textarea
+                  value={knowledgePrompt}
+                  onChange={(e) => setKnowledgePrompt(e.target.value)}
+                  disabled={loadingKnowledge || savingKnowledge}
+                  rows={15}
+                  placeholder="Escribe aquí las instrucciones completas, datos de la empresa, planes, precios y reglas de comportamiento..."
+                  className="flex-1 w-full p-4 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80 text-xs text-gray-900 dark:text-gray-100 font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none shadow-inner"
+                />
+              </div>
+
+              {/* Modal Footer */}
+              <div className="pt-2 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between gap-3 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleResetKnowledge}
+                  disabled={loadingKnowledge || savingKnowledge}
+                  className="px-3.5 py-2 rounded-xl text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 transition cursor-pointer border border-gray-200 dark:border-gray-800"
+                >
+                  Restaurar Plantilla Oficial
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsKnowledgeModalOpen(false)}
+                    disabled={savingKnowledge}
+                    className="px-4 py-2 rounded-xl text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={savingKnowledge || loadingKnowledge}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs shadow-md transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                  >
+                    <RiBrainLine size={16} />
+                    <span>{savingKnowledge ? "Guardando Conocimiento..." : "Guardar Conocimiento"}</span>
                   </button>
                 </div>
               </div>

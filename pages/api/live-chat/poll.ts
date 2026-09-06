@@ -20,17 +20,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: "Método no permitido" });
   }
 
-  const { sessionId } = req.query;
+  const { sessionId, visitorTyping } = req.query;
   if (!sessionId || typeof sessionId !== "string") {
     return res.status(400).json({ error: "sessionId es obligatorio" });
   }
 
   const db = getDb();
   try {
+    if (visitorTyping === "1" || visitorTyping === "true") {
+      db.prepare(`
+        UPDATE live_chat_sessions 
+        SET visitor_typing_until = datetime('now', '+4 seconds') 
+        WHERE id = ?
+      `).run(sessionId);
+    }
+
     const session = db.prepare("SELECT * FROM live_chat_sessions WHERE id = ?").get(sessionId) as any;
     if (!session) {
       return res.status(200).json({ messages: [], status: "not_found" });
     }
+
+    const isOperatorTyping = db.prepare(`
+      SELECT 1 FROM live_chat_sessions 
+      WHERE id = ? AND operator_typing_until IS NOT NULL AND operator_typing_until > datetime('now')
+    `).get(sessionId);
 
     const messages = db.prepare(`
       SELECT id, session_id, sender_type, sender_name, message, created_at 
@@ -45,6 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         status: session.status,
         needs_human: Boolean(session.needs_human),
         visitor_name: session.visitor_name,
+        operator_typing: Boolean(isOperatorTyping),
       },
       messages,
     });
