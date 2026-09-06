@@ -22,6 +22,11 @@ import {
   RiExternalLinkLine,
   RiBankCardLine,
   RiMailSendLine,
+  RiCustomerService2Line,
+  RiMessage3Line,
+  RiSendPlaneFill,
+  RiTimeLine,
+  RiCheckboxCircleLine,
 } from "react-icons/ri";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
@@ -79,6 +84,34 @@ interface PartnerSummary {
   total_paid_out: number;
 }
 
+interface AdminTicket {
+  id: string;
+  ticket_number: number;
+  user_id: string;
+  user_email: string;
+  user_name?: string;
+  company_name?: string;
+  subject: string;
+  category: string;
+  priority: string;
+  status: "open" | "in_progress" | "waiting_client" | "resolved" | "closed";
+  message_count?: number;
+  created_at: string;
+  updated_at: string;
+  last_reply_at: string;
+}
+
+interface AdminTicketMessage {
+  id: string;
+  ticket_id: string;
+  sender_id: string;
+  sender_email: string;
+  sender_role: "user" | "admin";
+  sender_name?: string;
+  message: string;
+  created_at: string;
+}
+
 export default function AdminSubscribersPage() {
   const { t, locale } = useTranslation();
   const { data: session, status } = useSession();
@@ -127,7 +160,31 @@ export default function AdminSubscribersPage() {
   const newPlanSelectId = useId();
 
   // Navigation section switcher
-  const [adminSection, setAdminSection] = useState<"subscribers" | "partners">("subscribers");
+  const [adminSection, setAdminSection] = useState<"subscribers" | "partners" | "tickets">("subscribers");
+
+  // Support Tickets State
+  const [adminTickets, setAdminTickets] = useState<AdminTicket[]>([]);
+  const [adminTicketCounts, setAdminTicketCounts] = useState<{
+    total: number;
+    open: number;
+    in_progress: number;
+    waiting_client: number;
+    resolved: number;
+    closed: number;
+  }>({ total: 0, open: 0, in_progress: 0, waiting_client: 0, resolved: 0, closed: 0 });
+  const [adminTicketsLoading, setAdminTicketsLoading] = useState(false);
+  const [ticketSearch, setTicketSearch] = useState("");
+  const [ticketStatusFilter, setTicketStatusFilter] = useState("all");
+
+  // Selected Ticket for Admin Details Modal
+  const [selectedAdminTicket, setSelectedAdminTicket] = useState<AdminTicket | null>(null);
+  const [selectedTicketMessages, setSelectedTicketMessages] = useState<AdminTicketMessage[]>([]);
+  const [selectedTicketCustomer, setSelectedTicketCustomer] = useState<any>(null);
+  const [isAdminTicketModalOpen, setIsAdminTicketModalOpen] = useState(false);
+  const [adminTicketLoadingDetail, setAdminTicketLoadingDetail] = useState(false);
+  const [adminReplyText, setAdminReplyText] = useState("");
+  const [adminSendingReply, setAdminSendingReply] = useState(false);
+  const [adminUpdatingStatus, setAdminUpdatingStatus] = useState(false);
 
   // Partners State
   const [partners, setPartners] = useState<Partner[]>([]);
@@ -167,8 +224,100 @@ export default function AdminSubscribersPage() {
     } else if (status === "authenticated") {
       loadData();
       loadPartners();
+      loadAdminTickets();
     }
   }, [status]);
+
+  async function loadAdminTickets() {
+    setAdminTicketsLoading(true);
+    try {
+      const res = await fetch("/api/support/tickets?all=true");
+      if (res.ok) {
+        const data = await res.json();
+        setAdminTickets(data.tickets || []);
+        if (data.counts) setAdminTicketCounts(data.counts);
+      }
+    } catch (err) {
+      console.error("Error al cargar tickets en admin:", err);
+    } finally {
+      setAdminTicketsLoading(false);
+    }
+  }
+
+  async function openAdminTicket(ticket: AdminTicket) {
+    setSelectedAdminTicket(ticket);
+    setIsAdminTicketModalOpen(true);
+    setAdminTicketLoadingDetail(true);
+    try {
+      const res = await fetch(`/api/support/tickets/${ticket.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedAdminTicket(data.ticket);
+        setSelectedTicketMessages(data.messages || []);
+        setSelectedTicketCustomer(data.customerDetails || null);
+      }
+    } catch (err) {
+      console.error("Error al cargar detalle de ticket:", err);
+    } finally {
+      setAdminTicketLoadingDetail(false);
+    }
+  }
+
+  async function handleAdminSendReply(e: React.FormEvent) {
+    e.preventDefault();
+    if (!adminReplyText.trim() || !selectedAdminTicket) return;
+
+    setAdminSendingReply(true);
+    try {
+      const res = await fetch(`/api/support/tickets/${selectedAdminTicket.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: adminReplyText.trim() }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedTicketMessages((prev) => [...prev, data.message]);
+        setAdminReplyText("");
+        toast.success("Respuesta enviada al cliente por plataforma e email");
+        if (data.newStatus) {
+          setSelectedAdminTicket((prev) => prev ? { ...prev, status: data.newStatus } : null);
+        }
+        loadAdminTickets();
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Error al enviar respuesta");
+      }
+    } catch (err) {
+      toast.error("Error de conexión");
+    } finally {
+      setAdminSendingReply(false);
+    }
+  }
+
+  async function handleAdminChangeStatus(newStatus: string) {
+    if (!selectedAdminTicket) return;
+    setAdminUpdatingStatus(true);
+    try {
+      const res = await fetch(`/api/support/tickets/${selectedAdminTicket.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (res.ok) {
+        setSelectedAdminTicket((prev) => prev ? { ...prev, status: newStatus as any } : null);
+        toast.success("Estado del ticket actualizado");
+        loadAdminTickets();
+      } else {
+        toast.error("No se pudo actualizar el estado");
+      }
+    } catch (err) {
+      toast.error("Error al actualizar estado");
+    } finally {
+      setAdminUpdatingStatus(false);
+    }
+  }
 
   async function loadData() {
     setLoading(true);
@@ -388,6 +537,21 @@ export default function AdminSubscribersPage() {
     );
   });
 
+  const filteredTickets = adminTickets.filter((tck) => {
+    const term = ticketSearch.toLowerCase().trim();
+    const matchesSearch =
+      !term ||
+      tck.subject.toLowerCase().includes(term) ||
+      tck.user_email.toLowerCase().includes(term) ||
+      (tck.user_name && tck.user_name.toLowerCase().includes(term)) ||
+      (tck.company_name && tck.company_name.toLowerCase().includes(term)) ||
+      String(tck.ticket_number).includes(term);
+
+    const matchesStatus = ticketStatusFilter === "all" || tck.status === ticketStatusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
+
   return (
     <>
       <Head>
@@ -401,16 +565,22 @@ export default function AdminSubscribersPage() {
           <div>
             <div className="flex items-center gap-2.5">
               <span className="p-2 rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400">
-                <RiShieldCheckLine size={24} />
+                {adminSection === "tickets" ? <RiCustomerService2Line size={24} /> : <RiShieldCheckLine size={24} />}
               </span>
               <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                {adminSection === "subscribers" ? t("admin.subscribersTitle") : t("admin.partnersTitle")}
+                {adminSection === "subscribers" 
+                  ? t("admin.subscribersTitle") 
+                  : adminSection === "partners"
+                  ? t("admin.partnersTitle")
+                  : "Centro de Soporte y Tickets"}
               </h1>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               {adminSection === "subscribers"
                 ? t("admin.subscribersSubtitle")
-                : t("admin.partnersSubtitle")}
+                : adminSection === "partners"
+                ? t("admin.partnersSubtitle")
+                : "Atención directa de incidencias, dudas técnicas y solicitudes de clientes InHubFlow"}
             </p>
           </div>
 
@@ -418,12 +588,13 @@ export default function AdminSubscribersPage() {
             <button
               onClick={() => {
                 if (adminSection === "subscribers") loadData();
-                else loadPartners();
+                else if (adminSection === "partners") loadPartners();
+                else loadAdminTickets();
               }}
               title={t("admin.refresh")}
-              className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors shadow-xs"
+              className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors shadow-xs cursor-pointer"
             >
-              <RiRefreshLine className={loading || partnersLoading ? "animate-spin" : ""} size={18} />
+              <RiRefreshLine className={loading || partnersLoading || adminTicketsLoading ? "animate-spin" : ""} size={18} />
             </button>
             {adminSection === "subscribers" ? (
               <button
@@ -433,7 +604,7 @@ export default function AdminSubscribersPage() {
                 <RiUserAddLine size={18} />
                 <span>{t("admin.newManualClient")}</span>
               </button>
-            ) : (
+            ) : adminSection === "partners" ? (
               <button
                 onClick={() => setIsCreatePartnerModalOpen(true)}
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-sm shadow-xs transition-all cursor-pointer"
@@ -441,12 +612,12 @@ export default function AdminSubscribersPage() {
                 <RiHandHeartLine size={18} />
                 <span>{t("admin.newPartner")}</span>
               </button>
-            )}
+            ) : null}
           </div>
         </div>
 
         {/* ── Section Switcher Tabs ── */}
-        <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-800 pb-2">
+        <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-800 pb-2 flex-wrap">
           <button
             onClick={() => setAdminSection("subscribers")}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl transition-colors cursor-pointer ${
@@ -475,6 +646,30 @@ export default function AdminSubscribersPage() {
             <span className="px-2 py-0.5 text-xs rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold">
               {partners.length}
             </span>
+          </button>
+
+          <button
+            onClick={() => {
+              setAdminSection("tickets");
+              loadAdminTickets();
+            }}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl transition-colors cursor-pointer ${
+              adminSection === "tickets"
+                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+            }`}
+          >
+            <RiCustomerService2Line size={18} />
+            <span>Soporte y Tickets</span>
+            {adminTicketCounts.open > 0 ? (
+              <span className="px-2 py-0.5 text-xs rounded-full bg-emerald-500 text-white font-bold animate-pulse">
+                {adminTicketCounts.open} nuevos
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 text-xs rounded-full bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+                {adminTicketCounts.total}
+              </span>
+            )}
           </button>
         </div>
 
@@ -917,6 +1112,217 @@ export default function AdminSubscribersPage() {
                 <div>
                   {t("admin.partnerCalloutDesc", { sampleUrl: "https://inhubflow.online?25-OFF=SE7GH" })}
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── SECTION 3: SUPPORT & TICKETS ── */}
+        {adminSection === "tickets" && (
+          <div className="space-y-6">
+            {/* KPI Stats Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
+                <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider">Total Tickets</span>
+                  <span className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                    <RiMessage3Line size={18} />
+                  </span>
+                </div>
+                <div className="text-3xl font-extrabold text-gray-900 dark:text-white">
+                  {adminTicketCounts.total}
+                </div>
+                <div className="text-xs text-gray-400 mt-1">Total acumulado de incidencias</div>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
+                <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider">Tickets Abiertos</span>
+                  <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    <RiCustomerService2Line size={18} />
+                  </span>
+                </div>
+                <div className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">
+                  {adminTicketCounts.open}
+                </div>
+                <div className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1">Requieren atención inmediata</div>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
+                <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider">En Proceso / Espera</span>
+                  <span className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                    <RiTimeLine size={18} />
+                  </span>
+                </div>
+                <div className="text-3xl font-extrabold text-amber-600 dark:text-amber-400">
+                  {(adminTicketCounts.in_progress || 0) + (adminTicketCounts.waiting_client || 0)}
+                </div>
+                <div className="text-xs text-gray-400 mt-1">En seguimiento con el cliente</div>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
+                <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider">Resueltos</span>
+                  <span className="p-2 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400">
+                    <RiCheckboxCircleLine size={18} />
+                  </span>
+                </div>
+                <div className="text-3xl font-extrabold text-teal-600 dark:text-teal-400">
+                  {adminTicketCounts.resolved}
+                </div>
+                <div className="text-xs text-gray-400 mt-1">Incidencias solucionadas</div>
+              </div>
+            </div>
+
+            {/* Filter & Search Bar */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
+              <div className="relative w-full sm:w-96">
+                <RiSearchLine className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="Buscar por cliente, email, asunto o #Ticket..."
+                  value={ticketSearch}
+                  onChange={(e) => setTicketSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <select
+                  value={ticketStatusFilter}
+                  onChange={(e) => setTicketStatusFilter(e.target.value)}
+                  className="px-3.5 py-2 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 text-xs sm:text-sm text-gray-700 dark:text-gray-300 focus:outline-none"
+                >
+                  <option value="all">Todos los Estados</option>
+                  <option value="open">Abiertos</option>
+                  <option value="in_progress">En Proceso</option>
+                  <option value="waiting_client">Esperando Cliente</option>
+                  <option value="resolved">Resueltos</option>
+                  <option value="closed">Cerrados</option>
+                </select>
+                <div className="text-xs text-gray-500 whitespace-nowrap">
+                  Mostrando {filteredTickets.length} de {adminTickets.length}
+                </div>
+              </div>
+            </div>
+
+            {/* Tickets Table */}
+            <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 text-xs uppercase font-semibold border-b border-gray-200 dark:border-gray-800">
+                    <tr>
+                      <th className="px-6 py-4"># Ticket</th>
+                      <th className="px-6 py-4">Cliente / Empresa</th>
+                      <th className="px-6 py-4">Asunto</th>
+                      <th className="px-6 py-4">Categoría</th>
+                      <th className="px-6 py-4">Prioridad</th>
+                      <th className="px-6 py-4">Estado</th>
+                      <th className="px-6 py-4">Última Actividad</th>
+                      <th className="px-6 py-4 text-right">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+                    {adminTicketsLoading ? (
+                      <tr>
+                        <td colSpan={8} className="px-6 py-12 text-center text-gray-400">
+                          <RiRefreshLine className="animate-spin inline-block mr-2" size={20} />
+                          Cargando tickets de soporte...
+                        </td>
+                      </tr>
+                    ) : filteredTickets.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="px-6 py-12 text-center text-gray-400">
+                          No se encontraron tickets con los filtros actuales.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredTickets.map((tck) => (
+                        <tr key={tck.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors">
+                          <td className="px-6 py-4 font-mono font-bold text-gray-900 dark:text-white">
+                            #TCK-{tck.ticket_number}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="font-semibold text-gray-900 dark:text-white">
+                              {tck.user_name || tck.user_email.split("@")[0]}
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              {tck.user_email} {tck.company_name ? `• ${tck.company_name}` : ""}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 font-medium text-gray-900 dark:text-white max-w-xs truncate">
+                            <div className="flex items-center gap-1.5">
+                              <span>{tck.subject}</span>
+                              {tck.message_count && tck.message_count > 1 ? (
+                                <span className="inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500 font-mono">
+                                  <RiMessage3Line size={10} />
+                                  {tck.message_count}
+                                </span>
+                              ) : null}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-xs text-gray-600 dark:text-gray-400">
+                            {tck.category}
+                          </td>
+                          <td className="px-6 py-4">
+                            {tck.priority === "urgent" ? (
+                              <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-400">Urgente</span>
+                            ) : tck.priority === "high" ? (
+                              <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-950/50 dark:text-orange-400">Alta</span>
+                            ) : tck.priority === "low" ? (
+                              <span className="text-[11px] font-normal px-2 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">Baja</span>
+                            ) : (
+                              <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400">Normal</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            {tck.status === "open" ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                Abierto
+                              </span>
+                            ) : tck.status === "in_progress" ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+                                En Proceso
+                              </span>
+                            ) : tck.status === "waiting_client" ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                                Espera Cliente
+                              </span>
+                            ) : tck.status === "resolved" ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-400 border border-teal-200 dark:border-teal-800">
+                                <RiCheckboxCircleLine size={12} />
+                                Resuelto
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                                Cerrado
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-xs text-gray-400 font-mono">
+                            {new Date(tck.updated_at || tck.created_at).toLocaleDateString("es-ES", {
+                              day: "2-digit",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              onClick={() => openAdminTicket(tck)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs transition cursor-pointer shadow-2xs"
+                            >
+                              <RiCustomerService2Line size={14} />
+                              <span>Atender</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -1491,6 +1897,178 @@ export default function AdminSubscribersPage() {
                   <RiCheckLine size={16} />
                   <span>{payoutSaving ? t("admin.recording") : t("admin.confirmPayout")}</span>
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Ticket Conversation Modal */}
+      {isAdminTicketModalOpen && selectedAdminTicket && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-3xl rounded-3xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-6 sm:p-8 shadow-2xl space-y-6 max-h-[92vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 dark:border-gray-800 pb-4">
+              <div>
+                <div className="flex items-center gap-2.5 mb-1.5 flex-wrap">
+                  <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200">
+                    #TCK-{selectedAdminTicket.ticket_number}
+                  </span>
+                  <span className="text-xs px-2 py-0.5 rounded-md bg-brand-50 text-brand-700 dark:bg-brand-950/40 dark:text-brand-400 font-semibold border border-brand-200 dark:border-brand-800">
+                    {selectedAdminTicket.category}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {new Date(selectedAdminTicket.created_at).toLocaleDateString("es-ES", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+                <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
+                  {selectedAdminTicket.subject}
+                </h3>
+                <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mt-1 flex-wrap">
+                  <span>Cliente: <strong className="text-gray-900 dark:text-white">{selectedAdminTicket.user_name || selectedAdminTicket.user_email}</strong></span>
+                  <span>Email: <strong className="text-gray-900 dark:text-white">{selectedAdminTicket.user_email}</strong></span>
+                  {selectedTicketCustomer && (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 font-semibold text-[11px]">
+                      Plan {selectedTicketCustomer.plan_tier?.toUpperCase()} ({selectedTicketCustomer.slots_limit} Slots)
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <button
+                onClick={() => setIsAdminTicketModalOpen(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-white cursor-pointer"
+              >
+                <RiCloseLine size={22} />
+              </button>
+            </div>
+
+            {/* Change Status Controls */}
+            <div className="flex items-center justify-between gap-4 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 text-xs">
+              <span className="font-semibold text-gray-700 dark:text-gray-300">Cambiar Estado del Ticket:</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  disabled={adminUpdatingStatus}
+                  onClick={() => handleAdminChangeStatus("in_progress")}
+                  className={`px-3 py-1 rounded-lg font-semibold transition cursor-pointer ${
+                    selectedAdminTicket.status === "in_progress"
+                      ? "bg-indigo-600 text-white"
+                      : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  En Proceso
+                </button>
+                <button
+                  type="button"
+                  disabled={adminUpdatingStatus}
+                  onClick={() => handleAdminChangeStatus("waiting_client")}
+                  className={`px-3 py-1 rounded-lg font-semibold transition cursor-pointer ${
+                    selectedAdminTicket.status === "waiting_client"
+                      ? "bg-amber-600 text-white"
+                      : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  Esperando Cliente
+                </button>
+                <button
+                  type="button"
+                  disabled={adminUpdatingStatus}
+                  onClick={() => handleAdminChangeStatus("resolved")}
+                  className={`px-3 py-1 rounded-lg font-semibold transition cursor-pointer ${
+                    selectedAdminTicket.status === "resolved"
+                      ? "bg-emerald-600 text-white"
+                      : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  Resuelto
+                </button>
+                <button
+                  type="button"
+                  disabled={adminUpdatingStatus}
+                  onClick={() => handleAdminChangeStatus("closed")}
+                  className={`px-3 py-1 rounded-lg font-semibold transition cursor-pointer ${
+                    selectedAdminTicket.status === "closed"
+                      ? "bg-gray-600 text-white"
+                      : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+
+            {/* Message Thread Scroll Area */}
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              {adminTicketLoadingDetail ? (
+                <div className="py-8 text-center text-sm text-gray-400">
+                  Cargando mensajes del ticket...
+                </div>
+              ) : (
+                selectedTicketMessages.map((msg) => {
+                  const isAdmin = msg.sender_role === "admin";
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`p-4 rounded-2xl border transition ${
+                        isAdmin
+                          ? "bg-indigo-50/60 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-900"
+                          : "bg-gray-50 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-bold ${isAdmin ? "text-indigo-700 dark:text-indigo-400" : "text-gray-900 dark:text-white"}`}>
+                            {isAdmin ? "Equipo de Soporte InHubFlow (Tú)" : msg.sender_name || msg.sender_email}
+                          </span>
+                          {isAdmin && (
+                            <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-indigo-200/60 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300">
+                              Admin
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] text-gray-400 font-mono">
+                          {new Date(msg.created_at).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </div>
+                      <p className="text-xs sm:text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">
+                        {msg.message}
+                      </p>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Reply Input Box */}
+            <form onSubmit={handleAdminSendReply} className="pt-2 border-t border-gray-100 dark:border-gray-800">
+              <div className="space-y-3">
+                <textarea
+                  rows={3}
+                  value={adminReplyText}
+                  onChange={(e) => setAdminReplyText(e.target.value)}
+                  placeholder="Escribe tu respuesta oficial para el cliente (se enviará a su plataforma y a su email)..."
+                  className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-xs sm:text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400">
+                    📧 El cliente recibirá una alerta en su email si Resend está activo.
+                  </span>
+                  <button
+                    type="submit"
+                    disabled={adminSendingReply || !adminReplyText.trim()}
+                    className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs shadow-xs disabled:opacity-50 cursor-pointer"
+                  >
+                    <RiSendPlaneFill size={14} />
+                    <span>{adminSendingReply ? "Enviando..." : "Responder al Cliente"}</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>

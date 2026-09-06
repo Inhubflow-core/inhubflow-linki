@@ -16,7 +16,7 @@ import {
   RiMailCheckLine,
   RiQuestionLine,
   RiCompassLine,
-  RiPlayCircleLine,
+  RiCustomerService2Line,
   RiGlobalLine,
   RiUserSearchLine,
   RiRobotLine,
@@ -28,8 +28,6 @@ import {
 import { pathToTourPage, replayPageTour } from "@/lib/tour";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useTheme } from "@/lib/context/ThemeContext";
-
-const LEARNING_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLBf6xNJOmsIQ";
 
 const mainNav = [
   { href: "/", labelKey: "nav.dashboard", icon: RiLayoutGridLine, color: "#465fff", tour: "nav-dashboard" },
@@ -287,6 +285,22 @@ export default function Sidebar({
           {!isCollapsed && <span>{t("nav.settings")}</span>}
         </Link>
 
+        {/* Support link */}
+        <Link
+          href="/support"
+          title={isCollapsed ? t("nav.support") : undefined}
+          className={`flex items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-normal transition-colors ${
+            isActive("/support")
+              ? "bg-brand-500/10 text-brand-600 dark:text-brand-400 font-medium"
+              : "text-gray-600 hover:bg-gray-100/70 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
+          } ${isCollapsed ? "justify-center px-0" : ""}`}
+        >
+          <div className="flex h-6.5 w-6.5 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400">
+            <RiCustomerService2Line size={17} />
+          </div>
+          {!isCollapsed && <span>{t("nav.support")}</span>}
+        </Link>
+
         {/* Tour & Help Guide */}
         <div className="relative" ref={helpRef}>
           <button
@@ -316,16 +330,14 @@ export default function Sidebar({
                   {t("nav.replayTour")}
                 </button>
               )}
-              <a
-                href={LEARNING_PLAYLIST_URL}
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                href="/support"
                 onClick={() => setHelpOpen(false)}
                 className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800 transition-colors"
               >
-                <RiPlayCircleLine size={14} className="text-gray-400 shrink-0" />
-                {t("nav.videoGuides")}
-              </a>
+                <RiCustomerService2Line size={14} className="text-gray-400 shrink-0" />
+                {t("nav.support")}
+              </Link>
             </div>
           )}
         </div>

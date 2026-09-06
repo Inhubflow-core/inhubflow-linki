@@ -603,6 +603,35 @@ function runMigrations(db: Database.Database) {
     "CREATE INDEX IF NOT EXISTS idx_team_invitations_owner ON team_invitations(owner_id, status)",
     "CREATE INDEX IF NOT EXISTS idx_users_owner ON users(owner_id)",
     "ALTER TABLE email_accounts ADD COLUMN owner_id TEXT REFERENCES users(id) ON DELETE SET NULL",
+    // Customer Support & Ticketing System
+    `CREATE TABLE IF NOT EXISTS support_tickets (
+      id TEXT PRIMARY KEY,
+      ticket_number INTEGER,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_email TEXT NOT NULL,
+      user_name TEXT,
+      company_name TEXT,
+      subject TEXT NOT NULL,
+      category TEXT DEFAULT 'general' CHECK(category IN ('general', 'campaigns', 'linkedin', 'email', 'sdr_ai', 'billing', 'bug', 'other')),
+      priority TEXT DEFAULT 'normal' CHECK(priority IN ('low', 'normal', 'high', 'urgent')),
+      status TEXT DEFAULT 'open' CHECK(status IN ('open', 'in_progress', 'waiting_client', 'resolved', 'closed')),
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      last_reply_at TEXT DEFAULT (datetime('now'))
+    )`,
+    "CREATE INDEX IF NOT EXISTS idx_support_tickets_user ON support_tickets(user_id, created_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status, updated_at DESC)",
+    `CREATE TABLE IF NOT EXISTS support_ticket_messages (
+      id TEXT PRIMARY KEY,
+      ticket_id TEXT NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+      sender_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      sender_email TEXT NOT NULL,
+      sender_role TEXT NOT NULL CHECK(sender_role IN ('user', 'admin')),
+      sender_name TEXT,
+      message TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    "CREATE INDEX IF NOT EXISTS idx_ticket_messages_ticket ON support_ticket_messages(ticket_id, created_at ASC)",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
