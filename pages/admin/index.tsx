@@ -27,6 +27,10 @@ import {
   RiSendPlaneFill,
   RiTimeLine,
   RiCheckboxCircleLine,
+  RiChat1Line,
+  RiFireFill,
+  RiRobotLine,
+  RiUser3Line,
 } from "react-icons/ri";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
@@ -112,6 +116,32 @@ interface AdminTicketMessage {
   created_at: string;
 }
 
+interface AdminLiveChatSession {
+  id: string;
+  visitor_name?: string;
+  visitor_email?: string;
+  company_name?: string;
+  language: string;
+  status: "ai_active" | "human_takeover" | "resolved" | "closed";
+  needs_human: number;
+  total_messages: number;
+  last_message?: string;
+  last_sender_type?: string;
+  last_message_at?: string;
+  page_url?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface AdminLiveChatMessage {
+  id: string;
+  session_id: string;
+  sender_type: "visitor" | "ai" | "human_agent";
+  sender_name?: string;
+  message: string;
+  created_at: string;
+}
+
 export default function AdminSubscribersPage() {
   const { t, locale } = useTranslation();
   const { data: session, status } = useSession();
@@ -160,7 +190,7 @@ export default function AdminSubscribersPage() {
   const newPlanSelectId = useId();
 
   // Navigation section switcher
-  const [adminSection, setAdminSection] = useState<"subscribers" | "partners" | "tickets">("subscribers");
+  const [adminSection, setAdminSection] = useState<"subscribers" | "partners" | "tickets" | "live_chat">("subscribers");
 
   // Support Tickets State
   const [adminTickets, setAdminTickets] = useState<AdminTicket[]>([]);
@@ -185,6 +215,23 @@ export default function AdminSubscribersPage() {
   const [adminReplyText, setAdminReplyText] = useState("");
   const [adminSendingReply, setAdminSendingReply] = useState(false);
   const [adminUpdatingStatus, setAdminUpdatingStatus] = useState(false);
+
+  // Live Chat State
+  const [adminLiveChatSessions, setAdminLiveChatSessions] = useState<AdminLiveChatSession[]>([]);
+  const [adminLiveChatCounts, setAdminLiveChatCounts] = useState<{ total: number; needs_human: number; active: number }>({
+    total: 0,
+    needs_human: 0,
+    active: 0,
+  });
+  const [adminLiveChatLoading, setAdminLiveChatLoading] = useState(false);
+  const [selectedLiveChatSession, setSelectedLiveChatSession] = useState<AdminLiveChatSession | null>(null);
+  const [selectedLiveChatMessages, setSelectedLiveChatMessages] = useState<AdminLiveChatMessage[]>([]);
+  const [liveChatLoadingThread, setLiveChatLoadingThread] = useState(false);
+  const [liveChatReplyText, setLiveChatReplyText] = useState("");
+  const [liveChatSendingReply, setLiveChatSendingReply] = useState(false);
+  const [liveChatActionLoading, setLiveChatActionLoading] = useState(false);
+  const [liveChatFilter, setLiveChatFilter] = useState<"all" | "needs_human" | "active" | "resolved">("all");
+  const [liveChatSearch, setLiveChatSearch] = useState("");
 
   // Partners State
   const [partners, setPartners] = useState<Partner[]>([]);
@@ -225,8 +272,146 @@ export default function AdminSubscribersPage() {
       loadData();
       loadPartners();
       loadAdminTickets();
+      loadLiveChatSessions();
     }
   }, [status]);
+
+  // Periodic polling for Live Chat
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    const interval = setInterval(() => {
+      loadLiveChatSessions(true);
+      if (selectedLiveChatSession?.id) {
+        loadLiveChatThread(selectedLiveChatSession.id, true);
+      }
+    }, adminSection === "live_chat" ? 4000 : 15000);
+
+    return () => clearInterval(interval);
+  }, [status, adminSection, selectedLiveChatSession?.id]);
+
+  async function loadLiveChatSessions(silent = false) {
+    if (!silent) setAdminLiveChatLoading(true);
+    try {
+      const res = await fetch("/api/live-chat/admin");
+      if (res.ok) {
+        const data = await res.json();
+        setAdminLiveChatSessions(data.sessions || []);
+        if (data.counts) setAdminLiveChatCounts(data.counts);
+      }
+    } catch (err) {
+      console.error("Error al cargar Live Chat en admin:", err);
+    } finally {
+      if (!silent) setAdminLiveChatLoading(false);
+    }
+  }
+
+  async function loadLiveChatThread(sessionId: string, silent = false) {
+    if (!silent) setLiveChatLoadingThread(true);
+    try {
+      const res = await fetch(`/api/live-chat/admin?sessionId=${sessionId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedLiveChatSession(data.session);
+        setSelectedLiveChatMessages(data.messages || []);
+      }
+    } catch (err) {
+      console.error("Error al cargar hilo de Live Chat:", err);
+    } finally {
+      if (!silent) setLiveChatLoadingThread(false);
+    }
+  }
+
+  async function handleLiveChatTakeover(sessionId: string) {
+    setLiveChatActionLoading(true);
+    try {
+      const res = await fetch("/api/live-chat/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "takeover", sessionId }),
+      });
+      if (res.ok) {
+        toast.success("Has tomado el control del chat. La IA está pausada.");
+        loadLiveChatThread(sessionId);
+        loadLiveChatSessions(true);
+      }
+    } catch {
+      toast.error("Error al tomar control");
+    } finally {
+      setLiveChatActionLoading(false);
+    }
+  }
+
+  async function handleLiveChatResumeAI(sessionId: string) {
+    setLiveChatActionLoading(true);
+    try {
+      const res = await fetch("/api/live-chat/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "resume_ai", sessionId }),
+      });
+      if (res.ok) {
+        toast.success("IA reactivada para esta conversación.");
+        loadLiveChatThread(sessionId);
+        loadLiveChatSessions(true);
+      }
+    } catch {
+      toast.error("Error al reactivar IA");
+    } finally {
+      setLiveChatActionLoading(false);
+    }
+  }
+
+  async function handleLiveChatResolve(sessionId: string) {
+    setLiveChatActionLoading(true);
+    try {
+      const res = await fetch("/api/live-chat/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "resolve", sessionId }),
+      });
+      if (res.ok) {
+        toast.success("Chat marcado como resuelto.");
+        loadLiveChatThread(sessionId);
+        loadLiveChatSessions(true);
+      }
+    } catch {
+      toast.error("Error al marcar como resuelto");
+    } finally {
+      setLiveChatActionLoading(false);
+    }
+  }
+
+  async function handleLiveChatSendReply(e: React.FormEvent) {
+    e.preventDefault();
+    if (!liveChatReplyText.trim() || !selectedLiveChatSession) return;
+    const textToSend = liveChatReplyText.trim();
+    setLiveChatSendingReply(true);
+
+    try {
+      const res = await fetch("/api/live-chat/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "reply",
+          sessionId: selectedLiveChatSession.id,
+          message: textToSend,
+        }),
+      });
+
+      if (res.ok) {
+        setLiveChatReplyText("");
+        toast.success("Mensaje enviado al visitante en la web");
+        loadLiveChatThread(selectedLiveChatSession.id);
+        loadLiveChatSessions(true);
+      } else {
+        toast.error("Error al enviar mensaje");
+      }
+    } catch {
+      toast.error("Error de conexión");
+    } finally {
+      setLiveChatSendingReply(false);
+    }
+  }
 
   async function loadAdminTickets() {
     setAdminTicketsLoading(true);
@@ -565,14 +750,22 @@ export default function AdminSubscribersPage() {
           <div>
             <div className="flex items-center gap-2.5">
               <span className="p-2 rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400">
-                {adminSection === "tickets" ? <RiCustomerService2Line size={24} /> : <RiShieldCheckLine size={24} />}
+                {adminSection === "tickets" ? (
+                  <RiCustomerService2Line size={24} />
+                ) : adminSection === "live_chat" ? (
+                  <RiChat1Line size={24} />
+                ) : (
+                  <RiShieldCheckLine size={24} />
+                )}
               </span>
               <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
                 {adminSection === "subscribers" 
                   ? t("admin.subscribersTitle") 
                   : adminSection === "partners"
                   ? t("admin.partnersTitle")
-                  : "Centro de Soporte y Tickets"}
+                  : adminSection === "tickets"
+                  ? "Centro de Soporte y Tickets"
+                  : "Live Chat Web: Asistente IA & Leads en Vivo"}
               </h1>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -580,7 +773,9 @@ export default function AdminSubscribersPage() {
                 ? t("admin.subscribersSubtitle")
                 : adminSection === "partners"
                 ? t("admin.partnersSubtitle")
-                : "Atención directa de incidencias, dudas técnicas y solicitudes de clientes InHubFlow"}
+                : adminSection === "tickets"
+                ? "Atención directa de incidencias, dudas técnicas y solicitudes de clientes InHubFlow"
+                : "Monitorea las conversaciones del Asistente SDR en la landing page, atiende prospectos calientes y responde en vivo."}
             </p>
           </div>
 
@@ -589,12 +784,13 @@ export default function AdminSubscribersPage() {
               onClick={() => {
                 if (adminSection === "subscribers") loadData();
                 else if (adminSection === "partners") loadPartners();
-                else loadAdminTickets();
+                else if (adminSection === "tickets") loadAdminTickets();
+                else loadLiveChatSessions();
               }}
               title={t("admin.refresh")}
               className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors shadow-xs cursor-pointer"
             >
-              <RiRefreshLine className={loading || partnersLoading || adminTicketsLoading ? "animate-spin" : ""} size={18} />
+              <RiRefreshLine className={loading || partnersLoading || adminTicketsLoading || adminLiveChatLoading ? "animate-spin" : ""} size={18} />
             </button>
             {adminSection === "subscribers" ? (
               <button
@@ -668,6 +864,31 @@ export default function AdminSubscribersPage() {
             ) : (
               <span className="px-2 py-0.5 text-xs rounded-full bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
                 {adminTicketCounts.total}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => {
+              setAdminSection("live_chat");
+              loadLiveChatSessions();
+            }}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl transition-colors cursor-pointer ${
+              adminSection === "live_chat"
+                ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20"
+                : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+            }`}
+          >
+            <RiChat1Line size={18} />
+            <span>Live Chat</span>
+            {adminLiveChatCounts.needs_human > 0 ? (
+              <span className="px-2 py-0.5 text-xs rounded-full bg-red-500 text-white font-bold animate-pulse flex items-center gap-1 shadow-xs">
+                <RiFireFill size={12} />
+                {adminLiveChatCounts.needs_human} alertas
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 text-xs rounded-full bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-semibold">
+                {adminLiveChatCounts.total}
               </span>
             )}
           </button>
@@ -1323,6 +1544,402 @@ export default function AdminSubscribersPage() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── SECTION 4: LIVE CHAT (WEB LEADS & AI SDR) ── */}
+        {adminSection === "live_chat" && (
+          <div className="space-y-6">
+            {/* KPI Stats Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
+                <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider">Total Conversaciones</span>
+                  <span className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                    <RiChat1Line size={18} />
+                  </span>
+                </div>
+                <div className="text-3xl font-extrabold text-gray-900 dark:text-white">
+                  {adminLiveChatCounts.total}
+                </div>
+                <div className="text-xs text-gray-400 mt-1">Visitantes que han interactuado en la web</div>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
+                <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider">Leads Calientes (Alertas)</span>
+                  <span className="p-2 rounded-xl bg-red-500/10 text-red-600 dark:text-red-400">
+                    <RiFireFill size={18} />
+                  </span>
+                </div>
+                <div className="text-3xl font-extrabold text-red-600 dark:text-red-400 flex items-center gap-2">
+                  {adminLiveChatCounts.needs_human}
+                  {adminLiveChatCounts.needs_human > 0 && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-red-500 text-white font-bold animate-pulse">
+                      ¡Atención requerida!
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-gray-400 mt-1">Solicitaron hablar con asesor o comprar</div>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
+                <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider">Sesiones en Curso</span>
+                  <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    <RiRobotLine size={18} />
+                  </span>
+                </div>
+                <div className="text-3xl font-extrabold text-gray-900 dark:text-white">
+                  {adminLiveChatCounts.active}
+                </div>
+                <div className="text-xs text-gray-400 mt-1">Atendidas por IA o con control humano</div>
+              </div>
+            </div>
+
+            {/* Live Chat Two-Column Workspace */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 h-[680px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-sm overflow-hidden">
+              {/* Left Column: Sessions List (4 cols) */}
+              <div className="lg:col-span-4 border-r border-gray-200 dark:border-gray-800 flex flex-col h-full bg-gray-50/50 dark:bg-gray-900/50">
+                {/* Search and Filters */}
+                <div className="p-4 border-b border-gray-200 dark:border-gray-800 space-y-3">
+                  <div className="relative">
+                    <RiSearchLine className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                    <input
+                      type="text"
+                      value={liveChatSearch}
+                      onChange={(e) => setLiveChatSearch(e.target.value)}
+                      placeholder="Buscar por visitante o empresa..."
+                      className="w-full pl-9 pr-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-white"
+                    />
+                  </div>
+
+                  {/* Filter Pills */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
+                    <button
+                      onClick={() => setLiveChatFilter("all")}
+                      className={`px-2.5 py-1 rounded-lg font-medium transition cursor-pointer shrink-0 ${
+                        liveChatFilter === "all"
+                          ? "bg-indigo-600 text-white"
+                          : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
+                      }`}
+                    >
+                      Todos ({adminLiveChatSessions.length})
+                    </button>
+                    <button
+                      onClick={() => setLiveChatFilter("needs_human")}
+                      className={`px-2.5 py-1 rounded-lg font-medium transition cursor-pointer shrink-0 flex items-center gap-1 ${
+                        liveChatFilter === "needs_human"
+                          ? "bg-red-600 text-white font-bold"
+                          : "bg-white dark:bg-gray-800 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900"
+                      }`}
+                    >
+                      <RiFireFill size={12} />
+                      Leads ({adminLiveChatCounts.needs_human})
+                    </button>
+                    <button
+                      onClick={() => setLiveChatFilter("active")}
+                      className={`px-2.5 py-1 rounded-lg font-medium transition cursor-pointer shrink-0 ${
+                        liveChatFilter === "active"
+                          ? "bg-indigo-600 text-white"
+                          : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
+                      }`}
+                    >
+                      Activos
+                    </button>
+                    <button
+                      onClick={() => setLiveChatFilter("resolved")}
+                      className={`px-2.5 py-1 rounded-lg font-medium transition cursor-pointer shrink-0 ${
+                        liveChatFilter === "resolved"
+                          ? "bg-indigo-600 text-white"
+                          : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
+                      }`}
+                    >
+                      Resueltos
+                    </button>
+                  </div>
+                </div>
+
+                {/* Sessions Scroll List */}
+                <div className="flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
+                  {adminLiveChatLoading ? (
+                    <div className="p-8 text-center text-xs text-gray-400">
+                      Cargando conversaciones...
+                    </div>
+                  ) : adminLiveChatSessions.length === 0 ? (
+                    <div className="p-8 text-center space-y-2">
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 mx-auto flex items-center justify-center text-xl">
+                        💬
+                      </div>
+                      <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">
+                        Aún no hay conversaciones registradas
+                      </p>
+                      <p className="text-[11px] text-gray-400 max-w-[200px] mx-auto">
+                        Cuando los visitantes escriban en el chat de inhubflow.online, aparecerán aquí al instante.
+                      </p>
+                    </div>
+                  ) : (
+                    adminLiveChatSessions
+                      .filter((s) => {
+                        const term = liveChatSearch.toLowerCase().trim();
+                        const matchesTerm =
+                          !term ||
+                          (s.visitor_name && s.visitor_name.toLowerCase().includes(term)) ||
+                          (s.company_name && s.company_name.toLowerCase().includes(term)) ||
+                          (s.visitor_email && s.visitor_email.toLowerCase().includes(term)) ||
+                          (s.last_message && s.last_message.toLowerCase().includes(term));
+
+                        if (!matchesTerm) return false;
+                        if (liveChatFilter === "needs_human") return s.needs_human === 1;
+                        if (liveChatFilter === "active") return s.status === "ai_active" || s.status === "human_takeover";
+                        if (liveChatFilter === "resolved") return s.status === "resolved" || s.status === "closed";
+                        return true;
+                      })
+                      .map((s) => {
+                        const isSelected = selectedLiveChatSession?.id === s.id;
+                        const isHot = s.needs_human === 1;
+                        const isHumanTakeover = s.status === "human_takeover";
+
+                        return (
+                          <div
+                            key={s.id}
+                            onClick={() => {
+                              setSelectedLiveChatSession(s);
+                              loadLiveChatThread(s.id);
+                            }}
+                            className={`p-3.5 transition cursor-pointer flex flex-col gap-1.5 ${
+                              isSelected
+                                ? "bg-indigo-50/80 dark:bg-indigo-950/40 border-l-4 border-indigo-600"
+                                : "hover:bg-white dark:hover:bg-gray-850"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                                  isHot 
+                                    ? "bg-red-500 text-white animate-bounce" 
+                                    : isHumanTakeover 
+                                    ? "bg-emerald-600 text-white" 
+                                    : "bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200"
+                                }`}>
+                                  {isHot ? "🔥" : s.visitor_name ? s.visitor_name.charAt(0).toUpperCase() : "V"}
+                                </div>
+                                <span className="text-xs font-bold text-gray-900 dark:text-white truncate">
+                                  {s.visitor_name || "Prospecto Web"}
+                                  {s.company_name && (
+                                    <span className="font-normal text-gray-400 ml-1">({s.company_name})</span>
+                                  )}
+                                </span>
+                              </div>
+
+                              <span className="text-[10px] text-gray-400 shrink-0 font-mono">
+                                {s.last_message_at
+                                  ? new Date(s.last_message_at).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
+                                  : ""}
+                              </span>
+                            </div>
+
+                            {/* Status Badge */}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {isHot && (
+                                <span className="text-[10px] bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 font-bold px-2 py-0.5 rounded-full border border-red-200 dark:border-red-900 flex items-center gap-1">
+                                  <RiFireFill size={10} /> Lead Caliente
+                                </span>
+                              )}
+                              {isHumanTakeover && (
+                                <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 font-semibold px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-900">
+                                  👤 En Vivo (Tú)
+                                </span>
+                              )}
+                              {s.status === "ai_active" && !isHot && (
+                                <span className="text-[10px] bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-semibold px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-900">
+                                  ⚡ IA SDR Activa
+                                </span>
+                              )}
+                              {s.status === "resolved" && (
+                                <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 font-medium px-2 py-0.5 rounded-full">
+                                  ✓ Resuelto
+                                </span>
+                              )}
+                              <span className="text-[10px] text-gray-400 uppercase font-mono">
+                                {s.language || "ES"}
+                              </span>
+                            </div>
+
+                            {/* Last message snippet */}
+                            <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed">
+                              {s.last_message || "Sin mensajes"}
+                            </p>
+                          </div>
+                        );
+                      })
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Chat Thread & Operator Console (8 cols) */}
+              <div className="lg:col-span-8 flex flex-col h-full bg-white dark:bg-gray-900">
+                {!selectedLiveChatSession ? (
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-3">
+                    <div className="w-16 h-16 rounded-3xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-3xl shadow-xs">
+                      💬
+                    </div>
+                    <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                      Consola de Live Chat & Asistente SDR
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 max-w-md leading-relaxed">
+                      Selecciona una conversación de la columna izquierda para ver los mensajes en tiempo real, supervisar las respuestas del bot de IA o tomar el control para chatear tú mismo con el visitante en vivo.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col h-full">
+                    {/* Chat Header */}
+                    <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gray-50/70 dark:bg-gray-850/50">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-bold text-gray-900 dark:text-white">
+                            {selectedLiveChatSession.visitor_name || "Prospecto Web"}
+                          </h4>
+                          {selectedLiveChatSession.company_name && (
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              • {selectedLiveChatSession.company_name}
+                            </span>
+                          )}
+                          {selectedLiveChatSession.needs_human === 1 && (
+                            <span className="text-[10px] bg-red-500 text-white font-bold px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
+                              <RiFireFill size={10} /> Lead Caliente
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 text-[11px] text-gray-400 mt-0.5 flex-wrap">
+                          {selectedLiveChatSession.visitor_email && (
+                            <span>✉️ {selectedLiveChatSession.visitor_email}</span>
+                          )}
+                          <span>🌐 {selectedLiveChatSession.page_url || "Landing Page"}</span>
+                          <span>ID: {selectedLiveChatSession.id.slice(0, 10)}...</span>
+                        </div>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center gap-2">
+                        {selectedLiveChatSession.status === "human_takeover" ? (
+                          <button
+                            type="button"
+                            disabled={liveChatActionLoading}
+                            onClick={() => handleLiveChatResumeAI(selectedLiveChatSession.id)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs transition cursor-pointer"
+                          >
+                            <RiRobotLine size={14} />
+                            <span>Reactivar IA</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={liveChatActionLoading}
+                            onClick={() => handleLiveChatTakeover(selectedLiveChatSession.id)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs shadow-xs transition cursor-pointer"
+                          >
+                            <RiUser3Line size={14} />
+                            <span>Tomar Control (Pausar IA)</span>
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          disabled={liveChatActionLoading}
+                          onClick={() => handleLiveChatResolve(selectedLiveChatSession.id)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold text-xs transition cursor-pointer"
+                        >
+                          <RiCheckboxCircleLine size={14} />
+                          <span>Resuelto</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Messages Thread */}
+                    <div className="flex-1 p-5 overflow-y-auto space-y-3.5 bg-slate-50/40 dark:bg-gray-900/40">
+                      {liveChatLoadingThread ? (
+                        <div className="py-8 text-center text-xs text-gray-400">
+                          Cargando mensajes del chat...
+                        </div>
+                      ) : selectedLiveChatMessages.length === 0 ? (
+                        <div className="py-8 text-center text-xs text-gray-400">
+                          Esta conversación aún no tiene mensajes.
+                        </div>
+                      ) : (
+                        selectedLiveChatMessages.map((msg) => {
+                          const isVisitor = msg.sender_type === "visitor";
+                          const isHumanAgent = msg.sender_type === "human_agent";
+
+                          return (
+                            <div
+                              key={msg.id}
+                              className={`flex flex-col ${isHumanAgent ? "items-end" : "items-start"}`}
+                            >
+                              <div className="flex items-center gap-1.5 mb-1 px-1">
+                                <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                                  isHumanAgent
+                                    ? "text-emerald-600 dark:text-emerald-400"
+                                    : isVisitor
+                                    ? "text-gray-600 dark:text-gray-300"
+                                    : "text-indigo-600 dark:text-indigo-400"
+                                }`}>
+                                  {isHumanAgent
+                                    ? "Roberto (Tú)"
+                                    : isVisitor
+                                    ? msg.sender_name || "Visitante"
+                                    : "🤖 Asistente InHubFlow"}
+                                </span>
+                                <span className="text-[10px] text-gray-400 font-mono">
+                                  {new Date(msg.created_at).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+                                </span>
+                              </div>
+
+                              <div
+                                className={`text-xs sm:text-sm rounded-2xl px-4 py-2.5 max-w-[80%] leading-relaxed shadow-xs whitespace-pre-wrap ${
+                                  isHumanAgent
+                                    ? "bg-emerald-600 text-white rounded-tr-none"
+                                    : isVisitor
+                                    ? "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 rounded-tl-none"
+                                    : "bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-900 text-indigo-950 dark:text-indigo-200 rounded-tl-none font-normal"
+                                }`}
+                              >
+                                {msg.message}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* Operator Reply Box */}
+                    <form onSubmit={handleLiveChatSendReply} className="p-3 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={liveChatReplyText}
+                          onChange={(e) => setLiveChatReplyText(e.target.value)}
+                          placeholder="Escribe tu mensaje en vivo al visitante (se enviará directamente a su pantalla)..."
+                          className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-xs sm:text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                        <button
+                          type="submit"
+                          disabled={liveChatSendingReply || !liveChatReplyText.trim()}
+                          className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold text-xs shadow-xs transition cursor-pointer shrink-0"
+                        >
+                          <RiSendPlaneFill size={14} />
+                          <span>{liveChatSendingReply ? "Enviando..." : "Enviar"}</span>
+                        </button>
+                      </div>
+                      <div className="text-[11px] text-gray-400 mt-1.5 flex items-center justify-between">
+                        <span>💡 Al responder, la IA se pausa automáticamente para no interferir con tu conversación.</span>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">Sincronización en tiempo real activa</span>
+                      </div>
+                    </form>
+                  </div>
+                )}
               </div>
             </div>
           </div>

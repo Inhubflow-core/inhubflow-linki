@@ -20,7 +20,7 @@ import { isAuthenticated } from "@/lib/auth";
 //                                   can bootstrap the auth flow. A generic 401 here would
 //                                   swallow that header and break every MCP client's first
 //                                   connection attempt.
-const PUBLIC_API_PREFIXES = ["/api/auth/", "/api/oauth/", "/api/mcp", "/api/webhooks/"];
+const PUBLIC_API_PREFIXES = ["/api/auth/", "/api/oauth/", "/api/mcp", "/api/webhooks/", "/api/live-chat/"];
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
