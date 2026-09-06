@@ -245,7 +245,14 @@ export default function LiveChatMobileAdmin() {
         <title>InHubFlow Live Chat | PWA</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
         <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" type="image/png" href="/logo-icon.png" />
+        <link rel="apple-touch-icon" href="/logo-icon.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/logo-icon.png" />
         <meta name="theme-color" content="#4f46e5" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="InHubFlow" />
       </Head>
 
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col font-sans">
@@ -263,15 +270,24 @@ export default function LiveChatMobileAdmin() {
                 <RiArrowLeftLine size={22} />
               </button>
             ) : (
-              <div className="p-2 rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400">
-                <RiCustomerService2Line size={20} />
-              </div>
+              <img
+                src="/logo-icon.png"
+                alt="InHubFlow Logo"
+                className="w-9 h-9 rounded-xl shadow-xs border border-gray-200 dark:border-gray-800 object-cover"
+              />
             )}
             <div>
-              <h1 className="text-base font-bold text-gray-900 dark:text-white leading-tight">
-                {selectedSessionId && currentSession
-                  ? currentSession.visitor_name || currentSession.visitor_email || "Prospecto Web"
-                  : "InHubFlow Live"}
+              <h1 className="text-base font-bold text-gray-900 dark:text-white leading-tight flex items-center gap-1.5">
+                {selectedSessionId && currentSession ? (
+                  currentSession.visitor_name || currentSession.visitor_email || "Prospecto Web"
+                ) : (
+                  <>
+                    <span>InHubFlow</span>
+                    <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                      LIVE
+                    </span>
+                  </>
+                )}
               </h1>
               <span className="text-[11px] text-gray-500 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
