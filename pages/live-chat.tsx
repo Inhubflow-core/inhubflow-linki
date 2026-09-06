@@ -57,6 +57,55 @@ export default function LiveChatMobileAdmin() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const prevSessionsCountRef = useRef<number>(0);
+  const prevHotLeadsRef = useRef<number>(0);
+  const prevMessagesCountRef = useRef<number>(0);
+
+  // Web Audio chime generator (double-tone bell/bip)
+  const playNotificationSound = useCallback(() => {
+    try {
+      if (typeof window === "undefined") return;
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+      const ctx = new AudioContextClass();
+      if (ctx.state === "suspended") {
+        ctx.resume();
+      }
+
+      const now = ctx.currentTime;
+
+      // Note 1: 880 Hz (A5)
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = "sine";
+      osc1.frequency.setValueAtTime(880, now);
+      gain1.gain.setValueAtTime(0.35, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.3);
+
+      // Note 2: 1318.5 Hz (E6) - bell chime harmonic
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = "sine";
+      osc2.frequency.setValueAtTime(1318.5, now + 0.09);
+      gain2.gain.setValueAtTime(0.4, now + 0.09);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now + 0.09);
+      osc2.stop(now + 0.45);
+
+      // Mobile vibration
+      if ("vibrate" in navigator) {
+        navigator.vibrate([150, 80, 150]);
+      }
+    } catch (e) {
+      console.warn("Audio chime error:", e);
+    }
+  }, []);
 
   // Check URL query param for deep link
   useEffect(() => {
@@ -79,7 +128,8 @@ export default function LiveChatMobileAdmin() {
       const perm = await Notification.requestPermission();
       if (perm === "granted") {
         setNotificationsEnabled(true);
-        toast.success("Notificaciones activadas en este dispositivo");
+        playNotificationSound();
+        toast.success("🔔 Notificaciones y sonido BIP activados");
       }
     }
   };
@@ -89,14 +139,35 @@ export default function LiveChatMobileAdmin() {
       const res = await fetch("/api/live-chat/admin");
       if (res.ok) {
         const data = await res.json();
-        setSessions(data.sessions || []);
+        const list = data.sessions || [];
+        setSessions(list);
+
+        const hotLeads = list.filter((s: any) => s.needs_human === 1).length;
+        const totalMessages = list.reduce((acc: number, s: any) => acc + (s.total_messages || 0), 0);
+
+        // Play sound if new message arrived or a lead needs attention
+        if (prevSessionsCountRef.current > 0) {
+          if (hotLeads > prevHotLeadsRef.current || totalMessages > prevMessagesCountRef.current) {
+            playNotificationSound();
+            if (Notification.permission === "granted") {
+              new Notification("🔥 InHubFlow Live Chat", {
+                body: "Nuevo mensaje de prospecto web en la landing page",
+                icon: "/logo-icon.png",
+              });
+            }
+          }
+        }
+
+        prevSessionsCountRef.current = list.length;
+        prevHotLeadsRef.current = hotLeads;
+        prevMessagesCountRef.current = totalMessages;
       }
     } catch (err) {
       console.error("Error al cargar chats:", err);
     } finally {
       setLoadingList(false);
     }
-  }, []);
+  }, [playNotificationSound]);
 
   const loadMessages = useCallback(async (sessionId: string) => {
     try {
@@ -104,7 +175,8 @@ export default function LiveChatMobileAdmin() {
       if (res.ok) {
         const data = await res.json();
         setCurrentSession(data.session);
-        setMessages(data.messages || []);
+        const msgs = data.messages || [];
+        setMessages(msgs);
       }
     } catch (err) {
       console.error("Error al cargar mensajes:", err);
@@ -119,7 +191,7 @@ export default function LiveChatMobileAdmin() {
     }
     if (authStatus === "authenticated") {
       loadSessions();
-      const interval = setInterval(loadSessions, 4000);
+      const interval = setInterval(loadSessions, 3500);
       return () => clearInterval(interval);
     }
   }, [authStatus, loadSessions, router]);
@@ -270,23 +342,16 @@ export default function LiveChatMobileAdmin() {
                 <RiArrowLeftLine size={22} />
               </button>
             ) : (
-              <img
-                src="/logo-icon.png"
-                alt="InHubFlow Logo"
-                className="w-9 h-9 rounded-xl shadow-xs border border-gray-200 dark:border-gray-800 object-cover"
-              />
+              <div className="p-2 rounded-xl bg-indigo-500/15 text-indigo-600 dark:text-indigo-400">
+                <RiCustomerService2Line size={22} />
+              </div>
             )}
             <div>
-              <h1 className="text-base font-bold text-gray-900 dark:text-white leading-tight flex items-center gap-1.5">
+              <h1 className="text-base font-bold text-gray-900 dark:text-white leading-tight">
                 {selectedSessionId && currentSession ? (
                   currentSession.visitor_name || currentSession.visitor_email || "Prospecto Web"
                 ) : (
-                  <>
-                    <span>InHubFlow</span>
-                    <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                      LIVE
-                    </span>
-                  </>
+                  "Live Chat"
                 )}
               </h1>
               <span className="text-[11px] text-gray-500 flex items-center gap-1">
@@ -301,16 +366,22 @@ export default function LiveChatMobileAdmin() {
           </div>
 
           <div className="flex items-center gap-2">
-            {!notificationsEnabled && (
-              <button
-                onClick={requestNotificationPerms}
-                title="Activar notificaciones en tu móvil"
-                className="p-2 rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-400 text-xs font-semibold flex items-center gap-1"
-              >
-                <RiNotification3Line size={16} />
-                <span className="hidden sm:inline">Activar Alertas</span>
-              </button>
-            )}
+            <button
+              onClick={() => {
+                requestNotificationPerms();
+                playNotificationSound();
+                toast.success("🔔 Alertas y sonido BIP activos");
+              }}
+              title={notificationsEnabled ? "Notificaciones y sonido activos" : "Toca para activar sonido y alertas"}
+              className={`p-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                notificationsEnabled
+                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
+                  : "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 animate-pulse"
+              }`}
+            >
+              <RiNotification3Line size={16} />
+              <span className="text-[11px]">{notificationsEnabled ? "Sonido ON" : "Activar Sonido"}</span>
+            </button>
             <button
               onClick={loadSessions}
               className="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
