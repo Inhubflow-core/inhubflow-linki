@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { getDb } from "@/lib/db";
 import { randomUUID } from "crypto";
+import { cleanupInactiveLiveChats } from "@/lib/live-chat/cleanup";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
@@ -16,6 +17,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (userEmail === "inhubflow@gmail.com") userRole = "admin";
 
   const db = getDb();
+  // Auto-prune inactive chats older than 5 minutes
+  cleanupInactiveLiveChats(db);
   if (userRole !== "admin") {
     try {
       const u = db.prepare("SELECT role FROM users WHERE email = ?").get(userEmail) as { role?: string } | undefined;
@@ -150,6 +153,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         `).run(newStatus, sessionId);
 
         return res.status(200).json({ success: true, status: newStatus });
+      }
+
+      if (action === "delete") {
+        db.prepare("DELETE FROM live_chat_messages WHERE session_id = ?").run(sessionId);
+        db.prepare("DELETE FROM live_chat_sessions WHERE id = ?").run(sessionId);
+        return res.status(200).json({ success: true, message: "Chat eliminado" });
       }
 
       if (action === "reply") {

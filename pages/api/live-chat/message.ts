@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getDb } from "@/lib/db";
 import { randomUUID } from "crypto";
 import { sendLiveChatPushNotification } from "@/lib/live-chat/push";
+import { cleanupInactiveLiveChats } from "@/lib/live-chat/cleanup";
 
 function applyCors(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -62,6 +63,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const db = getDb();
+  // Auto-prune inactive chats older than 5 minutes
+  cleanupInactiveLiveChats(db);
 
   try {
     const {

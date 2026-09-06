@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getDb } from "@/lib/db";
+import { cleanupInactiveLiveChats } from "@/lib/live-chat/cleanup";
 
 function applyCors(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -26,18 +27,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const db = getDb();
+  // Auto-prune inactive chats older than 5 minutes
+  cleanupInactiveLiveChats(db);
+
   try {
     if (visitorTyping === "1" || visitorTyping === "true") {
       db.prepare(`
         UPDATE live_chat_sessions 
-        SET visitor_typing_until = datetime('now', '+4 seconds') 
+        SET visitor_typing_until = datetime('now', '+4 seconds'),
+            updated_at = datetime('now')
         WHERE id = ?
       `).run(sessionId);
     }
 
     const session = db.prepare("SELECT * FROM live_chat_sessions WHERE id = ?").get(sessionId) as any;
     if (!session) {
-      return res.status(200).json({ messages: [], status: "not_found" });
+      return res.status(200).json({ session: null, messages: [], status: "expired", expired: true });
     }
 
     const isOperatorTyping = db.prepare(`

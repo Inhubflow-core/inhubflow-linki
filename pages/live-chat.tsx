@@ -17,6 +17,7 @@ import {
   RiNotification3Line,
   RiWhatsappLine,
   RiCheckLine,
+  RiDeleteBinLine,
 } from "react-icons/ri";
 import { toast } from "sonner";
 
@@ -230,6 +231,13 @@ export default function LiveChatMobileAdmin() {
         const list = data.sessions || [];
         setSessions(list);
 
+        // If currently open session was purged due to 5 min inactivity, reset detail view
+        if (selectedSessionId && !list.some((s: any) => s.id === selectedSessionId)) {
+          setSelectedSessionId(null);
+          setCurrentSession(null);
+          setMessages([]);
+        }
+
         const hotLeads = list.filter((s: any) => s.needs_human === 1).length;
 
         // BEEP ONLY when a lead requires human attention (AI Traspaso / Handoff)
@@ -246,7 +254,7 @@ export default function LiveChatMobileAdmin() {
     } finally {
       setLoadingList(false);
     }
-  }, [playNotificationSound]);
+  }, [playNotificationSound, selectedSessionId]);
 
   // Load messages for the selected session
   const loadMessages = useCallback(async (sessionId: string) => {
@@ -272,6 +280,12 @@ export default function LiveChatMobileAdmin() {
         }
 
         setMessages(msgs);
+      } else if (res.status === 404) {
+        // Chat was deleted or expired after 5 minutes of inactivity
+        setSelectedSessionId(null);
+        setCurrentSession(null);
+        setMessages([]);
+        toast.info("El chat expiró y fue eliminado por inactividad (5 min).");
       }
     } catch (err) {
       console.error("Error al cargar mensajes:", err);
@@ -419,6 +433,29 @@ export default function LiveChatMobileAdmin() {
       }
     } catch {
       toast.error("Error al resolver chat");
+    }
+  };
+
+  const handleDeleteChat = async () => {
+    if (!selectedSessionId) return;
+    if (!confirm("¿Eliminar este chat ahora de la base de datos?")) return;
+    try {
+      const res = await fetch("/api/live-chat/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", sessionId: selectedSessionId }),
+      });
+      if (res.ok) {
+        toast.success("Chat eliminado de la base de datos");
+        setSelectedSessionId(null);
+        setCurrentSession(null);
+        setMessages([]);
+        loadSessions();
+      } else {
+        toast.error("No se pudo eliminar el chat");
+      }
+    } catch {
+      toast.error("Error al eliminar chat");
     }
   };
 
@@ -637,6 +674,15 @@ export default function LiveChatMobileAdmin() {
                     >
                       <RiCheckboxCircleLine size={15} />
                       <span>Resolver</span>
+                    </button>
+
+                    <button
+                      onClick={handleDeleteChat}
+                      title="Eliminar chat de la base de datos inmediatamente"
+                      className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300 font-semibold cursor-pointer border border-red-200 dark:border-red-800 transition"
+                    >
+                      <RiDeleteBinLine size={15} />
+                      <span>Eliminar</span>
                     </button>
                   </div>
 
