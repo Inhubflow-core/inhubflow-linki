@@ -632,6 +632,34 @@ function runMigrations(db: Database.Database) {
       created_at TEXT DEFAULT (datetime('now'))
     )`,
     "CREATE INDEX IF NOT EXISTS idx_ticket_messages_ticket ON support_ticket_messages(ticket_id, created_at ASC)",
+    // InHubFlow Live Chat & AI Pre-qualifier System
+    `CREATE TABLE IF NOT EXISTS live_chat_sessions (
+      id TEXT PRIMARY KEY,
+      visitor_name TEXT,
+      visitor_email TEXT,
+      company_name TEXT,
+      language TEXT DEFAULT 'es',
+      status TEXT DEFAULT 'ai_active' CHECK(status IN ('ai_active', 'human_takeover', 'resolved', 'closed')),
+      needs_human INTEGER DEFAULT 0,
+      human_notified INTEGER DEFAULT 0,
+      page_url TEXT,
+      user_agent TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      last_visitor_message_at TEXT DEFAULT (datetime('now'))
+    )`,
+    "CREATE INDEX IF NOT EXISTS idx_live_chat_sessions_status ON live_chat_sessions(status, updated_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_live_chat_sessions_needs_human ON live_chat_sessions(needs_human, updated_at DESC)",
+    `CREATE TABLE IF NOT EXISTS live_chat_messages (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL REFERENCES live_chat_sessions(id) ON DELETE CASCADE,
+      sender_type TEXT NOT NULL CHECK(sender_type IN ('visitor', 'ai', 'human_agent')),
+      sender_name TEXT,
+      message TEXT NOT NULL,
+      metadata_json TEXT DEFAULT '{}',
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    "CREATE INDEX IF NOT EXISTS idx_live_chat_messages_session ON live_chat_messages(session_id, created_at ASC)",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
