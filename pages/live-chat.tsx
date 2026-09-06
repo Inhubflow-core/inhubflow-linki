@@ -425,9 +425,9 @@ export default function LiveChatMobileAdmin() {
   return (
     <>
       <Head>
-        <title>InHubFlow Live Chat | PWA</title>
+        <title>Live Chat</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
-        <link rel="manifest" href="/manifest.json" />
+        <link rel="manifest" href="/manifest-live-chat.json" />
         <link rel="icon" type="image/png" href="/logo-icon.png" />
         <link rel="apple-touch-icon" href="/logo-icon.png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/logo-icon.png" />
@@ -435,7 +435,8 @@ export default function LiveChatMobileAdmin() {
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="InHubFlow" />
+        <meta name="apple-mobile-web-app-title" content="Live Chat" />
+        <meta name="application-name" content="Live Chat" />
       </Head>
 
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col font-sans">
