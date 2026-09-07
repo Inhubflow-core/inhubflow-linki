@@ -25,6 +25,7 @@ import {
   RiMenuUnfoldLine,
   RiShieldCheckLine,
   RiTeamLine,
+  RiVideoLine,
 } from "react-icons/ri";
 import { pathToTourPage, replayPageTour } from "@/lib/tour";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
@@ -333,12 +334,12 @@ export default function Sidebar({
                 </button>
               )}
               <Link
-                href="/support"
+                href="/tutorials"
                 onClick={() => setHelpOpen(false)}
                 className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800 transition-colors"
               >
-                <RiCustomerService2Line size={14} className="text-gray-400 shrink-0" />
-                {t("nav.support")}
+                <RiVideoLine size={14} className="text-gray-400 shrink-0" />
+                {t("nav.tutorials")}
               </Link>
             </div>
           )}
