@@ -204,17 +204,30 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               }`}
               style={{ maxHeight: "calc(100vh - 270px)", minHeight: "480px" }}
             >
-              {/* Column Header */}
-              <div className="p-3.5 border-b border-gray-300 dark:border-gray-700 bg-white/70 dark:bg-gray-800/70 rounded-t-2xl flex items-center justify-between">
+              {/* Column Header con fondo translúcido acorde al color de la etapa */}
+              <div
+                className="p-3.5 border-b border-gray-300 dark:border-gray-700 rounded-t-2xl flex items-center justify-between transition-colors"
+                style={{
+                  backgroundColor: `${stage.color}15`,
+                  borderBottomColor: `${stage.color}35`,
+                }}
+              >
                 <div className="flex items-center gap-2 min-w-0">
                   <span
-                    className="w-3 h-3 rounded-full shrink-0 shadow-2xs"
+                    className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs"
                     style={{ backgroundColor: stage.color }}
                   />
-                  <h3 className="font-semibold text-xs text-gray-800 dark:text-gray-200 truncate">
+                  <h3 className="font-bold text-xs text-gray-900 dark:text-white truncate">
                     {stage.name}
                   </h3>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600">
+                  <span
+                    className="text-[11px] font-bold px-2 py-0.5 rounded-full border shadow-2xs"
+                    style={{
+                      backgroundColor: `${stage.color}25`,
+                      color: stage.color,
+                      borderColor: `${stage.color}45`,
+                    }}
+                  >
                     {cards.length}
                   </span>
                 </div>
