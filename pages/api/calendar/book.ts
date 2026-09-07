@@ -108,6 +108,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       auto_advance_pipeline: true,
     });
 
+    // 5. Safely attempt to send confirmation email if SMTP is configured
+    try {
+      const emailAcc = db.prepare(`SELECT * FROM email_accounts LIMIT 1`).get() as any;
+      if (emailAcc && emailAcc.smtp_host) {
+        const { sendEmail } = await import("@/lib/email/sender");
+        const formattedDate = new Date(slotStart).toLocaleString("es-ES", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        const emailSubject = `Confirmación de Reunión: ${title}`;
+        const emailBody = `Hola ${cleanName},\n\nTu reunión ha sido agendada con éxito.\n\nFecha y hora: ${formattedDate} (${settings.timezone})\nEnlace de Google Meet: ${meetingLink}\n\n¡Nos vemos pronto!\nEquipo InHubFlow`;
+
+        sendEmail(emailAcc, cleanEmail, emailSubject, emailBody).catch((e) =>
+          console.warn("[calendar/book] Failed to dispatch email confirmation:", e)
+        );
+      }
+    } catch (emailErr) {
+      console.warn("[calendar/book] Email confirmation skipped:", emailErr);
+    }
+
     return res.status(201).json({
       ok: true,
       event,

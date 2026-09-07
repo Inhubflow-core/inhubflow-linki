@@ -11,9 +11,15 @@ import {
   RiChat3Line,
   RiSaveLine,
   RiCheckLine,
+  RiCalendarEventLine,
+  RiVideoLine,
+  RiAddLine,
+  RiTimeLine,
 } from "react-icons/ri";
 import { toast } from "sonner";
 import type { PipelineCard, PipelineStageWithCount } from "@/lib/pipeline/pipeline-service";
+import { ScheduleModal } from "@/components/calendar/ScheduleModal";
+import type { CalendarEventWithTarget } from "@/lib/calendar/calendar-service";
 
 interface LeadDrawerProps {
   card: PipelineCard | null;
@@ -38,6 +44,11 @@ export const LeadDrawer: React.FC<LeadDrawerProps> = ({
   const [autopilot, setAutopilot] = useState(false);
   const [togglingAutopilot, setTogglingAutopilot] = useState(false);
 
+  // Calendar meetings for this prospect
+  const [meetings, setMeetings] = useState<CalendarEventWithTarget[]>([]);
+  const [loadingMeetings, setLoadingMeetings] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+
   useEffect(() => {
     if (card) {
       setAutopilot(Boolean(card.sdr_autopilot));
@@ -52,6 +63,18 @@ export const LeadDrawer: React.FC<LeadDrawerProps> = ({
           }
         })
         .catch(() => setNotes(""));
+
+      // Fetch calendar meetings
+      setLoadingMeetings(true);
+      fetch(`/api/calendar/events?target_id=${encodeURIComponent(card.id)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          setMeetings(data?.events || []);
+        })
+        .catch(() => setMeetings([]))
+        .finally(() => setLoadingMeetings(false));
+    } else {
+      setMeetings([]);
     }
   }, [card]);
 
@@ -256,6 +279,91 @@ export const LeadDrawer: React.FC<LeadDrawerProps> = ({
             </div>
           </div>
 
+          {/* Scheduled Meetings */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-base-content/60 flex items-center gap-1.5">
+                <RiCalendarEventLine size={14} className="text-primary" />
+                Reuniones Comerciales {meetings.length > 0 && `(${meetings.length})`}
+              </h4>
+              <button
+                type="button"
+                onClick={() => setShowScheduleModal(true)}
+                className="btn btn-xs btn-outline btn-primary gap-1"
+              >
+                <RiAddLine size={13} />
+                Agendar Cita
+              </button>
+            </div>
+
+            {loadingMeetings ? (
+              <div className="py-3 text-center text-xs text-base-content/50">Cargando citas...</div>
+            ) : meetings.length === 0 ? (
+              <div className="p-3.5 rounded-xl border border-dashed border-base-300 text-center bg-base-200/30">
+                <p className="text-xs text-base-content/60">No hay reuniones agendadas con este prospecto.</p>
+                <button
+                  type="button"
+                  onClick={() => setShowScheduleModal(true)}
+                  className="mt-1.5 text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1"
+                >
+                  <RiAddLine size={13} /> Programar cita ahora
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {meetings.map((m) => {
+                  const mDate = new Date(m.start_time).toLocaleDateString("es-ES", {
+                    weekday: "short",
+                    day: "numeric",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  });
+                  const statusInfo =
+                    m.status === "confirmed"
+                      ? { label: "Confirmada", cls: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" }
+                      : m.status === "completed"
+                      ? { label: "Realizada", cls: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20" }
+                      : m.status === "cancelled"
+                      ? { label: "Cancelada", cls: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20" }
+                      : { label: "No Asistió", cls: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" };
+
+                  return (
+                    <div
+                      key={m.id}
+                      className="p-3 rounded-xl border border-base-300 bg-base-200/40 space-y-2"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-base-content truncate">{m.title}</p>
+                          <p className="text-[11px] text-base-content/70 flex items-center gap-1 mt-0.5">
+                            <RiTimeLine size={12} className="text-primary shrink-0" />
+                            {mDate}
+                          </p>
+                        </div>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold shrink-0 ${statusInfo.cls}`}>
+                          {statusInfo.label}
+                        </span>
+                      </div>
+
+                      {m.meeting_link && (
+                        <a
+                          href={m.meeting_link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline font-semibold"
+                        >
+                          <RiVideoLine size={12} />
+                          Unirse a Videollamada
+                        </a>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           {/* Notes */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -299,6 +407,32 @@ export const LeadDrawer: React.FC<LeadDrawerProps> = ({
           </Link>
         </div>
       </div>
+
+      {/* Schedule Modal */}
+      {showScheduleModal && (
+        <ScheduleModal
+          isOpen={showScheduleModal}
+          onClose={() => setShowScheduleModal(false)}
+          initialTarget={{
+            id: card.id,
+            full_name: card.full_name,
+            company: card.company,
+            title: card.title,
+            email: card.email,
+            linkedin_url: card.linkedin_url,
+          }}
+          onEventCreated={(newEvent) => {
+            setMeetings((prev) => [newEvent, ...prev]);
+            // If the card moved to meeting stage, update stage in drawer
+            const meetingStage = stages.find(
+              (s) => s.trigger_key === "sdr_meeting" || s.id === "stage_meeting"
+            );
+            if (meetingStage && meetingStage.id !== card.stage_id) {
+              onStageChange(card.id, meetingStage.id);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

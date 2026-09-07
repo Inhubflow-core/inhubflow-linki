@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { FiUserPlus, FiMessageSquare, FiEye, FiRepeat, FiUsers, FiRefreshCw } from "react-icons/fi";
 import { RiMailSendLine, RiReplyLine, RiRobot2Line, RiLinkedinBoxLine, RiFilterLine } from "react-icons/ri";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
+import { UpcomingMeetingsWidget } from "@/components/calendar/UpcomingMeetingsWidget";
 
 interface DashboardStats {
   totals: {
@@ -756,8 +757,11 @@ export default function Dashboard() {
           {hasPremium && agentStats && <AiUsagePanel data={agentStats.daily} days={days} />}
         </div>
 
-        {/* Right: activity chart */}
-        <ActivityChart data={stats.activity} days={days} onDaysChange={setDays} />
+        {/* Right: activity chart & upcoming commercial meetings widget */}
+        <div className="space-y-4">
+          <ActivityChart data={stats.activity} days={days} onDaysChange={setDays} />
+          <UpcomingMeetingsWidget />
+        </div>
       </div>
     </div>
     </>

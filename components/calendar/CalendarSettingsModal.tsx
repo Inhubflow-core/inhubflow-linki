@@ -206,6 +206,32 @@ export const CalendarSettingsModal: React.FC<CalendarSettingsModalProps> = ({
             </div>
           </div>
 
+          {/* External Calendar Sync (iCal Feed) */}
+          <div className="p-3.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-850/60 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                Sincronización con Google Calendar / Outlook (Feed iCal)
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  const feedUrl = typeof window !== "undefined" ? `${window.location.origin}/api/calendar/feed` : "/api/calendar/feed";
+                  navigator.clipboard.writeText(feedUrl);
+                  toast.success("Enlace de suscripción iCal copiado. Pégalo en Google Calendar ('Desde URL') u Outlook.");
+                }}
+                className="inline-flex items-center gap-1 text-xs font-bold text-gray-600 dark:text-gray-300 hover:text-brand-500 dark:hover:text-brand-400 hover:underline"
+              >
+                <RiFileCopyLine size={14} /> Copiar Feed iCal
+              </button>
+            </div>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
+              Agrega esta URL como suscripción de calendario web en tu Google Calendar, Apple Calendar o Microsoft Outlook para reflejar automáticamente las citas agendadas en tiempo real.
+            </p>
+            <div className="text-xs text-gray-600 dark:text-gray-300 font-mono bg-white dark:bg-gray-900 p-2 rounded-lg border border-gray-200 dark:border-gray-800 truncate">
+              {typeof window !== "undefined" ? `${window.location.origin}/api/calendar/feed` : "/api/calendar/feed"}
+            </div>
+          </div>
+
           {/* Duration & Notice Parameters */}
           <div className="grid grid-cols-2 gap-3">
             <div>
