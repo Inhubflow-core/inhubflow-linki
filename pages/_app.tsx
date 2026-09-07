@@ -9,7 +9,11 @@ import { LanguageProvider } from "@/lib/i18n/LanguageContext";
 import { ThemeProvider, useTheme } from "@/lib/context/ThemeContext";
 import { NotificationProvider } from "@/components/notifications/NotificationProvider";
 
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = ["/login", "/book"];
+
+function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -17,7 +21,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (status === "loading") return;
-    if (!session && !PUBLIC_PATHS.includes(router.pathname)) {
+    if (!session && !isPublicPath(router.pathname)) {
       router.replace("/login");
     }
   }, [session, status, router]);
@@ -30,7 +34,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!session && !PUBLIC_PATHS.includes(router.pathname)) return null;
+  if (!session && !isPublicPath(router.pathname)) return null;
 
   return <>{children}</>;
 }

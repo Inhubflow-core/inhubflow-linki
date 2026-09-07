@@ -4,7 +4,7 @@ import Sidebar from "./Sidebar";
 import Header from "./Header";
 import TourGate from "@/components/onboarding/TourGate";
 
-const NO_LAYOUT_PATHS = ["/login", "/live-chat"];
+const NO_LAYOUT_PATHS = ["/login", "/live-chat", "/book"];
 
 export default function Layout({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -40,7 +40,11 @@ export default function Layout({ children }: { children: ReactNode }) {
     handleCollapse(!isCollapsed);
   };
 
-  if (NO_LAYOUT_PATHS.includes(router.pathname)) {
+  const isNoLayout = NO_LAYOUT_PATHS.some(
+    (p) => router.pathname === p || router.pathname.startsWith(`${p}/`)
+  );
+
+  if (isNoLayout) {
     return <>{children}</>;
   }
 

@@ -168,7 +168,7 @@ export function resolveSdrOperationalStatus(
     outboundEnabled,
     linkedinOutboundEnabled: outboundEnabled && linkedinOutboundMaster,
     emailOutboundEnabled: outboundEnabled && emailOutboundMaster,
-    calendarEnabled: envEnabled("NATIVE_CALENDAR_ENABLED"),
+    calendarEnabled: process.env.NATIVE_CALENDAR_ENABLED !== "false" && process.env.NATIVE_CALENDAR_ENABLED !== "0",
     reason: effectiveMode === "off" ? (requestedMode === "off" ? "disabled" : "module_unavailable") : "ready",
     blockers: [...new Set(blockers)],
     agentId: agent.id,

@@ -11,6 +11,9 @@ import {
   RiSearchLine,
   RiRefreshLine,
   RiFilter3Line,
+  RiShareLine,
+  RiSettings4Line,
+  RiCheckLine,
 } from "react-icons/ri";
 import { toast } from "sonner";
 import { CalendarHeader, type CalendarViewMode } from "@/components/calendar/CalendarHeader";
@@ -19,6 +22,7 @@ import { WeekView } from "@/components/calendar/WeekView";
 import { AgendaView } from "@/components/calendar/AgendaView";
 import { ScheduleModal } from "@/components/calendar/ScheduleModal";
 import { EventDetailModal } from "@/components/calendar/EventDetailModal";
+import { CalendarSettingsModal } from "@/components/calendar/CalendarSettingsModal";
 import {
   getCalendarEvents,
   type CalendarEventWithTarget,
@@ -49,6 +53,7 @@ export default function CalendarPage({ initialEvents }: CalendarPageProps) {
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [copiedLink, setCopiedLink] = useState(false);
 
   // Modals state
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
@@ -57,6 +62,16 @@ export default function CalendarPage({ initialEvents }: CalendarPageProps) {
 
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEventWithTarget | null>(null);
+
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+
+  const handleCopyBookingLink = () => {
+    const url = `${window.location.origin}/book`;
+    navigator.clipboard.writeText(url);
+    setCopiedLink(true);
+    toast.success("Enlace público de reserva copiado al portapapeles");
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
 
   // Fetch events from API
   const fetchEvents = useCallback(async () => {
@@ -222,6 +237,25 @@ export default function CalendarPage({ initialEvents }: CalendarPageProps) {
                 Agenda
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={handleCopyBookingLink}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
+              title="Copiar enlace de reserva pública estilo Calendly"
+            >
+              {copiedLink ? <RiCheckLine size={16} className="text-emerald-500" /> : <RiShareLine size={16} />}
+              {copiedLink ? "¡Copiado!" : "Copiar Link"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSettingsModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
+              title="Configurar horarios y disponibilidad"
+            >
+              <RiSettings4Line size={16} /> Horarios
+            </button>
 
             <button
               type="button"
@@ -398,6 +432,13 @@ export default function CalendarPage({ initialEvents }: CalendarPageProps) {
           onClose={() => setDetailModalOpen(false)}
           onEventUpdated={handleEventUpdated}
           onEventDeleted={handleEventDeleted}
+        />
+
+        {/* Calendar Settings Modal */}
+        <CalendarSettingsModal
+          isOpen={settingsModalOpen}
+          onClose={() => setSettingsModalOpen(false)}
+          onSaved={() => fetchEvents()}
         />
       </div>
     </>
