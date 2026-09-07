@@ -197,24 +197,24 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               onDragOver={(e) => handleDragOver(e, stage.id)}
               onDragLeave={(e) => handleDragLeave(e, stage.id)}
               onDrop={(e) => handleDrop(e, stage.id)}
-              className={`w-72 shrink-0 flex flex-col rounded-2xl bg-base-200/50 border transition-all duration-150 ${
+              className={`w-72 shrink-0 flex flex-col rounded-2xl bg-gray-50/80 dark:bg-gray-850/80 border transition-all duration-150 shadow-xs ${
                 isDragOver
-                  ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                  : "border-base-300/70"
+                  ? "border-brand-500 bg-brand-50/30 dark:bg-brand-950/20 ring-2 ring-brand-500/20"
+                  : "border-gray-300 dark:border-gray-700"
               }`}
               style={{ maxHeight: "calc(100vh - 270px)", minHeight: "480px" }}
             >
               {/* Column Header */}
-              <div className="p-3.5 border-b border-base-300/60 flex items-center justify-between">
+              <div className="p-3.5 border-b border-gray-300 dark:border-gray-700 bg-white/70 dark:bg-gray-800/70 rounded-t-2xl flex items-center justify-between">
                 <div className="flex items-center gap-2 min-w-0">
                   <span
                     className="w-3 h-3 rounded-full shrink-0 shadow-2xs"
                     style={{ backgroundColor: stage.color }}
                   />
-                  <h3 className="font-semibold text-xs text-base-content truncate">
+                  <h3 className="font-semibold text-xs text-gray-800 dark:text-gray-200 truncate">
                     {stage.name}
                   </h3>
-                  <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-base-300 text-base-content/70">
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600">
                     {cards.length}
                   </span>
                 </div>
@@ -224,13 +224,13 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   <button
                     tabIndex={0}
                     type="button"
-                    className="p-1 rounded-md text-base-content/40 hover:text-base-content hover:bg-base-300/60 transition-colors"
+                    className="p-1 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200/60 dark:hover:bg-gray-700/60 transition-colors"
                   >
                     <RiMore2Fill size={15} />
                   </button>
                   <ul
                     tabIndex={0}
-                    className="dropdown-content z-20 menu p-1 shadow-lg bg-base-100 rounded-box w-40 border border-base-300 text-xs"
+                    className="dropdown-content z-20 menu p-1 shadow-lg bg-white dark:bg-gray-800 rounded-box w-40 border border-gray-300 dark:border-gray-700 text-xs"
                   >
                     <li>
                       <button onClick={() => openEditStageModal(stage)}>
@@ -263,7 +263,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 ))}
 
                 {cards.length === 0 && (
-                  <div className="h-28 border border-dashed border-base-300 rounded-xl flex items-center justify-center text-xs text-base-content/40">
+                  <div className="h-28 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl flex items-center justify-center text-xs font-medium text-gray-500 dark:text-gray-400 bg-white/50 dark:bg-gray-900/40">
                     Arrastra prospectos aquí
                   </div>
                 )}
@@ -277,7 +277,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           <button
             type="button"
             onClick={openCreateStageModal}
-            className="w-full h-14 border-2 border-dashed border-base-300 hover:border-primary/60 rounded-2xl flex items-center justify-center gap-2 text-xs font-semibold text-base-content/60 hover:text-primary transition-colors bg-base-100/50 hover:bg-primary/5"
+            className="w-full h-14 border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-brand-500 rounded-2xl flex items-center justify-center gap-2 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:text-brand-600 transition-colors bg-white/60 dark:bg-gray-900/50 hover:bg-brand-50/20 shadow-xs"
           >
             <RiAddLine size={16} />
             Nueva Etapa

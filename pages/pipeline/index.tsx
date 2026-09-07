@@ -198,10 +198,10 @@ export default function PipelinePage({
 
           <div className="flex items-center gap-2 shrink-0">
             {/* View switcher: Table vs Kanban */}
-            <div className="join border border-base-300 rounded-lg p-0.5 bg-base-200/50">
+            <div className="join border border-gray-300 dark:border-gray-700 rounded-xl p-0.5 bg-gray-100 dark:bg-gray-800 shadow-xs">
               <Link
                 href="/contacts"
-                className="join-item btn btn-xs btn-ghost gap-1 text-base-content/60 hover:text-base-content"
+                className="join-item btn btn-xs btn-ghost gap-1 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
                 title="Ver lista tabular de contactos"
               >
                 <RiListCheck2 size={13} />
@@ -219,7 +219,7 @@ export default function PipelinePage({
 
             <Link
               href="/lead-finder"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
             >
               <RiUserSearchLine size={16} /> {t("nav.leadFinder")}
             </Link>
@@ -239,12 +239,12 @@ export default function PipelinePage({
         <div className="flex items-center gap-3 mb-5 flex-wrap">
           {/* Search */}
           <div className="relative">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-base-content/30 pointer-events-none">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
               <RiSearchLine size={13} />
             </span>
             <input
               type="text"
-              className="w-56 bg-base-200 border border-base-300/50 rounded-lg pl-8 pr-3 py-1.5 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:border-primary/40"
+              className="w-56 bg-white dark:bg-gray-850 border border-gray-300 dark:border-gray-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-brand-500 shadow-xs"
               placeholder="Buscar prospecto, empresa..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -253,7 +253,7 @@ export default function PipelinePage({
 
           {/* List selector */}
           <select
-            className="bg-base-200 border border-base-300/50 rounded-lg px-2.5 py-1.5 text-sm text-base-content focus:outline-none focus:border-primary/40 h-8"
+            className="bg-white dark:bg-gray-850 border border-gray-300 dark:border-gray-700 rounded-xl px-2.5 py-1.5 text-xs text-gray-800 dark:text-gray-200 focus:outline-none focus:border-brand-500 h-8 shadow-xs cursor-pointer"
             value={selectedList}
             onChange={(e) => setSelectedList(e.target.value)}
           >
@@ -267,7 +267,7 @@ export default function PipelinePage({
 
           {/* Workflow selector */}
           <select
-            className="bg-base-200 border border-base-300/50 rounded-lg px-2.5 py-1.5 text-sm text-base-content focus:outline-none focus:border-primary/40 h-8"
+            className="bg-white dark:bg-gray-850 border border-gray-300 dark:border-gray-700 rounded-xl px-2.5 py-1.5 text-xs text-gray-800 dark:text-gray-200 focus:outline-none focus:border-brand-500 h-8 shadow-xs cursor-pointer"
             value={selectedWorkflow}
             onChange={(e) => setSelectedWorkflow(e.target.value)}
           >
@@ -280,12 +280,12 @@ export default function PipelinePage({
           </select>
 
           {/* Channel selector */}
-          <div className="join border border-base-300/50 rounded-lg p-0.5 bg-base-200 h-8 flex items-center">
+          <div className="join border border-gray-300 dark:border-gray-700 rounded-xl p-0.5 bg-gray-100 dark:bg-gray-800 h-8 flex items-center shadow-xs">
             <button
               type="button"
               onClick={() => setChannelFilter("all")}
-              className={`join-item px-2.5 py-1 rounded text-xs transition-colors ${
-                channelFilter === "all" ? "bg-brand-500 text-white font-medium shadow-xs" : "text-base-content/60 hover:text-base-content"
+              className={`join-item px-2.5 py-1 rounded-lg text-xs transition-colors ${
+                channelFilter === "all" ? "bg-brand-500 text-white font-medium shadow-xs" : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
               }`}
             >
               Todos
@@ -293,8 +293,8 @@ export default function PipelinePage({
             <button
               type="button"
               onClick={() => setChannelFilter("linkedin")}
-              className={`join-item px-2.5 py-1 rounded text-xs transition-colors ${
-                channelFilter === "linkedin" ? "bg-brand-500 text-white font-medium shadow-xs" : "text-base-content/60 hover:text-base-content"
+              className={`join-item px-2.5 py-1 rounded-lg text-xs transition-colors ${
+                channelFilter === "linkedin" ? "bg-brand-500 text-white font-medium shadow-xs" : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
               }`}
             >
               LinkedIn
@@ -302,8 +302,8 @@ export default function PipelinePage({
             <button
               type="button"
               onClick={() => setChannelFilter("email")}
-              className={`join-item px-2.5 py-1 rounded text-xs transition-colors ${
-                channelFilter === "email" ? "bg-brand-500 text-white font-medium shadow-xs" : "text-base-content/60 hover:text-base-content"
+              className={`join-item px-2.5 py-1 rounded-lg text-xs transition-colors ${
+                channelFilter === "email" ? "bg-brand-500 text-white font-medium shadow-xs" : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
               }`}
             >
               Email
@@ -314,10 +314,10 @@ export default function PipelinePage({
             <button
               type="button"
               onClick={() => setOnlyHuman((prev) => !prev)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors shadow-xs ${
                 onlyHuman
                   ? "bg-error/15 text-error border-error/30 font-semibold"
-                  : "bg-base-200 border-base-300/50 text-base-content/60 hover:text-base-content"
+                  : "bg-white dark:bg-gray-850 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:border-gray-400"
               }`}
             >
               <RiAlertLine size={13} />

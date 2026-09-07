@@ -60,7 +60,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ card, onSelect, onDragSt
       draggable
       onDragStart={(e) => onDragStart(e, card.id)}
       onClick={() => onSelect(card)}
-      className="group relative bg-base-100 hover:bg-base-200/50 border border-base-300/80 hover:border-primary/50 rounded-xl p-3.5 shadow-xs hover:shadow-md transition-all cursor-grab active:cursor-grabbing select-none"
+      className="group relative bg-white dark:bg-gray-900 hover:bg-gray-50/90 dark:hover:bg-gray-850 border border-gray-300 dark:border-gray-700 hover:border-brand-500/60 rounded-xl p-3.5 shadow-xs hover:shadow-md transition-all cursor-grab active:cursor-grabbing select-none"
     >
       {/* Top Header: Channel + Tags */}
       <div className="flex items-center justify-between gap-1.5 mb-2.5">
