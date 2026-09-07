@@ -7,6 +7,7 @@ import { encryptSecret, isEncrypted } from "@/lib/crypto";
 import { autoSeedInstance } from "@/lib/auto-seed";
 import { applySdrSchema } from "@/lib/sdr-agent/schema";
 import { applyPipelineSchema } from "@/lib/pipeline/schema";
+import { applyCalendarSchema } from "@/lib/calendar/schema";
 
 function resolveDbPath(): string {
   if (process.env.INHUBFLOW_DB_PATH) return process.env.INHUBFLOW_DB_PATH;
@@ -923,6 +924,9 @@ function runMigrations(db: Database.Database) {
 
   // Pipeline CRM module: Kanban stages and target stage associations.
   applyPipelineSchema(db);
+
+  // Calendar and scheduling module
+  applyCalendarSchema(db);
 }
 
 // Cleanup migration for previously inserted targets that had concatenated DOM card strings

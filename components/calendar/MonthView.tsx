@@ -1,0 +1,209 @@
+import React from "react";
+import type { CalendarEventWithTarget } from "@/lib/calendar/calendar-service";
+import { RiVideoLine, RiUserLine, RiBuildingLine } from "react-icons/ri";
+
+interface MonthViewProps {
+  currentDate: Date;
+  events: CalendarEventWithTarget[];
+  onSelectEvent: (event: CalendarEventWithTarget) => void;
+  onSelectDate: (date: Date) => void;
+}
+
+const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+export const MonthView: React.FC<MonthViewProps> = ({
+  currentDate,
+  events,
+  onSelectEvent,
+  onSelectDate,
+}) => {
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+
+  // Compute days for calendar grid
+  const calendarDays = React.useMemo(() => {
+    const firstDayOfMonth = new Date(year, month, 1);
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+
+    // Days in week: Sunday=0, Monday=1, ... Saturday=6
+    // We want Monday as index 0, Sunday as index 6
+    let startDayOfWeek = firstDayOfMonth.getDay() - 1;
+    if (startDayOfWeek === -1) startDayOfWeek = 6;
+
+    const days: Array<{
+      date: Date;
+      isCurrentMonth: boolean;
+      isToday: boolean;
+      events: CalendarEventWithTarget[];
+    }> = [];
+
+    const todayStr = new Date().toISOString().split("T")[0];
+
+    // Padding days from previous month
+    const prevMonthLastDay = new Date(year, month, 0).getDate();
+    for (let i = startDayOfWeek - 1; i >= 0; i--) {
+      const d = new Date(year, month - 1, prevMonthLastDay - i);
+      const dStr = d.toISOString().split("T")[0];
+      days.push({
+        date: d,
+        isCurrentMonth: false,
+        isToday: dStr === todayStr,
+        events: events.filter((e) => e.start_time.startsWith(dStr)),
+      });
+    }
+
+    // Days in current month
+    for (let i = 1; i <= lastDayOfMonth.getDate(); i++) {
+      const d = new Date(year, month, i);
+      // Ensure local date matching
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const dayNum = String(d.getDate()).padStart(2, "0");
+      const dStr = `${y}-${m}-${dayNum}`;
+
+      days.push({
+        date: d,
+        isCurrentMonth: true,
+        isToday: dStr === todayStr,
+        events: events.filter((e) => {
+          const eDate = new Date(e.start_time);
+          const ey = eDate.getFullYear();
+          const em = String(eDate.getMonth() + 1).padStart(2, "0");
+          const ed = String(eDate.getDate()).padStart(2, "0");
+          return `${ey}-${em}-${ed}` === dStr;
+        }),
+      });
+    }
+
+    // Padding days for next month to complete rows of 7
+    const remainingDays = 42 - days.length; // 6 weeks standard grid
+    if (remainingDays > 0 && remainingDays < 7) {
+      for (let i = 1; i <= remainingDays; i++) {
+        const d = new Date(year, month + 1, i);
+        const dStr = d.toISOString().split("T")[0];
+        days.push({
+          date: d,
+          isCurrentMonth: false,
+          isToday: dStr === todayStr,
+          events: events.filter((e) => e.start_time.startsWith(dStr)),
+        });
+      }
+    }
+
+    return days;
+  }, [year, month, events]);
+
+  function getStatusStyle(status: string) {
+    switch (status) {
+      case "completed":
+        return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20";
+      case "cancelled":
+        return "bg-gray-200 dark:bg-gray-800 text-gray-500 line-through border-gray-300 dark:border-gray-700";
+      case "no_show":
+        return "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20";
+      default:
+        return "bg-brand-500/15 text-brand-700 dark:text-brand-300 border-brand-500/20";
+    }
+  }
+
+  function formatTime(iso: string) {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    } catch {
+      return "";
+    }
+  }
+
+  return (
+    <div className="w-full rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xs overflow-hidden">
+      {/* Weekday headers */}
+      <div className="grid grid-cols-7 border-b border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-850/80">
+        {WEEKDAYS.map((wd, idx) => (
+          <div
+            key={wd}
+            className={`py-3 text-center text-xs font-semibold uppercase tracking-wider ${
+              idx >= 5
+                ? "text-gray-400 dark:text-gray-500"
+                : "text-gray-700 dark:text-gray-300"
+            }`}
+          >
+            {wd}
+          </div>
+        ))}
+      </div>
+
+      {/* Days Grid */}
+      <div className="grid grid-cols-7 divide-x divide-y divide-gray-100 dark:divide-gray-800/60">
+        {calendarDays.map((cell, idx) => {
+          const maxVisible = 3;
+          const visibleEvents = cell.events.slice(0, maxVisible);
+          const overflowCount = cell.events.length - maxVisible;
+
+          return (
+            <div
+              key={idx}
+              onClick={() => onSelectDate(cell.date)}
+              className={`min-h-[110px] md:min-h-[125px] p-2 flex flex-col transition-colors cursor-pointer group ${
+                cell.isCurrentMonth
+                  ? "bg-white dark:bg-gray-900 hover:bg-gray-50/60 dark:hover:bg-gray-850/50"
+                  : "bg-gray-50/40 dark:bg-gray-950/40 text-gray-400 dark:text-gray-600"
+              }`}
+            >
+              {/* Day Number and Today Indicator */}
+              <div className="flex items-center justify-between mb-1.5">
+                <span
+                  className={`inline-flex items-center justify-center text-xs font-semibold rounded-full w-6 h-6 transition-colors ${
+                    cell.isToday
+                      ? "bg-brand-500 text-white shadow-2xs font-bold"
+                      : cell.isCurrentMonth
+                      ? "text-gray-700 dark:text-gray-300 group-hover:text-brand-600"
+                      : "text-gray-400 dark:text-gray-600"
+                  }`}
+                >
+                  {cell.date.getDate()}
+                </span>
+
+                {cell.events.length > 0 && (
+                  <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500">
+                    {cell.events.length} {cell.events.length === 1 ? "cita" : "citas"}
+                  </span>
+                )}
+              </div>
+
+              {/* Event chips */}
+              <div className="flex-1 space-y-1 overflow-hidden">
+                {visibleEvents.map((evt) => (
+                  <div
+                    key={evt.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectEvent(evt);
+                    }}
+                    title={`${formatTime(evt.start_time)} - ${evt.title} (${evt.target_name || "Sin prospecto"})`}
+                    className={`px-2 py-1 rounded-md text-[11px] font-medium border truncate transition-transform hover:scale-[1.02] shadow-2xs flex items-center gap-1.5 ${getStatusStyle(
+                      evt.status
+                    )}`}
+                  >
+                    <span className="shrink-0 font-bold opacity-80">
+                      {formatTime(evt.start_time)}
+                    </span>
+                    <span className="truncate">
+                      {evt.target_name || evt.title}
+                    </span>
+                  </div>
+                ))}
+
+                {overflowCount > 0 && (
+                  <div className="text-[10px] font-semibold text-brand-600 dark:text-brand-400 pl-1 pt-0.5">
+                    +{overflowCount} más...
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
