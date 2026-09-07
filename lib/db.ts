@@ -6,14 +6,16 @@ import { scheduleUpdateCheck } from "@/lib/update-check";
 import { encryptSecret, isEncrypted } from "@/lib/crypto";
 import { autoSeedInstance } from "@/lib/auto-seed";
 import { applySdrSchema } from "@/lib/sdr-agent/schema";
+import { applyPipelineSchema } from "@/lib/pipeline/schema";
 
 function resolveDbPath(): string {
   if (process.env.INHUBFLOW_DB_PATH) return process.env.INHUBFLOW_DB_PATH;
   if (process.env.LINKI_DB_PATH) return process.env.LINKI_DB_PATH;
   const inhubflowDb = path.join(process.cwd(), "inhubflow.db");
-  if (fs.existsSync(inhubflowDb)) return inhubflowDb;
   const linkiDb = path.join(process.cwd(), "linki.db");
+  if (fs.existsSync(inhubflowDb) && fs.statSync(inhubflowDb).size > 4096) return inhubflowDb;
   if (fs.existsSync(linkiDb)) return linkiDb;
+  if (fs.existsSync(inhubflowDb)) return inhubflowDb;
   return inhubflowDb;
 }
 
@@ -918,6 +920,9 @@ function runMigrations(db: Database.Database) {
   // Optional SDR module: additive tables only. Applying the schema does not
   // initialize a provider, start a worker, or alter existing core behavior.
   applySdrSchema(db);
+
+  // Pipeline CRM module: Kanban stages and target stage associations.
+  applyPipelineSchema(db);
 }
 
 // Cleanup migration for previously inserted targets that had concatenated DOM card strings

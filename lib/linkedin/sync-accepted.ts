@@ -8,6 +8,7 @@ import {
   parseVoyagerConnections,
   type PendingConnectionTarget,
 } from "./connection-reconciliation";
+import { autoAdvanceTargetByTrigger } from "@/lib/pipeline/pipeline-service";
 
 /**
  * Reconciles accepted LinkedIn connections from the authoritative connections
@@ -192,6 +193,7 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
             if (changed === 1) {
               stamped++;
               console.log(`[sync-accepted] Accepted via ${matches.matchedBy}: ${matches.targetId} (${connection.vanity})`);
+              try { autoAdvanceTargetByTrigger(db, matches.targetId, "connected"); } catch { /* non-blocking */ }
             }
           } else if (matches.conflictTargetIds.length > 0) {
             console.warn(`[sync-accepted] Ambiguous vanity ${connection.vanity}; refusing targets ${matches.conflictTargetIds.join(",")}`);
@@ -201,7 +203,10 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
           if (matches.targetId) {
             matchedTargets++;
             const changed = stampAccepted.run(msToSqlite(connection.createdAt), connection.memberUrn, matches.targetId).changes;
-            if (changed === 1) stamped++;
+            if (changed === 1) {
+              stamped++;
+              try { autoAdvanceTargetByTrigger(db, matches.targetId, "connected"); } catch { /* non-blocking */ }
+            }
           }
         }
 

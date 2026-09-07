@@ -10,7 +10,7 @@ import {
   RiExternalLinkLine, RiArrowLeftSLine, RiArrowRightSLine,
   RiUserFollowLine, RiUserAddLine, RiUserLine, RiUserSearchLine,
   RiMessage2Line, RiReplyLine, RiMailCheckLine, RiAtLine, RiMailLine,
-  RiSearchLine, RiAddLine, RiListCheck2, RiDeleteBinLine,
+  RiSearchLine, RiAddLine, RiListCheck2, RiDeleteBinLine, RiKanbanView,
 } from "react-icons/ri";
 import FilterBar, { ActiveFilter, filtersToParams } from "@/components/ui/FilterBar";
 
@@ -232,6 +232,26 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {/* View Switcher: Table vs Kanban */}
+            <div className="join border border-base-300 rounded-lg p-0.5 bg-base-200/50">
+              <button
+                type="button"
+                className="join-item btn btn-xs btn-primary gap-1 font-semibold"
+                title="Vista actual: Tabla"
+              >
+                <RiListCheck2 size={13} />
+                Tabla
+              </button>
+              <Link
+                href="/pipeline"
+                className="join-item btn btn-xs btn-ghost gap-1 text-base-content/60 hover:text-base-content"
+                title="Ir al Tablero Kanban"
+              >
+                <RiKanbanView size={13} />
+                Kanban
+              </Link>
+            </div>
+
             <Link
               href="/lead-finder"
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"

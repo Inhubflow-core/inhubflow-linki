@@ -19,6 +19,7 @@ import { getSdrThread, listSdrMessages, type SdrMessageRecord, type SdrThreadRec
 import { resolveSdrOperationalStatus, type SdrOperationalStatus } from "./runtime";
 import { type SdrAgentRecord, type SdrAgentVersionRecord } from "./seed";
 import { hasProviderBudget, recordProviderFailure, recordProviderSuccess } from "./usage";
+import { autoAdvanceTargetByTrigger } from "@/lib/pipeline/pipeline-service";
 
 interface TargetContext {
   full_name: string | null;
@@ -295,6 +296,23 @@ function finishDecision(
       latencyMs: input.latencyMs,
       usage: input.providerResult?.usage,
     });
+
+    // Auto-advance target in CRM pipeline based on SDR AI intent
+    try {
+      const intent = input.decision.intent;
+      if (intent === "interested" || intent === "pricing_question" || intent === "proposal_request") {
+        autoAdvanceTargetByTrigger(db, input.context.thread.target_id, "sdr_interested");
+      } else if (intent === "meeting_request") {
+        autoAdvanceTargetByTrigger(db, input.context.thread.target_id, "sdr_meeting");
+      } else if (intent === "not_interested" || intent === "unsubscribe") {
+        autoAdvanceTargetByTrigger(db, input.context.thread.target_id, "sdr_not_interested");
+      } else {
+        autoAdvanceTargetByTrigger(db, input.context.thread.target_id, "replied");
+      }
+    } catch {
+      // Non-blocking pipeline trigger
+    }
+
     let handoffId: string | undefined;
     let actionId: string | undefined;
 
