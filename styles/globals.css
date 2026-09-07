@@ -74,6 +74,9 @@
   --color-success: #12b76a;
   --color-warning: #f79009;
   --color-error: #f04438;
+  --rounded-box: 1rem;
+  --rounded-btn: 0.75rem;
+  --rounded-badge: 1.9rem;
 }
 
 @plugin "daisyui/theme" {
@@ -91,6 +94,9 @@
   --color-success: #12b76a;
   --color-warning: #f79009;
   --color-error: #f04438;
+  --rounded-box: 1rem;
+  --rounded-btn: 0.75rem;
+  --rounded-badge: 1.9rem;
 }
 
 :root,
@@ -270,6 +276,47 @@ html.dark .textarea-bordered {
 html.dark .table th,
 html.dark .table td {
   border-color: #1d2939;
+}
+
+/* ── Unified Button Design System ── */
+.btn {
+  font-family: "Outfit", sans-serif !important;
+  font-weight: 600 !important;
+  border-radius: 0.75rem !important; /* rounded-xl (12px) */
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: -0.01em;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+/* Secondary / Default DaisyUI buttons with crisp border */
+.btn:not(.btn-primary):not(.btn-secondary):not(.btn-accent):not(.btn-error):not(.btn-success):not(.btn-warning):not(.btn-info):not(.btn-ghost):not(.btn-link) {
+  border: 1px solid #d0d5dd !important;
+  background-color: #ffffff !important;
+  color: #344054 !important;
+}
+
+html.dark .btn:not(.btn-primary):not(.btn-secondary):not(.btn-accent):not(.btn-error):not(.btn-success):not(.btn-warning):not(.btn-info):not(.btn-ghost):not(.btn-link) {
+  border: 1px solid #344054 !important;
+  background-color: #1d2939 !important;
+  color: #fcfcfd !important;
+}
+
+.btn-outline {
+  border: 1px solid #d0d5dd !important;
+  border-radius: 0.75rem !important;
+}
+
+html.dark .btn-outline {
+  border: 1px solid #344054 !important;
+}
+
+.btn-ghost {
+  border-radius: 0.75rem !important;
+  font-weight: 500;
 }
 
 /* Product tour (driver.js) — styled to match InHubFlow */

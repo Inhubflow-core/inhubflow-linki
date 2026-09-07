@@ -245,9 +245,9 @@ export default function CompaniesPage({ initialCompanies }: { initialCompanies: 
                   <label className="label text-xs text-base-content/50 pb-1">{t("companies.notes")}</label>
                   <textarea className="textarea textarea-bordered w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl shadow-xs text-gray-900 dark:text-white text-sm h-20 resize-none" placeholder="Notes..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
                 </div>
-                <div className="modal-action mt-1">
-                  <button type="button" className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors" onClick={() => setShowModal(false)}>{t("common.cancel")}</button>
-                  <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-50" disabled={loading}>
+                <div className="modal-action mt-2">
+                  <button type="button" className="px-4 py-2 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => setShowModal(false)}>{t("common.cancel")}</button>
+                  <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-colors disabled:opacity-50 shadow-xs" disabled={loading}>
                     {loading ? <span className="loading loading-spinner loading-xs" /> : (editId ? t("common.saveChanges") : t("companies.addCompany"))}
                   </button>
                 </div>

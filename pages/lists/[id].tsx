@@ -890,9 +890,9 @@ export default function ListDetailPage({
                       ))}
                     </select>
                   </div>
-                  <div className="modal-action mt-1">
-                    <button type="button" className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors" onClick={() => setImportSource("pick")} disabled={importing}>{t("common.back") || "Back"}</button>
-                    <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-50" disabled={importing}>
+                  <div className="modal-action mt-2">
+                    <button type="button" className="px-4 py-2 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => setImportSource("pick")} disabled={importing}>{t("common.back") || "Back"}</button>
+                    <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-colors disabled:opacity-50 shadow-xs" disabled={importing}>
                       {importing ? <><span className="loading loading-spinner loading-xs" /> {t("lists.importing") || "Importing..."}</> : (t("lists.startImport") || "Start Import")}
                     </button>
                   </div>
@@ -949,12 +949,12 @@ export default function ListDetailPage({
                     </div>
                   )}
 
-                  <div className="modal-action mt-1">
-                    <button type="button" className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors" onClick={() => setImportSource("pick")} disabled={csvImporting}>{t("common.back") || "Back"}</button>
+                  <div className="modal-action mt-2">
+                    <button type="button" className="px-4 py-2 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => setImportSource("pick")} disabled={csvImporting}>{t("common.back") || "Back"}</button>
                     {csvResult ? (
-                      <button type="button" className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors" onClick={closeImportModal}>{t("common.done") || "Done"}</button>
+                      <button type="button" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-colors shadow-xs" onClick={closeImportModal}>{t("common.done") || "Done"}</button>
                     ) : (
-                      <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-50" disabled={csvImporting}>
+                      <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-colors disabled:opacity-50 shadow-xs" disabled={csvImporting}>
                         {csvImporting ? <><span className="loading loading-spinner loading-xs" /> {t("lists.importing") || "Importing..."}</> : (t("lists.importLeads") || "Import CSV")}
                       </button>
                     )}
@@ -1051,9 +1051,9 @@ export default function ListDetailPage({
                   ))}
                 </select>
               </div>
-              <div className="modal-action mt-1">
-                <button type="button" className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors" onClick={() => setShowSync(false)} disabled={syncing}>Cancel</button>
-                <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-50" disabled={syncing}>
+              <div className="modal-action mt-2">
+                <button type="button" className="px-4 py-2 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => setShowSync(false)} disabled={syncing}>Cancel</button>
+                <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-colors disabled:opacity-50 shadow-xs" disabled={syncing}>
                   {syncing ? <><span className="loading loading-spinner loading-xs" /> Syncing...</> : "Sync Now"}
                 </button>
               </div>

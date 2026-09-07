@@ -3572,9 +3572,9 @@ export default function WorkflowDetailPage({
             <p className="text-sm text-base-content/60 mb-4">
               {t("campaignDetail.stopCampaignDesc")}
             </p>
-            <div className="modal-action">
-              <button className="px-4 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300 transition-colors" onClick={() => setShowStop(false)}>{t("campaignDetail.cancel")}</button>
-              <button className="px-4 py-1.5 rounded-lg text-sm font-medium bg-error/15 text-error border border-error/25 hover:bg-error/25 transition-colors" onClick={stopRun}>{t("campaignDetail.stopCampaignConfirm")}</button>
+            <div className="modal-action mt-2">
+              <button className="px-4 py-2 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => setShowStop(false)}>{t("campaignDetail.cancel")}</button>
+              <button className="px-4 py-2 rounded-xl text-sm font-semibold bg-rose-500 hover:bg-rose-600 !text-white transition-colors shadow-xs" onClick={stopRun}>{t("campaignDetail.stopCampaignConfirm")}</button>
             </div>
           </div>
           <div className="modal-backdrop" onClick={() => setShowStop(false)} />
