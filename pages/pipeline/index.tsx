@@ -179,9 +179,9 @@ export default function PipelinePage({
         <title>Pipeline — Dashboard B2B</title>
       </Head>
 
-      <div className="flex flex-col h-[calc(100vh-4rem)] p-4 md:p-6 overflow-hidden">
+      <div>
         {/* Top Header Banner (Matching other pages) */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 border border-brand-500/20 dark:border-brand-500/10 p-5 md:p-6 rounded-2xl mb-6 shrink-0">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 border border-brand-500/20 dark:border-brand-500/10 p-5 md:p-6 rounded-2xl mb-6">
           <div className="space-y-1">
             <div className="flex items-center gap-2.5">
               <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
@@ -196,7 +196,7 @@ export default function PipelinePage({
             </p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <div className="flex items-center gap-2 shrink-0">
             {/* View switcher: Table vs Kanban */}
             <div className="join border border-base-300 rounded-lg p-0.5 bg-base-200/50">
               <Link
@@ -209,7 +209,7 @@ export default function PipelinePage({
               </Link>
               <button
                 type="button"
-                className="join-item btn btn-xs btn-primary gap-1 shadow-2xs font-semibold"
+                className="join-item btn btn-xs btn-primary gap-1 font-semibold"
                 title="Vista actual: Tablero Kanban"
               >
                 <RiKanbanView size={13} />
@@ -227,7 +227,7 @@ export default function PipelinePage({
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-all shadow-xs"
             >
               <RiRefreshLine size={16} className={refreshing ? "animate-spin" : ""} />
               Actualizar
@@ -235,8 +235,8 @@ export default function PipelinePage({
           </div>
         </div>
 
-        {/* Filter row (Clean style like contacts) */}
-        <div className="flex items-center gap-3 mb-5 flex-wrap shrink-0">
+        {/* Filter row */}
+        <div className="flex items-center gap-3 mb-5 flex-wrap">
           {/* Search */}
           <div className="relative">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-base-content/30 pointer-events-none">
@@ -251,30 +251,30 @@ export default function PipelinePage({
             />
           </div>
 
-          {/* Workflow selector */}
-          <select
-            className="bg-base-200 border border-base-300/50 rounded-lg px-2.5 py-1.5 text-sm text-base-content focus:outline-none focus:border-primary/40 h-8"
-            value={selectedWorkflow}
-            onChange={(e) => setSelectedWorkflow(e.target.value)}
-          >
-            <option value="">Todas las Campañas</option>
-            {initialWorkflows.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name}
-              </option>
-            ))}
-          </select>
-
           {/* List selector */}
           <select
             className="bg-base-200 border border-base-300/50 rounded-lg px-2.5 py-1.5 text-sm text-base-content focus:outline-none focus:border-primary/40 h-8"
             value={selectedList}
             onChange={(e) => setSelectedList(e.target.value)}
           >
-            <option value="">Todas las Listas</option>
+            <option value="">Todas las listas</option>
             {initialLists.map((l) => (
               <option key={l.id} value={l.id}>
                 {l.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Workflow selector */}
+          <select
+            className="bg-base-200 border border-base-300/50 rounded-lg px-2.5 py-1.5 text-sm text-base-content focus:outline-none focus:border-primary/40 h-8"
+            value={selectedWorkflow}
+            onChange={(e) => setSelectedWorkflow(e.target.value)}
+          >
+            <option value="">Todas las campañas</option>
+            {initialWorkflows.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
               </option>
             ))}
           </select>

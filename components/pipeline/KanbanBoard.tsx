@@ -178,7 +178,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   }
 
   return (
-    <div className="relative flex-1 overflow-x-auto overflow-y-hidden pb-4">
+    <div className="relative overflow-x-auto pb-6">
       {loading && (
         <div className="absolute inset-0 bg-base-100/50 backdrop-blur-2xs flex items-center justify-center z-30">
           <RiLoader4Line size={32} className="animate-spin text-primary" />
@@ -186,7 +186,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       )}
 
       {/* Columns Container */}
-      <div className="inline-flex items-start gap-4 min-h-[calc(100vh-220px)] px-2">
+      <div className="inline-flex items-start gap-4 min-h-[500px]">
         {stages.map((stage) => {
           const cards = cardsByStage[stage.id] || [];
           const isDragOver = dragOverStageId === stage.id;
@@ -202,7 +202,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   ? "border-primary bg-primary/5 ring-2 ring-primary/20"
                   : "border-base-300/70"
               }`}
-              style={{ maxHeight: "calc(100vh - 220px)" }}
+              style={{ maxHeight: "calc(100vh - 270px)", minHeight: "480px" }}
             >
               {/* Column Header */}
               <div className="p-3.5 border-b border-base-300/60 flex items-center justify-between">
