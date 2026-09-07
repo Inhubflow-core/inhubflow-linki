@@ -102,16 +102,16 @@ export const WeekView: React.FC<WeekViewProps> = ({
   }
 
   return (
-    <div className="w-full rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xs overflow-hidden flex flex-col">
+    <div className="w-full rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xs overflow-hidden flex flex-col">
       {/* Week header row */}
-      <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-850/80 sticky top-0 z-10">
-        <div className="py-3 text-center text-xs font-semibold text-gray-400 border-r border-gray-200 dark:border-gray-800">
+      <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-850 sticky top-0 z-10">
+        <div className="py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 border-r border-gray-300 dark:border-gray-700">
           Hora
         </div>
         {weekDays.map((wd) => (
           <div
             key={wd.dateStr}
-            className={`py-2.5 px-2 text-center border-r last:border-r-0 border-gray-200 dark:border-gray-800 transition-colors ${
+            className={`py-2.5 px-2 text-center border-r last:border-r-0 border-gray-300 dark:border-gray-700 transition-colors ${
               wd.isToday ? "bg-brand-500/5 dark:bg-brand-500/10" : ""
             }`}
           >
@@ -135,12 +135,12 @@ export const WeekView: React.FC<WeekViewProps> = ({
       <div className="overflow-y-auto max-h-[620px] relative">
         <div className="grid grid-cols-[60px_repeat(7,1fr)] relative">
           {/* Time axis */}
-          <div className="border-r border-gray-200 dark:border-gray-800 bg-gray-50/30 dark:bg-gray-850/30 select-none">
+          <div className="border-r border-gray-300 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-850/60 select-none">
             {HOURS.map((hour) => (
               <div
                 key={hour}
                 style={{ height: `${HOUR_HEIGHT}px` }}
-                className="text-[11px] font-medium text-gray-400 dark:text-gray-500 pr-2 pt-1 text-right border-b border-gray-100 dark:border-gray-800/40"
+                className="text-[11px] font-medium text-gray-400 dark:text-gray-500 pr-2 pt-1 text-right border-b border-gray-200 dark:border-gray-800"
               >
                 {String(hour).padStart(2, "0")}:00
               </div>
@@ -151,7 +151,7 @@ export const WeekView: React.FC<WeekViewProps> = ({
           {weekDays.map((wd) => (
             <div
               key={wd.dateStr}
-              className={`relative border-r last:border-r-0 border-gray-200 dark:border-gray-800 transition-colors ${
+              className={`relative border-r last:border-r-0 border-gray-300 dark:border-gray-700 transition-colors ${
                 wd.isToday ? "bg-brand-500/[0.02]" : ""
               }`}
             >
@@ -161,7 +161,7 @@ export const WeekView: React.FC<WeekViewProps> = ({
                   key={hour}
                   onClick={() => onSelectSlot(wd.date, hour)}
                   style={{ height: `${HOUR_HEIGHT}px` }}
-                  className="border-b border-gray-100 dark:border-gray-800/40 hover:bg-brand-50/40 dark:hover:bg-brand-950/20 cursor-pointer transition-colors"
+                  className="border-b border-gray-200 dark:border-gray-800 hover:bg-brand-50/40 dark:hover:bg-brand-950/20 cursor-pointer transition-colors"
                 />
               ))}
 

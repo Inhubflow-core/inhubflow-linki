@@ -116,13 +116,13 @@ export const MonthView: React.FC<MonthViewProps> = ({
   }
 
   return (
-    <div className="w-full rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xs overflow-hidden">
+    <div className="w-full rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xs overflow-hidden">
       {/* Weekday headers */}
-      <div className="grid grid-cols-7 border-b border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-850/80">
+      <div className="grid grid-cols-7 border-b border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-850 divide-x divide-gray-300 dark:divide-gray-700">
         {WEEKDAYS.map((wd, idx) => (
           <div
             key={wd}
-            className={`py-3 text-center text-xs font-semibold uppercase tracking-wider ${
+            className={`py-3 text-center text-xs font-bold uppercase tracking-wider ${
               idx >= 5
                 ? "text-gray-400 dark:text-gray-500"
                 : "text-gray-700 dark:text-gray-300"
@@ -133,8 +133,8 @@ export const MonthView: React.FC<MonthViewProps> = ({
         ))}
       </div>
 
-      {/* Days Grid */}
-      <div className="grid grid-cols-7 divide-x divide-y divide-gray-100 dark:divide-gray-800/60">
+      {/* Days Grid - Acentuado con líneas continuas y nítidas */}
+      <div className="grid grid-cols-7 gap-px bg-gray-300 dark:bg-gray-700">
         {calendarDays.map((cell, idx) => {
           const maxVisible = 3;
           const visibleEvents = cell.events.slice(0, maxVisible);
@@ -144,10 +144,10 @@ export const MonthView: React.FC<MonthViewProps> = ({
             <div
               key={idx}
               onClick={() => onSelectDate(cell.date)}
-              className={`min-h-[110px] md:min-h-[125px] p-2 flex flex-col transition-colors cursor-pointer group ${
+              className={`min-h-[110px] md:min-h-[125px] p-2.5 flex flex-col transition-colors cursor-pointer group ${
                 cell.isCurrentMonth
-                  ? "bg-white dark:bg-gray-900 hover:bg-gray-50/60 dark:hover:bg-gray-850/50"
-                  : "bg-gray-50/40 dark:bg-gray-950/40 text-gray-400 dark:text-gray-600"
+                  ? "bg-white dark:bg-gray-900 hover:bg-brand-50/20 dark:hover:bg-brand-950/25"
+                  : "bg-gray-50/70 dark:bg-gray-950/60 text-gray-400 dark:text-gray-600"
               }`}
             >
               {/* Day Number and Today Indicator */}
