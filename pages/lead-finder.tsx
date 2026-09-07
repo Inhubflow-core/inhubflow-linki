@@ -414,7 +414,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
               {/* Title / Cargo */}
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                  👔 {t("leadFinder.jobTitleLabel")} <span className="text-brand-500">*</span>
+                  {t("leadFinder.jobTitleLabel")} <span className="text-brand-500">*</span>
                 </label>
                 <div className="relative">
                   <RiBriefcaseLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
@@ -456,7 +456,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                   {/* Country Selector */}
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                      🌎 País
+                      País
                     </label>
                     <select
                       value={country}
@@ -469,7 +469,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     >
                       {COUNTRIES_LIST.map((c) => (
                         <option key={c.name} value={c.name}>
-                          {c.flag} {c.name}
+                          {c.name}
                         </option>
                       ))}
                     </select>
@@ -478,7 +478,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                   {/* City Input */}
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                      🏙️ Ciudad <span className="text-gray-400 font-normal">(Opcional)</span>
+                      Ciudad <span className="text-gray-400 font-normal">(Opcional)</span>
                     </label>
                     <div className="relative">
                       <RiMapPinLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
@@ -523,7 +523,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
               {/* Company / Industry (Optional) */}
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                  🏢 {t("leadFinder.companyLabel")} <span className="text-gray-400 font-normal">{t("leadFinder.optional")}</span>
+                  {t("leadFinder.companyLabel")} <span className="text-gray-400 font-normal">{t("leadFinder.optional")}</span>
                 </label>
                 <div className="relative">
                   <RiBuildingLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
@@ -562,7 +562,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
               {/* Quantity Limit */}
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                  🔢 {t("leadFinder.quantityLabel")}
+                  {t("leadFinder.quantityLabel")}
                 </label>
                 <div className="grid grid-cols-4 gap-2">
                   {[10, 25, 50, 100].map((val) => (
@@ -586,7 +586,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
               {/* Target List Name */}
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                  📋 {t("leadFinder.listNameLabel")}
+                  {t("leadFinder.listNameLabel")}
                 </label>
                 <div className="relative">
                   <RiFileList3Line className="absolute left-3.5 top-3 text-gray-400" size={16} />

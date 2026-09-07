@@ -42,17 +42,17 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ card, onSelect, onDragSt
   // Intent badge display
   let intentBadge: { text: string; cls: string } | null = null;
   if (card.sdr_intent === "interested" || card.reply_kind === "call_task") {
-    intentBadge = { text: "🔥 Interesado", cls: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30" };
+    intentBadge = { text: "Interesado", cls: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30" };
   } else if (card.sdr_intent === "meeting_request") {
-    intentBadge = { text: "📅 Pide Reunión", cls: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" };
+    intentBadge = { text: "Pide Reunión", cls: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" };
   } else if (card.sdr_intent === "pricing_question" || card.reply_kind === "pricing") {
-    intentBadge = { text: "💰 Precios", cls: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30" };
+    intentBadge = { text: "Precios", cls: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30" };
   } else if (card.sdr_intent === "not_interested" || card.reply_kind === "not_interested") {
-    intentBadge = { text: "🛑 No Interesado", cls: "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30" };
+    intentBadge = { text: "No Interesado", cls: "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30" };
   } else if (card.reply_kind === "ooo_followup" || card.sdr_intent === "ooo") {
-    intentBadge = { text: "🏖️ Fuera de Oficina", cls: "bg-amber-500/15 text-amber-600 border-amber-500/30" };
+    intentBadge = { text: "Fuera de Oficina", cls: "bg-amber-500/15 text-amber-600 border-amber-500/30" };
   } else if (card.reply_kind === "human_reply") {
-    intentBadge = { text: "💬 Respondió", cls: "bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30" };
+    intentBadge = { text: "Respondió", cls: "bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30" };
   }
 
   return (

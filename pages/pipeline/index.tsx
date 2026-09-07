@@ -13,6 +13,7 @@ import {
   RiAlertLine,
   RiFlowChart,
   RiFileList3Line,
+  RiUserSearchLine,
 } from "react-icons/ri";
 import { toast } from "sonner";
 import { KanbanBoard } from "@/components/pipeline/KanbanBoard";
@@ -179,29 +180,23 @@ export default function PipelinePage({
       </Head>
 
       <div className="flex flex-col h-[calc(100vh-4rem)] p-4 md:p-6 overflow-hidden">
-        {/* Top Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-4 shrink-0">
-          <div>
+        {/* Top Header Banner (Matching other pages) */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 border border-brand-500/20 dark:border-brand-500/10 p-5 md:p-6 rounded-2xl mb-6 shrink-0">
+          <div className="space-y-1">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 text-primary flex items-center justify-center border border-primary/20 shadow-2xs">
-                <RiKanbanView size={20} />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-base-content flex items-center gap-2">
-                  Pipeline de Oportunidades
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                    {totalCards} prospectos
-                  </span>
-                </h1>
-                <p className="text-xs text-base-content/60">
-                  Gestión inteligente de embudo comercial y sincronización en tiempo real con SDR IA
-                </p>
-              </div>
+              <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                Pipeline
+              </h1>
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500/15 text-brand-600 dark:text-brand-400">
+                {totalCards.toLocaleString()} {totalCards === 1 ? "prospecto" : "prospectos"}
+              </span>
             </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Gestión visual de embudo comercial y sincronización en tiempo real con SDR IA.
+            </p>
           </div>
 
-          {/* Right Top Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
             {/* View switcher: Table vs Kanban */}
             <div className="join border border-base-300 rounded-lg p-0.5 bg-base-200/50">
               <Link
@@ -222,114 +217,110 @@ export default function PipelinePage({
               </button>
             </div>
 
-            {/* Refresh */}
+            <Link
+              href="/lead-finder"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
+            >
+              <RiUserSearchLine size={16} /> {t("nav.leadFinder")}
+            </Link>
+
             <button
-              type="button"
               onClick={handleRefresh}
               disabled={refreshing}
-              className="btn btn-sm btn-outline border-base-300 gap-1 text-xs"
-              title="Actualizar datos"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
             >
-              <RiRefreshLine size={14} className={refreshing ? "animate-spin" : ""} />
-              <span className="hidden sm:inline">Actualizar</span>
+              <RiRefreshLine size={16} className={refreshing ? "animate-spin" : ""} />
+              Actualizar
             </button>
           </div>
         </div>
 
-        {/* Filter Bar */}
-        <div className="bg-base-100 border border-base-300/80 rounded-2xl p-3 mb-4 shrink-0 shadow-2xs flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
-            {/* Search */}
-            <div className="relative min-w-[180px] max-w-xs flex-1">
-              <RiSearchLine
-                size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40"
-              />
-              <input
-                type="text"
-                placeholder="Buscar prospecto, empresa..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="input input-sm input-bordered w-full pl-8 text-xs"
-              />
-            </div>
-
-            {/* Filter by Campaign/Workflow */}
-            <div className="relative">
-              <select
-                value={selectedWorkflow}
-                onChange={(e) => setSelectedWorkflow(e.target.value)}
-                className="select select-sm select-bordered text-xs font-medium pr-8"
-              >
-                <option value="">Todas las Campañas</option>
-                {initialWorkflows.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Filter by List */}
-            <div className="relative">
-              <select
-                value={selectedList}
-                onChange={(e) => setSelectedList(e.target.value)}
-                className="select select-sm select-bordered text-xs font-medium pr-8"
-              >
-                <option value="">Todas las Listas</option>
-                {initialLists.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Filter by Channel */}
-            <div className="join border border-base-300 rounded-lg p-0.5 bg-base-200/40">
-              <button
-                type="button"
-                onClick={() => setChannelFilter("all")}
-                className={`join-item btn btn-xs ${
-                  channelFilter === "all" ? "btn-primary font-semibold" : "btn-ghost text-base-content/60"
-                }`}
-              >
-                Todos
-              </button>
-              <button
-                type="button"
-                onClick={() => setChannelFilter("linkedin")}
-                className={`join-item btn btn-xs ${
-                  channelFilter === "linkedin" ? "btn-primary font-semibold" : "btn-ghost text-base-content/60"
-                }`}
-              >
-                LinkedIn
-              </button>
-              <button
-                type="button"
-                onClick={() => setChannelFilter("email")}
-                className={`join-item btn btn-xs ${
-                  channelFilter === "email" ? "btn-primary font-semibold" : "btn-ghost text-base-content/60"
-                }`}
-              >
-                Email
-              </button>
-            </div>
+        {/* Filter row (Clean style like contacts) */}
+        <div className="flex items-center gap-3 mb-5 flex-wrap shrink-0">
+          {/* Search */}
+          <div className="relative">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-base-content/30 pointer-events-none">
+              <RiSearchLine size={13} />
+            </span>
+            <input
+              type="text"
+              className="w-56 bg-base-200 border border-base-300/50 rounded-lg pl-8 pr-3 py-1.5 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:border-primary/40"
+              placeholder="Buscar prospecto, empresa..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
 
-          {/* Quick toggle: Needs Human Attention */}
-          <div className="flex items-center gap-2">
+          {/* Workflow selector */}
+          <select
+            className="bg-base-200 border border-base-300/50 rounded-lg px-2.5 py-1.5 text-sm text-base-content focus:outline-none focus:border-primary/40 h-8"
+            value={selectedWorkflow}
+            onChange={(e) => setSelectedWorkflow(e.target.value)}
+          >
+            <option value="">Todas las Campañas</option>
+            {initialWorkflows.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+
+          {/* List selector */}
+          <select
+            className="bg-base-200 border border-base-300/50 rounded-lg px-2.5 py-1.5 text-sm text-base-content focus:outline-none focus:border-primary/40 h-8"
+            value={selectedList}
+            onChange={(e) => setSelectedList(e.target.value)}
+          >
+            <option value="">Todas las Listas</option>
+            {initialLists.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Channel selector */}
+          <div className="join border border-base-300/50 rounded-lg p-0.5 bg-base-200 h-8 flex items-center">
+            <button
+              type="button"
+              onClick={() => setChannelFilter("all")}
+              className={`join-item px-2.5 py-1 rounded text-xs transition-colors ${
+                channelFilter === "all" ? "bg-brand-500 text-white font-medium shadow-xs" : "text-base-content/60 hover:text-base-content"
+              }`}
+            >
+              Todos
+            </button>
+            <button
+              type="button"
+              onClick={() => setChannelFilter("linkedin")}
+              className={`join-item px-2.5 py-1 rounded text-xs transition-colors ${
+                channelFilter === "linkedin" ? "bg-brand-500 text-white font-medium shadow-xs" : "text-base-content/60 hover:text-base-content"
+              }`}
+            >
+              LinkedIn
+            </button>
+            <button
+              type="button"
+              onClick={() => setChannelFilter("email")}
+              className={`join-item px-2.5 py-1 rounded text-xs transition-colors ${
+                channelFilter === "email" ? "bg-brand-500 text-white font-medium shadow-xs" : "text-base-content/60 hover:text-base-content"
+              }`}
+            >
+              Email
+            </button>
+          </div>
+
+          <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
               onClick={() => setOnlyHuman((prev) => !prev)}
-              className={`btn btn-xs rounded-lg gap-1.5 transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                 onlyHuman
-                  ? "btn-error text-white font-semibold"
-                  : "btn-outline border-base-300 text-base-content/60 hover:text-base-content"
+                  ? "bg-error/15 text-error border-error/30 font-semibold"
+                  : "bg-base-200 border-base-300/50 text-base-content/60 hover:text-base-content"
               }`}
             >
-              <RiAlertLine size={13} className={onlyHuman ? "animate-bounce" : ""} />
+              <RiAlertLine size={13} />
               Solo requiere humano
             </button>
           </div>

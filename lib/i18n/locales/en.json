@@ -149,6 +149,7 @@
     "locationLabel": "Location (City, Country)",
     "locationPlaceholder": "e.g. Madrid, Spain | São Paulo, Brazil | London, UK...",
     "companyLabel": "Company or Industry",
+    "optional": "(Optional)",
     "companyPlaceholder": "e.g. Health, SaaS, Real Estate, Google...",
     "quantityLabel": "Number of Leads to Extract",
     "leadsCount": "{count} leads",
