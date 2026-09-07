@@ -78,7 +78,7 @@ function ChannelHeader({ icon, label, color }: { icon: React.ReactNode; label: s
       <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color }}>
         {icon} {label}
       </span>
-      <div className="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
+      <div className="flex-1 h-px bg-gray-300 dark:bg-gray-700" />
     </div>
   );
 }
@@ -97,7 +97,7 @@ function KpiCard({
 }) {
   return (
     <div
-      className="relative rounded-2xl border border-gray-200 bg-white p-4 shadow-xs dark:border-gray-800 dark:bg-gray-900 overflow-hidden group hover:border-brand-500/40 dark:hover:border-brand-500/40 transition-all"
+      className="relative rounded-2xl border border-gray-300 bg-white p-4 shadow-xs dark:border-gray-700 dark:bg-gray-900 overflow-hidden group hover:border-brand-500/50 dark:hover:border-brand-500/50 transition-all"
     >
       <div
         className="absolute top-0 right-0 w-16 h-16 rounded-bl-3xl opacity-[0.06] transition-opacity group-hover:opacity-15"
@@ -196,7 +196,7 @@ function ActivityChart({
   }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-xs dark:border-gray-800 dark:bg-gray-900 flex flex-col" style={{ minHeight: 280 }} data-tour="dashboard-chart">
+    <div className="rounded-2xl border border-gray-300 bg-white p-5 shadow-xs dark:border-gray-700 dark:bg-gray-900 flex flex-col" style={{ minHeight: 280 }} data-tour="dashboard-chart">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-4">
@@ -237,7 +237,7 @@ function ActivityChart({
         {gridLines.map(g => (
           <div
             key={g}
-            className="absolute left-0 right-0 border-t border-gray-100 dark:border-gray-800/60"
+            className="absolute left-0 right-0 border-t border-gray-200 dark:border-gray-800"
             style={{ bottom: `${g * 100}%` }}
           />
         ))}
@@ -325,7 +325,7 @@ function LinkedInCard({
   ];
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-xs dark:border-gray-800 dark:bg-gray-900">
+    <div className="rounded-2xl border border-gray-300 bg-white p-4 shadow-xs dark:border-gray-700 dark:bg-gray-900">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <RiLinkedinBoxLine size={16} className="text-gray-400" />
@@ -379,7 +379,7 @@ function AiUsagePanel({ data, days }: { data: AgentStats["daily"]; days: number 
   const labelEvery = days <= 7 ? 1 : days <= 14 ? 2 : days <= 30 ? 5 : 15;
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-xs dark:border-gray-800 dark:bg-gray-900">
+    <div className="rounded-2xl border border-gray-300 bg-white p-4 shadow-xs dark:border-gray-700 dark:bg-gray-900">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <RiRobot2Line size={16} className="text-gray-400" />
@@ -446,7 +446,7 @@ function FilterBar({
         className={`h-8 max-w-[150px] sm:max-w-[200px] truncate px-3 rounded-xl text-xs font-medium border transition-all focus:outline-none cursor-pointer ${
           listId
             ? "border-brand-500 bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-400"
-            : "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300"
+            : "border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-400"
         }`}
       >
         <option value="">{t("dashboard.allLists")}</option>
@@ -458,7 +458,7 @@ function FilterBar({
         className={`h-8 max-w-[150px] sm:max-w-[200px] truncate px-3 rounded-xl text-xs font-medium border transition-all focus:outline-none cursor-pointer ${
           workflowId
             ? "border-brand-500 bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-400"
-            : "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300"
+            : "border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-400"
         }`}
       >
         <option value="">{t("dashboard.allCampaigns")}</option>
@@ -729,11 +729,11 @@ export default function Dashboard() {
         {/* Left: funnel + LinkedIn + AI */}
         <div className="space-y-4">
           {/* Funnel */}
-          <div className="rounded-2xl border border-gray-200 bg-white shadow-xs dark:border-gray-800 dark:bg-gray-900 overflow-hidden" data-tour="dashboard-funnel">
-            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+          <div className="rounded-2xl border border-gray-300 bg-white shadow-xs dark:border-gray-700 dark:bg-gray-900 overflow-hidden" data-tour="dashboard-funnel">
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
               <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t("dashboard.funnel")}</span>
             </div>
-            <div className="divide-y divide-gray-100 dark:divide-gray-800 py-1">
+            <div className="divide-y divide-gray-200 dark:divide-gray-800 py-1">
               <FunnelRow icon={<FiUsers size={12} />}        color="#808080" label={t("contacts.title")}        value={totals.total_targets}       max={maxFunnelValue} />
               <FunnelRow icon={<FiUserPlus size={12} />}     color="#32d583" label={t("dashboard.connected")}      value={totals.connected}           max={maxFunnelValue} />
               <FunnelRow icon={<FiRepeat size={12} />}       color="#c084fc" label={t("inbox.title")}     value={totals.replies_received}    max={maxFunnelValue} />

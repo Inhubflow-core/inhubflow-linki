@@ -88,7 +88,7 @@ export default function CompanyDetailPage({ company }: { company: Company }) {
         </div>
 
         {/* Header */}
-        <div className="bg-base-200 border border-base-300/50 rounded-xl p-5 mb-4">
+        <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs p-5 mb-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3 flex-1">
               <div className="w-10 h-10 rounded-lg bg-base-300 flex items-center justify-center shrink-0 mt-0.5">
@@ -142,7 +142,7 @@ export default function CompanyDetailPage({ company }: { company: Company }) {
 
         {/* Description */}
         {company.description && (
-          <div className="bg-base-200 border border-base-300/50 rounded-xl p-5 mb-4">
+          <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs p-5 mb-4">
             <p className="text-[11px] text-base-content/40 uppercase tracking-wide mb-2">About</p>
             <p className="text-sm text-base-content/70 leading-relaxed whitespace-pre-line">{company.description}</p>
           </div>
@@ -151,7 +151,7 @@ export default function CompanyDetailPage({ company }: { company: Company }) {
         {/* Details grid */}
         {(company.employee_count || company.founded_year || company.annual_revenue || company.phone ||
           company.city || company.country || company.technology_names || company.keywords) && (
-          <div className="bg-base-200 border border-base-300/50 rounded-xl p-5 mb-4">
+          <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs p-5 mb-4">
             <p className="text-[11px] text-base-content/40 uppercase tracking-wide mb-3">Details</p>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {company.employee_count && (
@@ -230,14 +230,14 @@ export default function CompanyDetailPage({ company }: { company: Company }) {
 
         {/* Notes */}
         {company.notes && (
-          <div className="bg-base-200 border border-base-300/50 rounded-xl p-5 mb-4">
+          <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs p-5 mb-4">
             <p className="text-[11px] text-base-content/40 uppercase tracking-wide mb-2">Notes</p>
             <p className="text-sm text-base-content/70 leading-relaxed whitespace-pre-line">{company.notes}</p>
           </div>
         )}
 
         {/* Contacts */}
-        <div className="bg-base-200 border border-base-300/50 rounded-xl p-5">
+        <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs p-5">
           <p className="text-[11px] text-base-content/40 uppercase tracking-wide mb-3">
             Contacts ({company.contacts.length})
           </p>

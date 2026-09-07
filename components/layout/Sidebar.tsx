@@ -111,12 +111,12 @@ export default function Sidebar({
 
   return (
     <aside
-      className={`fixed top-0 left-0 h-screen z-50 flex flex-col border-r border-gray-200 bg-white transition-all duration-300 dark:border-gray-800 dark:bg-gray-900 ${
+      className={`fixed top-0 left-0 h-screen z-50 flex flex-col border-r border-gray-300 bg-white transition-all duration-300 dark:border-gray-700 dark:bg-gray-900 ${
         isCollapsed ? "w-16" : "w-64"
       }`}
     >
       {/* Brand Header */}
-      <div className={`flex shrink-0 items-center border-b border-gray-100 dark:border-gray-800 transition-all duration-300 ${
+      <div className={`flex shrink-0 items-center border-b border-gray-200 dark:border-gray-800 transition-all duration-300 ${
         isCollapsed ? "h-16 justify-center px-2" : "h-20 justify-start px-5"
       }`}>
         <Link href="/" className="flex items-center w-full">
@@ -273,7 +273,7 @@ export default function Sidebar({
       )}
 
       {/* Footer Navigation */}
-      <div className="border-t border-gray-100 dark:border-gray-800 p-3 space-y-0.5">
+      <div className="border-t border-gray-200 dark:border-gray-800 p-3 space-y-0.5">
         {/* Settings link */}
         <Link
           href="/settings"
@@ -322,7 +322,7 @@ export default function Sidebar({
           </button>
 
           {helpOpen && (
-            <div className="absolute left-full bottom-0 ml-2 w-52 rounded-2xl border border-gray-200 bg-white p-2 shadow-xl backdrop-blur-md dark:border-gray-800 dark:bg-gray-900 z-50">
+            <div className="absolute left-full bottom-0 ml-2 w-52 rounded-2xl border border-gray-300 bg-white p-2 shadow-xl backdrop-blur-md dark:border-gray-700 dark:bg-gray-900 z-50">
               {tourPage && (
                 <button
                   onClick={() => {

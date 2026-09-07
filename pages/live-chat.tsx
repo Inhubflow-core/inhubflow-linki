@@ -478,7 +478,7 @@ export default function LiveChatMobileAdmin() {
 
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col font-sans">
         {/* Top App Bar */}
-        <header className="sticky top-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-3 flex items-center justify-between">
+        <header className="sticky top-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-300 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {selectedSessionId ? (
               <button
@@ -550,7 +550,7 @@ export default function LiveChatMobileAdmin() {
         <div className="flex-1 flex overflow-hidden">
           {/* List of Chats */}
           <div
-            className={`w-full md:w-80 md:border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-y-auto ${
+            className={`w-full md:w-80 md:border-r border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-y-auto ${
               selectedSessionId ? "hidden md:block" : "block"
             }`}
           >
@@ -648,7 +648,7 @@ export default function LiveChatMobileAdmin() {
             <div className="flex-1 flex flex-col bg-gray-50/50 dark:bg-gray-950">
               {/* Quick Actions Header */}
               {currentSession && (
-                <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 p-2.5 px-4 flex items-center justify-between gap-2 flex-wrap">
+                <div className="bg-white dark:bg-gray-900 border-b border-gray-300 dark:border-gray-700 p-2.5 px-4 flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2">
                     {currentSession.status === "human_takeover" ? (
                       <button
@@ -756,14 +756,14 @@ export default function LiveChatMobileAdmin() {
               {/* Chat Input Bar */}
               <form
                 onSubmit={handleSendReply}
-                className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-3 px-4 flex items-center gap-2.5"
+                className="bg-white dark:bg-gray-900 border-t border-gray-300 dark:border-gray-700 p-3 px-4 flex items-center gap-2.5"
               >
                 <input
                   type="text"
                   value={replyText}
                   onChange={(e) => handleReplyChange(e.target.value)}
                   placeholder="Escribe tu mensaje a este cliente..."
-                  className="flex-1 py-3 px-4 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-base text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className="flex-1 py-3 px-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs text-base text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
                 <button
                   type="submit"

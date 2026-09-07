@@ -229,7 +229,7 @@ export default function PublicBookingPage() {
       </Head>
 
       <div className="min-h-screen bg-slate-50 dark:bg-[#0c111d] text-gray-900 dark:text-gray-100 flex items-center justify-center p-4 md:p-8 font-sans">
-        <div className="w-full max-w-4xl bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-12 min-h-[580px]">
+        <div className="w-full max-w-4xl bg-white dark:bg-gray-900 rounded-3xl border border-gray-300 dark:border-gray-700 shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-12 min-h-[580px]">
           {/* Left Column: Meeting & Host Details */}
           <div className="md:col-span-5 p-6 md:p-8 bg-gray-50/70 dark:bg-gray-850/50 border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-800 flex flex-col justify-between space-y-6">
             <div className="space-y-4">
@@ -439,7 +439,7 @@ export default function PublicBookingPage() {
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Tu nombre y apellido"
-                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-brand-500"
+                      className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl shadow-xs px-3 py-2 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-brand-500"
                     />
                   </div>
 
@@ -453,7 +453,7 @@ export default function PublicBookingPage() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="nombre@tuempresa.com"
-                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-brand-500"
+                      className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl shadow-xs px-3 py-2 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-brand-500"
                     />
                   </div>
 
@@ -467,7 +467,7 @@ export default function PublicBookingPage() {
                         value={company}
                         onChange={(e) => setCompany(e.target.value)}
                         placeholder="Nombre de tu empresa"
-                        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-brand-500"
+                        className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl shadow-xs px-3 py-2 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-brand-500"
                       />
                     </div>
 
@@ -480,7 +480,7 @@ export default function PublicBookingPage() {
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         placeholder="+56 9 1234 5678"
-                        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-brand-500"
+                        className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl shadow-xs px-3 py-2 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-brand-500"
                       />
                     </div>
                   </div>
@@ -494,7 +494,7 @@ export default function PublicBookingPage() {
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       placeholder="Ej: Buscamos automatizar la prospección en LinkedIn para captar clientes en México..."
-                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-3 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-brand-500"
+                      className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl shadow-xs p-3 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-brand-500"
                     />
                   </div>
                 </div>
@@ -526,7 +526,7 @@ export default function PublicBookingPage() {
                 </div>
 
                 {/* Meeting card */}
-                <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left space-y-2 text-xs">
+                <div className="p-4 rounded-2xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs text-left space-y-2 text-xs">
                   <div className="font-bold text-gray-900 dark:text-white">
                     {bookingResult.event.title}
                   </div>

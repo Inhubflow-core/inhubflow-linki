@@ -206,7 +206,7 @@ export default function SettingsPage({
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-1 mb-6 border-b border-base-300/50 pb-0">
+        <div className="flex items-center gap-1 mb-6 border-b border-gray-200 dark:border-gray-800 pb-0">
           {visibleTabs.map(({ key, label, icon: Icon }) => (
             <button
               key={key}
@@ -437,13 +437,13 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
       </div>
 
       {accounts.length === 0 ? (
-        <div className="text-center py-12 text-base-content/30 text-sm border border-dashed border-base-300/60 rounded-xl">
+        <div className="text-center py-12 text-base-content/30 text-sm border border-dashed border-gray-300 dark:border-gray-700 rounded-2xl bg-white dark:bg-gray-900 shadow-xs">
           No LinkedIn accounts yet.
         </div>
       ) : (
         <div className="flex flex-col gap-2">
           {accounts.map((a) => (
-            <div key={a.id} className="flex items-center gap-4 px-4 py-3 bg-base-200 border border-base-300/50 rounded-xl hover:border-base-300 transition-colors">
+            <div key={a.id} className="flex items-center gap-4 px-4 py-3 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs hover:border-base-300 transition-colors">
               <div className="w-9 h-9 rounded-lg bg-base-300 flex items-center justify-center text-sm font-bold text-base-content/60 shrink-0">
                 {a.name.charAt(0).toUpperCase()}
               </div>
@@ -492,23 +492,23 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
       {/* Add/Edit modal */}
       {showModal && (
         <div className="modal modal-open">
-          <div className="modal-box bg-base-200 border border-base-300/50 max-w-md">
+          <div className="modal-box bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xl max-w-md">
             <h3 className="font-semibold text-base mb-4">{editingAccount ? "Edit LinkedIn Account" : "Add LinkedIn Account"}</h3>
             <form onSubmit={save} className="flex flex-col gap-3">
               <div>
                 <label className="label text-xs text-base-content/50 pb-1">Display name</label>
-                <input className="input input-bordered input-sm w-full bg-base-300/50" placeholder="e.g. Mohammad LinkedIn" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+                <input className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white" placeholder="e.g. Mohammad LinkedIn" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
               </div>
               <div>
                 <label className="label text-xs text-base-content/50 pb-1">Email</label>
-                <input type="email" className="input input-bordered input-sm w-full bg-base-300/50" placeholder="you@example.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+                <input type="email" className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white" placeholder="you@example.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="label text-xs text-base-content/50 pb-1">Connections/day (Máx 20)</label>
                   <input
                     type="number"
-                    className="input input-bordered input-sm w-full bg-base-300/50"
+                    className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
                     value={form.daily_connection_limit}
                     onChange={(e) => {
                       const val = Number(e.target.value);
@@ -522,7 +522,7 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                   <label className="label text-xs text-base-content/50 pb-1">Messages/day (Máx 20)</label>
                   <input
                     type="number"
-                    className="input input-bordered input-sm w-full bg-base-300/50"
+                    className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
                     value={form.daily_message_limit}
                     onChange={(e) => {
                       const val = Number(e.target.value);
@@ -536,7 +536,7 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                   <label className="label text-xs text-base-content/50 pb-1">InMail/day (Máx 20)</label>
                   <input
                     type="number"
-                    className="input input-bordered input-sm w-full bg-base-300/50"
+                    className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
                     value={form.daily_inmail_limit}
                     onChange={(e) => {
                       const val = Number(e.target.value);
@@ -551,7 +551,7 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                 🔒 Límite de seguridad para protección de cuenta: Máximo 20/día (puedes configurar menos si prefieres).
               </p>
 
-              <div className="border-t border-base-300/40 pt-3 flex flex-col gap-3">
+              <div className="border-t border-gray-200 dark:border-gray-800 pt-3 flex flex-col gap-3">
                 <p className="text-xs font-medium text-base-content/50 uppercase tracking-wide">Working Hours</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -621,7 +621,7 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
       {/* Auth modal */}
       {authModal && (
         <div className="modal modal-open">
-          <div className="modal-box bg-base-200 border border-base-300/50 max-w-lg">
+          <div className="modal-box bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xl max-w-lg">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h3 className="font-bold text-base text-gray-900 dark:text-white">Conectar Cuenta de LinkedIn</h3>
@@ -716,7 +716,7 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                   </button>
                 </div>
                 <input
-                  className="input input-bordered input-sm w-full bg-base-300/50 font-mono text-xs"
+                  className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white font-mono text-xs"
                   placeholder="AQEDATxxxxxx..."
                   value={authForm.li_at}
                   onChange={(e) => setAuthForm({ ...authForm, li_at: e.target.value })}
@@ -784,7 +784,7 @@ function RampDiagram({ startDate, target }: { startDate: string; target: number 
         <span>Day 1 — 2/day</span>
         <span>Day {daysToFull} — {target}/day</span>
       </div>
-      <div className="mt-2 pt-2 border-t border-base-300/50 flex items-center justify-between text-xs">
+      <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between text-xs">
         <span className="text-base-content/50">
           Today: <span className="text-base-content font-medium">{currentLimit}/day</span>
         </span>
@@ -1012,13 +1012,13 @@ function EmailTab({ initialAccounts }: { initialAccounts: EmailAccount[] }) {
       </div>
 
       {accounts.length === 0 ? (
-        <div className="text-center py-12 text-base-content/30 text-sm border border-dashed border-base-300/60 rounded-xl">
+        <div className="text-center py-12 text-base-content/30 text-sm border border-dashed border-gray-300 dark:border-gray-700 rounded-2xl bg-white dark:bg-gray-900 shadow-xs">
           No email accounts yet. Add one to start sending emails.
         </div>
       ) : (
         <div className="flex flex-col gap-2">
           {pageAccounts.map((a) => (
-            <div key={a.id} className="flex items-center gap-4 px-4 py-3 bg-base-200 border border-base-300/50 rounded-xl hover:border-base-300 transition-colors">
+            <div key={a.id} className="flex items-center gap-4 px-4 py-3 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs hover:border-base-300 transition-colors">
               <div className="w-9 h-9 rounded-lg bg-base-300 flex items-center justify-center text-sm font-bold text-base-content/60 shrink-0">
                 {a.name.charAt(0).toUpperCase()}
               </div>
@@ -1076,7 +1076,7 @@ function EmailTab({ initialAccounts }: { initialAccounts: EmailAccount[] }) {
             </div>
           ))}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-2 mt-1 border-t border-base-300/40">
+            <div className="flex items-center justify-between pt-2 mt-1 border-t border-gray-200 dark:border-gray-800">
               <span className="text-xs text-base-content/40">
                 {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, accounts.length)} of {accounts.length}
               </span>
@@ -1113,7 +1113,7 @@ function EmailTab({ initialAccounts }: { initialAccounts: EmailAccount[] }) {
       {/* Create / Edit modal */}
       {showModal && (
         <div className="modal modal-open">
-          <div className="modal-box bg-base-200 border border-base-300/50 max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="modal-box bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xl max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 className="font-semibold text-base mb-4">{editingAccount ? "Edit Email Account" : "Add Email Account"}</h3>
             <form onSubmit={save} className="flex flex-col gap-3">
 
@@ -1135,35 +1135,35 @@ function EmailTab({ initialAccounts }: { initialAccounts: EmailAccount[] }) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="label text-xs text-base-content/50 pb-1">Display name</label>
-                  <input className="input input-bordered input-sm w-full bg-base-300/50" placeholder="My Gmail" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+                  <input className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white" placeholder="My Gmail" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
                 </div>
                 <div>
                   <label className="label text-xs text-base-content/50 pb-1">From name (optional)</label>
-                  <input className="input input-bordered input-sm w-full bg-base-300/50" placeholder="Your Name" value={form.from_name} onChange={(e) => setForm({ ...form, from_name: e.target.value })} />
+                  <input className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white" placeholder="Your Name" value={form.from_name} onChange={(e) => setForm({ ...form, from_name: e.target.value })} />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="label text-xs text-base-content/50 pb-1">From email address</label>
-                  <input type="email" className="input input-bordered input-sm w-full bg-base-300/50" placeholder="you@gmail.com" value={form.from_email} onChange={(e) => setForm({ ...form, from_email: e.target.value })} required />
+                  <input type="email" className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white" placeholder="you@gmail.com" value={form.from_email} onChange={(e) => setForm({ ...form, from_email: e.target.value })} required />
                 </div>
                 <div>
                   <label className="label text-xs text-base-content/50 pb-1">Reply-To (optional)</label>
-                  <input type="email" className="input input-bordered input-sm w-full bg-base-300/50" placeholder="you@example.com" value={form.reply_to} onChange={(e) => setForm({ ...form, reply_to: e.target.value })} />
+                  <input type="email" className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white" placeholder="you@example.com" value={form.reply_to} onChange={(e) => setForm({ ...form, reply_to: e.target.value })} />
                 </div>
               </div>
 
-              <div className="border-t border-base-300/40 pt-3">
+              <div className="border-t border-gray-200 dark:border-gray-800 pt-3">
                 <p className="text-xs font-medium text-base-content/50 mb-2 uppercase tracking-wide">SMTP (sending)</p>
                 <div className="grid grid-cols-3 gap-2">
                   <div className="col-span-2">
                     <label className="label text-xs text-base-content/50 pb-1">Host</label>
-                    <input className="input input-bordered input-sm w-full bg-base-300/50 font-mono text-xs" placeholder="smtp.gmail.com" value={form.smtp_host} onChange={(e) => setForm({ ...form, smtp_host: e.target.value })} required />
+                    <input className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white font-mono text-xs" placeholder="smtp.gmail.com" value={form.smtp_host} onChange={(e) => setForm({ ...form, smtp_host: e.target.value })} required />
                   </div>
                   <div>
                     <label className="label text-xs text-base-content/50 pb-1">Port</label>
-                    <input type="number" className="input input-bordered input-sm w-full bg-base-300/50" value={form.smtp_port} onChange={(e) => setForm({ ...form, smtp_port: Number(e.target.value) })} />
+                    <input type="number" className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white" value={form.smtp_port} onChange={(e) => setForm({ ...form, smtp_port: Number(e.target.value) })} />
                   </div>
                 </div>
                 <div className="flex items-center gap-2 mt-2 mb-3">
@@ -1193,7 +1193,7 @@ function EmailTab({ initialAccounts }: { initialAccounts: EmailAccount[] }) {
                       <label className="label text-xs text-base-content/50 pb-1">Username / Email</label>
                       <input
                         autoComplete="new-password"
-                        className="input input-bordered input-sm w-full bg-base-300/50"
+                        className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
                         placeholder="you@gmail.com"
                         value={form.username}
                         onChange={(e) => setForm({ ...form, username: e.target.value })}
@@ -1207,7 +1207,7 @@ function EmailTab({ initialAccounts }: { initialAccounts: EmailAccount[] }) {
                       <input
                         type="password"
                         autoComplete="new-password"
-                        className="input input-bordered input-sm w-full bg-base-300/50"
+                        className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
                         placeholder={editingAccount ? "•••••••• (unchanged)" : "xxxx xxxx xxxx xxxx"}
                         value={form.password}
                         onChange={(e) => setForm({ ...form, password: e.target.value })}
@@ -1218,16 +1218,16 @@ function EmailTab({ initialAccounts }: { initialAccounts: EmailAccount[] }) {
                 )}
               </div>
 
-              <div className="border-t border-base-300/40 pt-3">
+              <div className="border-t border-gray-200 dark:border-gray-800 pt-3">
                 <p className="text-xs font-medium text-base-content/50 mb-2 uppercase tracking-wide">IMAP (inbox reading — optional)</p>
                 <div className="grid grid-cols-3 gap-2">
                   <div className="col-span-2">
                     <label className="label text-xs text-base-content/50 pb-1">Host</label>
-                    <input className="input input-bordered input-sm w-full bg-base-300/50 font-mono text-xs" placeholder="imap.gmail.com" value={form.imap_host} onChange={(e) => setForm({ ...form, imap_host: e.target.value })} />
+                    <input className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white font-mono text-xs" placeholder="imap.gmail.com" value={form.imap_host} onChange={(e) => setForm({ ...form, imap_host: e.target.value })} />
                   </div>
                   <div>
                     <label className="label text-xs text-base-content/50 pb-1">Port</label>
-                    <input type="number" className="input input-bordered input-sm w-full bg-base-300/50" value={form.imap_port} onChange={(e) => setForm({ ...form, imap_port: Number(e.target.value) })} />
+                    <input type="number" className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white" value={form.imap_port} onChange={(e) => setForm({ ...form, imap_port: Number(e.target.value) })} />
                   </div>
                 </div>
                 <div className="flex items-center justify-between mb-2 mt-3">
@@ -1253,7 +1253,7 @@ function EmailTab({ initialAccounts }: { initialAccounts: EmailAccount[] }) {
                       <label className="label text-xs text-base-content/50 pb-1">IMAP username <span className="text-base-content/30">(blank = same as SMTP)</span></label>
                       <input
                         autoComplete="new-password"
-                        className="input input-bordered input-sm w-full bg-base-300/50 font-mono text-xs"
+                        className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white font-mono text-xs"
                         placeholder="IMAP username"
                         value={form.imap_username}
                         onChange={(e) => setForm({ ...form, imap_username: e.target.value })}
@@ -1264,7 +1264,7 @@ function EmailTab({ initialAccounts }: { initialAccounts: EmailAccount[] }) {
                       <input
                         type="password"
                         autoComplete="new-password"
-                        className="input input-bordered input-sm w-full bg-base-300/50"
+                        className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
                         placeholder="•••••••• (unchanged)"
                         value={form.imap_password}
                         onChange={(e) => setForm({ ...form, imap_password: e.target.value })}
@@ -1274,11 +1274,11 @@ function EmailTab({ initialAccounts }: { initialAccounts: EmailAccount[] }) {
                 )}
               </div>
 
-              <div className="border-t border-base-300/40 pt-3 flex flex-col gap-3">
+              <div className="border-t border-gray-200 dark:border-gray-800 pt-3 flex flex-col gap-3">
                 <p className="text-xs font-medium text-base-content/50 uppercase tracking-wide">Limits &amp; Schedule</p>
                 <div>
                   <label className="label text-xs text-base-content/50 pb-1">Emails / day</label>
-                  <input type="number" className="input input-bordered input-sm w-full bg-base-300/50" value={form.daily_email_limit} onChange={(e) => setForm({ ...form, daily_email_limit: Number(e.target.value) })} min={1} max={500} />
+                  <input type="number" className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white" value={form.daily_email_limit} onChange={(e) => setForm({ ...form, daily_email_limit: Number(e.target.value) })} min={1} max={500} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -1333,7 +1333,7 @@ function EmailTab({ initialAccounts }: { initialAccounts: EmailAccount[] }) {
                 </div>
               </div>
 
-              <div className="border-t border-base-300/40 pt-3 flex flex-col gap-3">
+              <div className="border-t border-gray-200 dark:border-gray-800 pt-3 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-base-content/50 uppercase tracking-wide">Sending ramp-up</p>
@@ -1354,7 +1354,7 @@ function EmailTab({ initialAccounts }: { initialAccounts: EmailAccount[] }) {
                       <label className="label text-xs text-base-content/50 pb-1">Ramp start date</label>
                       <input
                         type="date"
-                        className="input input-bordered input-sm w-full bg-base-300/50"
+                        className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
                         value={form.ramp_start_date}
                         onChange={(e) => setForm(f => ({ ...f, ramp_start_date: e.target.value }))}
                       />
@@ -1364,13 +1364,13 @@ function EmailTab({ initialAccounts }: { initialAccounts: EmailAccount[] }) {
                 )}
               </div>
 
-              <div className="border-t border-base-300/40 pt-3">
+              <div className="border-t border-gray-200 dark:border-gray-800 pt-3">
                 <p className="text-xs font-medium text-base-content/50 mb-1 uppercase tracking-wide">Signature</p>
                 <p className="text-xs text-base-content/35 mb-2">
                   Appended to outgoing emails. If empty, nothing is added — no separator line, nothing.
                 </p>
                 <textarea
-                  className="textarea textarea-bordered w-full bg-base-300/50 text-sm h-24 resize-none font-mono"
+                  className="textarea textarea-bordered w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white text-sm h-24 resize-none font-mono"
                   placeholder={"John Smith\nHead of Sales · Acme Corp\njohn@acme.com"}
                   value={form.signature}
                   onChange={(e) => setForm({ ...form, signature: e.target.value })}
@@ -1446,11 +1446,11 @@ function TemplatesTab({ initialTemplates }: { initialTemplates: Template[] }) {
       </div>
 
       {templates.length === 0 ? (
-        <div className="text-center py-12 text-base-content/30 text-sm border border-dashed border-base-300/60 rounded-xl">No templates yet.</div>
+        <div className="text-center py-12 text-base-content/30 text-sm border border-dashed border-gray-300 dark:border-gray-700 rounded-2xl bg-white dark:bg-gray-900 shadow-xs">No templates yet.</div>
       ) : (
         <div className="flex flex-col gap-2">
           {templates.map((t) => (
-            <div key={t.id} className="flex items-start gap-4 px-4 py-3 bg-base-200 border border-base-300/50 rounded-xl hover:border-base-300 transition-colors">
+            <div key={t.id} className="flex items-start gap-4 px-4 py-3 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs hover:border-base-300 transition-colors">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium">{t.name}</p>
                 <p className="text-xs text-base-content/40 mt-0.5 line-clamp-2 whitespace-pre-wrap">{t.body}</p>
@@ -1470,12 +1470,12 @@ function TemplatesTab({ initialTemplates }: { initialTemplates: Template[] }) {
 
       {showModal && (
         <div className="modal modal-open">
-          <div className="modal-box bg-base-200 border border-base-300/50 max-w-lg">
+          <div className="modal-box bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xl max-w-lg">
             <h3 className="font-semibold text-base mb-4">{editing ? "Edit Template" : "New Template"}</h3>
             <form onSubmit={save} className="flex flex-col gap-3">
               <div>
                 <label className="label text-xs text-base-content/50 pb-1">Template name</label>
-                <input className="input input-bordered input-sm w-full bg-base-300/50" placeholder="e.g. Connection note" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+                <input className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white" placeholder="e.g. Connection note" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
               </div>
               <div>
                 <label className="label text-xs text-base-content/50 pb-1">Body</label>
@@ -1494,7 +1494,7 @@ function TemplatesTab({ initialTemplates }: { initialTemplates: Template[] }) {
                     </button>
                   ))}
                 </div>
-                <textarea id="tmpl-body" className="textarea textarea-bordered w-full bg-base-300/50 text-sm font-mono" rows={6} placeholder="Hi {{first_name}}, I noticed you're at {{company}}..." value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} required />
+                <textarea id="tmpl-body" className="textarea textarea-bordered w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white text-sm font-mono" rows={6} placeholder="Hi {{first_name}}, I noticed you're at {{company}}..." value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} required />
               </div>
               <div className="modal-action mt-1">
                 <button type="button" className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors" onClick={() => setShowModal(false)}>Cancel</button>
@@ -1606,7 +1606,7 @@ function IntegrationsTab({ hasPremium }: { hasPremium: boolean }) {
         const isEditing = editingKey === intg.key;
 
         return (
-          <div key={intg.key} className="bg-base-200 border border-base-300/50 rounded-xl overflow-hidden">
+          <div key={intg.key} className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs overflow-hidden">
             <div className="flex items-center gap-4 px-4 py-3.5">
               {/* Logo badge */}
               <div
@@ -1658,7 +1658,7 @@ function IntegrationsTab({ hasPremium }: { hasPremium: boolean }) {
                 <input
                   type="text"
                   autoFocus
-                  className="input input-bordered input-sm flex-1 bg-base-300/50 font-mono text-xs"
+                  className="input input-bordered input-sm flex-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white font-mono text-xs"
                   placeholder={intg.placeholder}
                   value={apiKeyInput}
                   onChange={(e) => setApiKeyInput(e.target.value)}
@@ -1709,7 +1709,7 @@ function McpCard() {
   const cliCommand = `claude mcp add --transport http inhubflow ${mcpUrl}`;
 
   return (
-    <div className="bg-base-200 border border-base-300/50 rounded-xl overflow-hidden">
+    <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs overflow-hidden">
       <button
         onClick={() => setExpanded((v) => !v)}
         className="flex w-full items-center gap-2 px-4 py-3 text-left"
@@ -1812,7 +1812,7 @@ function GeneralTab({ hasPremium }: { hasPremium: boolean }) {
   return (
     <div className="max-w-sm flex flex-col gap-4">
       {/* Account */}
-      <div className="bg-base-200 border border-base-300/50 rounded-xl p-4">
+      <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs p-4">
         <p className="text-xs font-medium text-base-content/40 uppercase tracking-wide mb-2">Account</p>
         <p className="text-sm text-base-content/70">
           Signed in as <span className="text-base-content font-medium">{session?.user?.email ?? "—"}</span>
@@ -1820,7 +1820,7 @@ function GeneralTab({ hasPremium }: { hasPremium: boolean }) {
       </div>
 
       {/* Language / Idioma */}
-      <div className="bg-base-200 border border-base-300/50 rounded-xl p-4">
+      <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs p-4">
         <div className="flex items-center gap-2 mb-1">
           <RiGlobalLine size={13} className="text-base-content/40" />
           <p className="text-xs font-medium text-base-content/40 uppercase tracking-wide">{t("settings.language")}</p>
@@ -1855,7 +1855,7 @@ function GeneralTab({ hasPremium }: { hasPremium: boolean }) {
 
 
       {/* Daily import limit */}
-      <div className="bg-base-200 border border-base-300/50 rounded-xl p-4">
+      <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs p-4">
         <div className="flex items-center gap-2 mb-1">
           <RiDownloadLine size={13} className="text-base-content/40" />
           <p className="text-xs font-medium text-base-content/40 uppercase tracking-wide">Daily import limit</p>
@@ -1865,7 +1865,7 @@ function GeneralTab({ hasPremium }: { hasPremium: boolean }) {
         </p>
         <form onSubmit={saveImportCap} className="flex items-end gap-2">
           <div className="flex-1">
-            <input type="number" min={1} className="input input-bordered input-sm w-full bg-base-300/50" placeholder="1500" value={importCap} onChange={(e) => setImportCap(e.target.value === "" ? "" : Number(e.target.value))} required />
+            <input type="number" min={1} className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white" placeholder="1500" value={importCap} onChange={(e) => setImportCap(e.target.value === "" ? "" : Number(e.target.value))} required />
           </div>
           <button type="submit" disabled={capSaving} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-50">
             {capSaving ? <span className="loading loading-spinner loading-xs" /> : "Save"}
@@ -1877,7 +1877,7 @@ function GeneralTab({ hasPremium }: { hasPremium: boolean }) {
       {hasPremium && <McpCard />}
 
       {/* Product tour */}
-      <div className="bg-base-200 border border-base-300/50 rounded-xl p-4">
+      <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs p-4">
         <div className="flex items-center gap-2 mb-2">
           <RiCompassLine size={13} className="text-base-content/40" />
           <p className="text-xs font-medium text-base-content/40 uppercase tracking-wide">Product tour</p>
@@ -1907,7 +1907,7 @@ function GeneralTab({ hasPremium }: { hasPremium: boolean }) {
       </div>
 
       {/* Change password */}
-      <div className="bg-base-200 border border-base-300/50 rounded-xl p-4">
+      <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs p-4">
         <div className="flex items-center gap-2 mb-3">
           <RiLockPasswordLine size={13} className="text-base-content/40" />
           <p className="text-xs font-medium text-base-content/40 uppercase tracking-wide">Change password</p>
@@ -1915,15 +1915,15 @@ function GeneralTab({ hasPremium }: { hasPremium: boolean }) {
         <form onSubmit={handleChangePassword} className="flex flex-col gap-3">
           <div>
             <label className="label text-xs text-base-content/50 pb-1">Current password</label>
-            <input type="password" className="input input-bordered input-sm w-full bg-base-300/50" placeholder="Current password" value={form.currentPassword} onChange={(e) => setForm({ ...form, currentPassword: e.target.value })} required />
+            <input type="password" className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white" placeholder="Current password" value={form.currentPassword} onChange={(e) => setForm({ ...form, currentPassword: e.target.value })} required />
           </div>
           <div>
             <label className="label text-xs text-base-content/50 pb-1">New password</label>
-            <input type="password" className="input input-bordered input-sm w-full bg-base-300/50" placeholder="Min. 8 characters" value={form.newPassword} onChange={(e) => setForm({ ...form, newPassword: e.target.value })} minLength={8} required />
+            <input type="password" className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white" placeholder="Min. 8 characters" value={form.newPassword} onChange={(e) => setForm({ ...form, newPassword: e.target.value })} minLength={8} required />
           </div>
           <div>
             <label className="label text-xs text-base-content/50 pb-1">Confirm new password</label>
-            <input type="password" className="input input-bordered input-sm w-full bg-base-300/50" placeholder="Repeat new password" value={form.confirmPassword} onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} required />
+            <input type="password" className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white" placeholder="Repeat new password" value={form.confirmPassword} onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} required />
           </div>
           <div className="flex justify-end pt-1">
             <button type="submit" disabled={loading} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-50">

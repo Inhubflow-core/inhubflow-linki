@@ -249,13 +249,13 @@ export default function ListsPage({ initialLists, accounts = [], apolloConfigure
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           <Link
             href="/lead-finder"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
           >
             <RiUserSearchLine size={16} /> {t("nav.leadFinder")}
           </Link>
           <button
             onClick={() => openCreateModal("sales_nav")}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-300 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all shadow-xs"
             title={t("lists.importSalesNavDesc")}
           >
             <RiLinkedinBoxFill size={17} className="text-[#0A66C2]" />
@@ -273,10 +273,10 @@ export default function ListsPage({ initialLists, accounts = [], apolloConfigure
 
       {/* Import jobs panel */}
       {activeJobs.length > 0 && (
-        <div className="mb-6 rounded-lg border border-base-300/50 bg-base-200/40 p-4" data-tour="lists-jobs">
+        <div className="mb-6 rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 shadow-xs" data-tour="lists-jobs">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold">{t("lists.importJobs")}</h2>
-            <span className="text-xs text-base-content/50">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t("lists.importJobs")}</h2>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
               {t("lists.contactsImportedToday", { current: importedToday, max: dailyCap })}
             </span>
           </div>
@@ -285,29 +285,29 @@ export default function ListsPage({ initialLists, accounts = [], apolloConfigure
               const pct = j.total > 0 ? Math.round((j.count / j.total) * 100) : 0;
               const scheduled = j.status === "scheduled";
               return (
-                <div key={j.id} className="flex items-center gap-3 rounded-md bg-base-300/30 px-3 py-2">
+                <div key={j.id} className="flex items-center gap-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/50 px-3 py-2.5">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm truncate">{j.list_name ?? "—"}</span>
+                      <span className="font-semibold text-sm truncate text-gray-900 dark:text-white">{j.list_name ?? "—"}</span>
                       {j.batch_index > 1 && (
-                        <span className="text-xs text-base-content/40">{t("lists.batch", { index: j.batch_index })}</span>
+                        <span className="text-xs text-gray-400">{t("lists.batch", { index: j.batch_index })}</span>
                       )}
                       {scheduled ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-warning/15 text-warning">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-warning/15 text-warning border border-warning/20">
                           <RiCalendarLine size={11} /> {t("lists.scheduled", { date: j.scheduled_for ?? "" })}
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-info/15 text-info">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-info/15 text-info border border-info/20">
                           <span className="loading loading-spinner" style={{ width: 9, height: 9 }} /> {t("lists.scraping", { pct })}
                         </span>
                       )}
                     </div>
                     {!scheduled && (
-                      <div className="mt-1.5 w-full bg-base-300 rounded-full h-1">
-                        <div className="bg-primary h-1 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                      <div className="mt-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                        <div className="bg-brand-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
                       </div>
                     )}
-                    <span className="text-xs text-base-content/40">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
                       {scheduled
                         ? `Resumes at page ${j.start_page} — capped at ${dailyCap}/day`
                         : `${j.count} / ${j.total}`}
@@ -327,8 +327,8 @@ export default function ListsPage({ initialLists, accounts = [], apolloConfigure
       )}
 
       {lists.length === 0 ? (
-        <div className="text-center py-14 px-4 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30">
-          <div className="inline-flex p-3 rounded-2xl bg-brand-500/10 text-brand-500 dark:bg-brand-500/20 mb-3">
+        <div className="text-center py-14 px-4 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30">
+          <div className="inline-flex p-3 rounded-2xl bg-brand-500/10 text-brand-500 dark:bg-brand-500/20 mb-3 border border-brand-500/20">
             <RiUserSearchLine size={28} />
           </div>
           <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">
@@ -347,14 +347,14 @@ export default function ListsPage({ initialLists, accounts = [], apolloConfigure
             </button>
             <Link
               href="/lead-finder"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs md:text-sm font-medium bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 shadow-xs transition-all"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs md:text-sm font-medium bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 shadow-xs transition-all"
             >
               <RiUserSearchLine size={16} />
               {t("nav.leadFinder")}
             </Link>
             <button
               onClick={() => openCreateModal("empty")}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-gray-800 transition-all"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-gray-800 transition-all border border-transparent hover:border-gray-300 dark:hover:border-gray-700"
             >
               <RiAddLine size={16} />
               {t("lists.newList")}
@@ -362,10 +362,10 @@ export default function ListsPage({ initialLists, accounts = [], apolloConfigure
           </div>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-base-300/50">
+        <div className="overflow-x-auto rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-theme-xs">
           <table className="table w-full text-sm">
             <thead>
-              <tr className="border-base-300/50 text-base-content/50 text-xs uppercase tracking-wide">
+              <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/40 text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide">
                 <th>{t("common.name")}</th>
                 <th>{t("nav.contacts")}</th>
                 <th>{t("nav.campaigns")}</th>
@@ -374,32 +374,32 @@ export default function ListsPage({ initialLists, accounts = [], apolloConfigure
                 <th></th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
               {lists.map((l) => (
                 <tr
                   key={l.id}
-                  className="border-base-300/30 hover:bg-base-200/50 cursor-pointer"
+                  className="hover:bg-gray-50/80 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
                   onClick={() => router.push(`/lists/${l.id}`)}
                 >
                   <td>
-                    <span className="font-medium">{l.name}</span>
+                    <span className="font-semibold text-gray-900 dark:text-white">{l.name}</span>
                     {l.description && (
-                      <p className="text-base-content/40 text-xs mt-0.5">{l.description}</p>
+                      <p className="text-gray-500 dark:text-gray-400 text-xs mt-0.5">{l.description}</p>
                     )}
                   </td>
                   <td>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-base-300 text-base-content/60">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
                       {l.target_count} {l.target_count === 1 ? t("lists.leadsCount", { count: 1 }) : t("lists.leadsCountPlural", { count: l.target_count })}
                     </span>
                   </td>
                   <td>
                     {l.active_run_id ? (
-                      <span className="inline-flex items-center gap-1.5 text-xs text-base-content/60">
+                      <span className="inline-flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300">
                         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${l.active_run_status === 'running' ? 'bg-success animate-pulse' : 'bg-warning'}`} />
                         {l.active_workflow_name ?? t("common.active")}
                       </span>
                     ) : (
-                      <span className="text-base-content/20 text-xs">—</span>
+                      <span className="text-gray-400 text-xs">—</span>
                     )}
                   </td>
                   <td className="min-w-35">
@@ -413,17 +413,17 @@ export default function ListsPage({ initialLists, accounts = [], apolloConfigure
                             <span className="loading loading-spinner loading-xs text-primary" style={{ width: 10, height: 10 }} />
                             <span className="text-xs text-primary font-medium">{label} {pct}%</span>
                           </div>
-                          <div className="w-full bg-base-300 rounded-full h-1">
-                            <div className="bg-primary h-1 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                            <div className="bg-brand-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
                           </div>
-                          <span className="text-xs text-base-content/40">{job.count} / {job.total}</span>
+                          <span className="text-xs text-gray-400">{job.count} / {job.total}</span>
                         </div>
                       );
                     })() : (
-                      <span className="text-base-content/20 text-xs">—</span>
+                      <span className="text-gray-400 text-xs">—</span>
                     )}
                   </td>
-                  <td className="text-base-content/40 text-xs">
+                  <td className="text-gray-500 dark:text-gray-400 text-xs">
                     {new Date(l.created_at).toLocaleDateString()}
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>
@@ -445,9 +445,9 @@ export default function ListsPage({ initialLists, accounts = [], apolloConfigure
 
       {showModal && (
         <div className="modal modal-open">
-          <div className="modal-box bg-base-200 border border-base-300/50 max-w-lg">
+          <div className="modal-box bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xl max-w-lg p-6">
             {/* Modal Header with Tabs */}
-            <div className="flex items-center justify-between border-b border-base-300/60 pb-3 mb-4">
+            <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-3 mb-4">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -455,7 +455,7 @@ export default function ListsPage({ initialLists, accounts = [], apolloConfigure
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     modalMode === "sales_nav"
                       ? "bg-[#0A66C2] text-white shadow-xs"
-                      : "text-base-content/60 hover:text-base-content hover:bg-base-300/50"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
                   }`}
                 >
                   <RiLinkedinBoxFill size={16} />
@@ -467,7 +467,7 @@ export default function ListsPage({ initialLists, accounts = [], apolloConfigure
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     modalMode === "empty"
                       ? "bg-brand-500 text-white shadow-xs"
-                      : "text-base-content/60 hover:text-base-content hover:bg-base-300/50"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
                   }`}
                 >
                   <RiAddLine size={15} />
@@ -476,7 +476,7 @@ export default function ListsPage({ initialLists, accounts = [], apolloConfigure
               </div>
               <button
                 type="button"
-                className="btn btn-ghost btn-xs btn-circle text-base-content/50"
+                className="btn btn-ghost btn-xs btn-circle text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                 onClick={() => setShowModal(false)}
               >
                 <RiCloseLine size={16} />
@@ -486,7 +486,7 @@ export default function ListsPage({ initialLists, accounts = [], apolloConfigure
             {/* Mode 1: Sales Navigator Import Form */}
             {modalMode === "sales_nav" && (
               <form onSubmit={createSalesNavList} className="flex flex-col gap-3.5">
-                <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-900 dark:text-blue-200 flex items-start gap-2.5">
+                <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/80 text-xs text-blue-900 dark:text-blue-200 flex items-start gap-2.5">
                   <RiInformationLine size={18} className="text-[#0A66C2] shrink-0 mt-0.5" />
                   <div>
                     <span className="font-semibold block mb-0.5">Integración Directa con LinkedIn Sales Navigator</span>
@@ -495,11 +495,11 @@ export default function ListsPage({ initialLists, accounts = [], apolloConfigure
                 </div>
 
                 <div>
-                  <label className="label text-xs font-medium text-base-content/70 pb-1">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
                     {t("common.name")} de la Lista <span className="text-brand-500">*</span>
                   </label>
                   <input
-                    className="input input-bordered input-sm w-full bg-base-300/50 text-xs"
+                    className="w-full rounded-xl border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-3.5 py-2 text-xs text-gray-900 dark:text-gray-100 shadow-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none"
                     placeholder="ej: Directores de Operaciones LatAm - Sales Nav"
                     value={salesNavForm.name}
                     onChange={(e) => setSalesNavForm({ ...salesNavForm, name: e.target.value })}
@@ -508,23 +508,23 @@ export default function ListsPage({ initialLists, accounts = [], apolloConfigure
                 </div>
 
                 <div>
-                  <label className="label text-xs font-medium text-base-content/70 pb-1">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
                     {t("lists.salesNavUrl")} <span className="text-brand-500">*</span>
                   </label>
                   <input
-                    className="input input-bordered input-sm w-full bg-base-300/50 font-mono text-xs"
+                    className="w-full rounded-xl border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-3.5 py-2 font-mono text-xs text-gray-900 dark:text-gray-100 shadow-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none"
                     placeholder="https://www.linkedin.com/sales/lists/people/... o /sales/search/people?..."
                     value={salesNavForm.sales_nav_url}
                     onChange={(e) => setSalesNavForm({ ...salesNavForm, sales_nav_url: e.target.value })}
                     required
                   />
-                  <span className="text-[11px] text-base-content/40 mt-1 block">
+                  <span className="text-[11px] text-gray-400 mt-1 block">
                     Pega la URL de una lista de personas guardada o una búsqueda de Sales Navigator.
                   </span>
                 </div>
 
                 <div>
-                  <label className="label text-xs font-medium text-base-content/70 pb-1">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
                     {t("lists.accountToUse")} <span className="text-brand-500">*</span>
                   </label>
                   {accounts.length === 0 || !accounts.some((a) => a.is_authenticated) ? (
@@ -536,7 +536,7 @@ export default function ListsPage({ initialLists, accounts = [], apolloConfigure
                     </div>
                   ) : (
                     <select
-                      className="select select-bordered select-sm w-full bg-base-300/50 text-xs cursor-pointer"
+                      className="w-full rounded-xl border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-3 py-2 text-xs text-gray-900 dark:text-gray-100 shadow-xs cursor-pointer focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none"
                       value={salesNavForm.account_id}
                       onChange={(e) => setSalesNavForm({ ...salesNavForm, account_id: e.target.value })}
                       required
@@ -552,7 +552,7 @@ export default function ListsPage({ initialLists, accounts = [], apolloConfigure
                 </div>
 
                 {apolloConfigured && (
-                  <label className="flex items-center gap-2 cursor-pointer text-xs text-base-content/70 pt-1">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300 pt-1">
                     <input
                       type="checkbox"
                       className="checkbox checkbox-xs checkbox-primary"
@@ -564,10 +564,10 @@ export default function ListsPage({ initialLists, accounts = [], apolloConfigure
                   </label>
                 )}
 
-                <div className="modal-action mt-2 pt-2 border-t border-base-300/50 flex items-center justify-end gap-2">
+                <div className="modal-action mt-2 pt-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-2">
                   <button
                     type="button"
-                    className="btn btn-ghost btn-sm text-base-content/60"
+                    className="btn btn-ghost btn-sm text-gray-600 dark:text-gray-400"
                     onClick={() => setShowModal(false)}
                     disabled={loading}
                   >
@@ -595,11 +595,11 @@ export default function ListsPage({ initialLists, accounts = [], apolloConfigure
             {modalMode === "empty" && (
               <form onSubmit={createEmptyList} className="flex flex-col gap-3.5">
                 <div>
-                  <label className="label text-xs font-medium text-base-content/70 pb-1">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
                     {t("common.name")} de la Lista <span className="text-brand-500">*</span>
                   </label>
                   <input
-                    className="input input-bordered input-sm w-full bg-base-300/50 text-xs"
+                    className="w-full rounded-xl border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-3.5 py-2 text-xs text-gray-900 dark:text-gray-100 shadow-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none"
                     placeholder={t("lists.namePlaceholder")}
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -607,20 +607,20 @@ export default function ListsPage({ initialLists, accounts = [], apolloConfigure
                   />
                 </div>
                 <div>
-                  <label className="label text-xs font-medium text-base-content/70 pb-1">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
                     {t("common.description")} ({t("common.optional")})
                   </label>
                   <input
-                    className="input input-bordered input-sm w-full bg-base-300/50 text-xs"
+                    className="w-full rounded-xl border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-3.5 py-2 text-xs text-gray-900 dark:text-gray-100 shadow-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none"
                     placeholder={t("lists.descPlaceholder")}
                     value={form.description}
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
                   />
                 </div>
-                <div className="modal-action mt-2 pt-2 border-t border-base-300/50 flex items-center justify-end gap-2">
+                <div className="modal-action mt-2 pt-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-2">
                   <button
                     type="button"
-                    className="btn btn-ghost btn-sm text-base-content/60"
+                    className="btn btn-ghost btn-sm text-gray-600 dark:text-gray-400"
                     onClick={() => setShowModal(false)}
                     disabled={loading}
                   >

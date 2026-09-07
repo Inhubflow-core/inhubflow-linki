@@ -58,7 +58,7 @@ export const UpcomingMeetingsWidget: React.FC = () => {
   }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-xs dark:border-gray-800 dark:bg-gray-900 flex flex-col">
+    <div className="rounded-2xl border border-gray-300 bg-white p-5 shadow-xs dark:border-gray-700 dark:bg-gray-900 flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2.5">
@@ -90,7 +90,7 @@ export const UpcomingMeetingsWidget: React.FC = () => {
           Cargando reuniones...
         </div>
       ) : events.length === 0 ? (
-        <div className="p-6 rounded-xl border border-dashed border-gray-200 dark:border-gray-800 text-center bg-gray-50/50 dark:bg-gray-850/30">
+        <div className="p-6 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 text-center bg-gray-50/50 dark:bg-gray-850/30">
           <RiCalendarEventLine size={24} className="mx-auto text-gray-400 dark:text-gray-600 mb-2" />
           <p className="text-xs text-gray-600 dark:text-gray-400 font-medium">
             No tienes reuniones comerciales agendadas para los próximos días.
@@ -111,7 +111,7 @@ export const UpcomingMeetingsWidget: React.FC = () => {
             return (
               <div
                 key={evt.id}
-                className="p-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-850/50 hover:border-brand-500/30 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                className="p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-850/50 hover:border-brand-500/40 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   {evt.target_image_url ? (
@@ -150,7 +150,7 @@ export const UpcomingMeetingsWidget: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-200/50 dark:border-gray-800">
+                <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-200 dark:border-gray-800">
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-brand-600 dark:text-brand-400 bg-brand-50/80 dark:bg-brand-950/40 px-2.5 py-1 rounded-lg border border-brand-500/20">
                     <RiTimeLine size={13} className="shrink-0" />
                     <span>{formatRelativeDate(evt.start_time)}</span>

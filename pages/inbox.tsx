@@ -686,7 +686,7 @@ function ChatPanel({ reply, onActionDone }: ChatPanelProps) {
   return (
     <div className="flex-1 flex flex-col h-full bg-base-100 min-w-0 overflow-hidden">
       {/* ── Chat Header ── */}
-      <div className="px-5 py-3.5 border-b border-base-300/60 bg-base-100/90 backdrop-blur-sm flex items-center justify-between gap-4 shrink-0">
+      <div className="px-5 py-3.5 border-b border-gray-200 dark:border-gray-800 bg-base-100/90 backdrop-blur-sm flex items-center justify-between gap-4 shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <div className="relative shrink-0">
             <div
@@ -901,7 +901,7 @@ function ChatPanel({ reply, onActionDone }: ChatPanelProps) {
                       : "bg-primary/10 border border-primary/20 rounded-2xl rounded-tr-xs p-4 shadow-sm ml-8"
                   }`}
                 >
-                  <div className="flex items-center justify-between text-xs text-base-content/60 pb-2 border-b border-base-300/30">
+                  <div className="flex items-center justify-between text-xs text-base-content/60 pb-2 border-b border-gray-200 dark:border-gray-800/30">
                     <span className="font-semibold text-base-content">{isLead ? reply.full_name || msg.from : "Tú"}</span>
                     <span>{formatDate(msg.date, locale)}</span>
                   </div>
@@ -916,7 +916,7 @@ function ChatPanel({ reply, onActionDone }: ChatPanelProps) {
       </div>
 
       {/* ── Composer Box ── */}
-      <div className="p-4 border-t border-base-300/60 bg-base-100 shrink-0 space-y-2.5 relative">
+      <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-base-100 shrink-0 space-y-2.5 relative">
         {/* SDR AI Pending Approval / Proposed Draft Card */}
         {!actionDismissed && reply.sdr_action_id && ["waiting_approval", "proposed"].includes(reply.sdr_action_state || "") && reply.sdr_reply_draft && (
           <div className="rounded-2xl border border-primary/30 bg-primary/5 p-3.5 space-y-2.5 animate-fadeIn shadow-sm">
@@ -1063,7 +1063,7 @@ function ChatPanel({ reply, onActionDone }: ChatPanelProps) {
           {/* Emoji Picker Popover */}
           {showEmojiPicker && (
             <div className="absolute bottom-16 left-2 z-50 bg-base-100 border border-base-300 rounded-2xl shadow-2xl p-3 w-72 space-y-2.5 animate-fadeIn">
-              <div className="flex items-center justify-between pb-1.5 border-b border-base-300/40 text-xs font-semibold text-base-content/70">
+              <div className="flex items-center justify-between pb-1.5 border-b border-gray-200 dark:border-gray-800/40 text-xs font-semibold text-base-content/70">
                 <span>Emojis Rápidos</span>
                 <button
                   type="button"
@@ -1439,8 +1439,8 @@ export default function InboxPage() {
       {/* ── LinkedIn Diagnostic Report Modal ── */}
       {diagnosticReport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-base-100 border border-base-300 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-fadeIn">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-base-300">
+          <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-fadeIn">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800">
               <div className="flex items-center gap-2">
                 <RiPulseLine className="text-warning text-lg" />
                 <h3 className="font-semibold text-base">Diagnóstico en Vivo de Bandeja LinkedIn</h3>
@@ -1484,7 +1484,7 @@ export default function InboxPage() {
               )}
             </div>
 
-            <div className="p-4 border-t border-base-300 flex justify-end">
+            <div className="p-4 border-t border-gray-200 dark:border-gray-800 flex justify-end">
               <button
                 onClick={() => setDiagnosticReport(null)}
                 className="px-4 py-1.5 rounded-lg bg-base-200 hover:bg-base-300 text-xs font-semibold"
@@ -1579,11 +1579,11 @@ export default function InboxPage() {
       </div>
 
       {/* ── 2-COLUMN SPLIT VIEW CONTAINER (50% / 50%) ── */}
-      <div className="flex-1 flex min-h-[640px] h-[calc(100vh-7.5rem)] bg-base-100 rounded-2xl border border-base-300/70 shadow-xl overflow-hidden">
+      <div className="flex-1 flex min-h-[640px] h-[calc(100vh-7.5rem)] bg-white dark:bg-gray-900 rounded-2xl border border-gray-300 dark:border-gray-700 shadow-xl overflow-hidden">
         {/* ── LEFT COLUMN: Conversations List (50%) ── */}
-        <div className="w-full md:w-1/2 md:basis-1/2 flex-1 flex flex-col border-r border-base-300/70 bg-base-100/70 select-none min-w-0">
+        <div className="w-full md:w-1/2 md:basis-1/2 flex-1 flex flex-col border-r border-gray-300 dark:border-gray-700 bg-white/70 dark:bg-gray-900/70 select-none min-w-0">
           {/* Top Search & Filter Bar */}
-          <div className="p-3.5 border-b border-base-300/60 space-y-2.5 bg-base-100">
+          <div className="p-3.5 border-b border-gray-200 dark:border-gray-800 space-y-2.5 bg-base-100">
             {/* Search input */}
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40 pointer-events-none">

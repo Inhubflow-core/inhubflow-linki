@@ -259,14 +259,14 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
       </div>
 
       {workflows.length === 0 ? (
-        <div className="text-center py-20 border border-dashed border-base-300/60 rounded-xl text-base-content/30 text-sm">
+        <div className="text-center py-20 border border-dashed border-gray-300 dark:border-gray-700 rounded-2xl bg-white dark:bg-gray-900 text-gray-400 dark:text-gray-500 text-sm shadow-xs">
           {t("workflows.noCampaigns")}
         </div>
       ) : (
         <>
         {/* Active campaigns */}
         {activeWorkflows.length === 0 ? (
-          <div className="text-center py-12 border border-dashed border-base-300/60 rounded-xl text-base-content/30 text-sm mb-4">
+          <div className="text-center py-12 border border-dashed border-gray-300 dark:border-gray-700 rounded-2xl bg-white dark:bg-gray-900 text-gray-400 dark:text-gray-500 text-sm mb-4 shadow-xs">
             {t("workflows.noActiveCampaigns")}
           </div>
         ) : (
@@ -294,7 +294,7 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
             return (
               <div
                 key={w.id}
-                className="bg-base-200 border border-base-300/50 rounded-xl p-5 cursor-pointer hover:border-base-300 transition-all hover:shadow-sm flex flex-col gap-4"
+                className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl p-5 cursor-pointer hover:border-brand-500/50 transition-all hover:shadow-md flex flex-col gap-4 shadow-xs"
                 onClick={() => router.push(`/workflows/${w.id}`)}
               >
                 {/* Header: icon + name + status */}
@@ -304,15 +304,15 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <span className="font-semibold text-sm truncate">{w.name}</span>
+                      <span className="font-semibold text-sm truncate text-gray-900 dark:text-white">{w.name}</span>
                       {isRunning && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-success/15 text-success shrink-0">
-                          <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse inline-block" />
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-medium bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 shrink-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
                           Active
                         </span>
                       )}
                       {isPaused && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-warning/15 text-warning shrink-0">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 shrink-0">
                           Paused
                         </span>
                       )}
@@ -324,8 +324,8 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
                           const StepIcon = STEP_ICON[type] ?? RiEyeLine;
                           return (
                             <span key={i} className="flex items-center gap-1">
-                              {i > 0 && <RiArrowRightLine size={9} className="text-base-content/25" />}
-                              <span className="inline-flex items-center gap-1 text-xs text-base-content/40">
+                              {i > 0 && <RiArrowRightLine size={9} className="text-gray-400 dark:text-gray-600" />}
+                              <span className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                                 <StepIcon size={11} />
                                 {STEP_LABEL[type] ?? type}
                               </span>
@@ -335,21 +335,21 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
                       </div>
                     )}
                     {actionSteps.length === 0 && (
-                      <p className="text-xs text-base-content/30 mb-1.5">No steps configured</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">No steps configured</p>
                     )}
 
                     {/* Assigned Account & Target List */}
                     {w.account_name && (
                       <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                         <span
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-brand-50 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300 border border-brand-200/50 dark:border-brand-800/50"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-brand-50 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300 border border-brand-200 dark:border-brand-800"
                           title={w.account_email || undefined}
                         >
                           <RiUserLine size={12} className="shrink-0 text-brand-500" />
                           {w.account_name}
                         </span>
                         {w.list_name && (
-                          <span className="text-[11px] text-base-content/45 truncate max-w-[180px]" title={w.list_name}>
+                          <span className="text-[11px] text-gray-500 dark:text-gray-400 truncate max-w-[180px]" title={w.list_name}>
                             • {w.list_name}
                           </span>
                         )}
@@ -361,36 +361,36 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
                 {/* Progress */}
                 {w.total_prospects > 0 ? (
                   <div className="flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between text-xs text-base-content/50">
+                    <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
                       <span>{w.completed_prospects} / {w.total_prospects} prospects done</span>
                       <span>{progress}%</span>
                     </div>
-                    <div className="w-full h-1.5 bg-base-300/60 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progress}%` }} />
+                    <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full bg-brand-500 transition-all" style={{ width: `${progress}%` }} />
                     </div>
                     {(w.connections_sent > 0 || acceptanceRate !== null) && (
-                      <div className="flex items-center gap-3 text-xs text-base-content/35 mt-0.5">
+                      <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                         {w.connections_sent > 0 && <span>{w.connections_sent} connected</span>}
-                        {acceptanceRate !== null && <span className="text-success">{acceptanceRate}% accepted</span>}
+                        {acceptanceRate !== null && <span className="text-emerald-600 dark:text-emerald-400 font-medium">{acceptanceRate}% accepted</span>}
                       </div>
                     )}
                   </div>
                 ) : (
-                  <p className="text-xs text-base-content/30">No prospects enrolled yet</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">No prospects enrolled yet</p>
                 )}
 
                 {/* Footer */}
                 <div
-                  className="flex items-center justify-between pt-1 border-t border-base-300/30"
+                  className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-800"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <span className="text-xs text-base-content/30">
+                  <span className="text-xs text-gray-400 dark:text-gray-500">
                     {w.action_step_count} step{w.action_step_count !== 1 ? "s" : ""}
                   </span>
                   <div className="flex items-center gap-1.5">
                     {isRunning && w.active_run_id && (
                       <button
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-warning/10 text-warning border border-warning/20 hover:bg-warning/20 transition-colors"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
                         onClick={() => pauseRun(w.id, w.active_run_id!)}
                       >
                         <RiPauseLine size={11} /> Pause
@@ -398,7 +398,7 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
                     )}
                     {isPaused && w.active_run_id && (
                       <button
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20 hover:bg-brand-500/20 transition-colors"
                         onClick={() => resumeRun(w.id, w.active_run_id!)}
                       >
                         <RiPlayLine size={11} /> Resume
@@ -406,20 +406,20 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
                     )}
                     <button
                       title="Duplicate workflow"
-                      className="inline-flex items-center p-1.5 rounded-md text-xs bg-base-300/60 text-base-content/50 border border-base-300/50 hover:bg-base-300 hover:text-base-content transition-colors"
+                      className="inline-flex items-center p-1.5 rounded-lg text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                       onClick={() => duplicateWorkflow(w.id, w.name)}
                     >
                       <RiFileCopyLine size={12} />
                     </button>
                     <button
                       title="Archive"
-                      className="inline-flex items-center p-1.5 rounded-md text-xs bg-base-300/60 text-base-content/50 border border-base-300/50 hover:bg-base-300 hover:text-base-content transition-colors"
+                      className="inline-flex items-center p-1.5 rounded-lg text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                       onClick={() => toggleArchive(w.id, true)}
                     >
                       <RiArchiveLine size={12} />
                     </button>
                     <button
-                      className="inline-flex items-center p-1.5 rounded-md text-xs bg-error/10 text-error border border-error/20 hover:bg-error/20 transition-colors"
+                      className="inline-flex items-center p-1.5 rounded-lg text-xs bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 transition-colors"
                       onClick={() => setDeleteId(w.id)}
                     >
                       <RiDeleteBinLine size={12} />
@@ -436,7 +436,7 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
         {archivedWorkflows.length > 0 && (
           <div className="mt-2">
             <button
-              className="flex items-center gap-2 text-xs text-base-content/40 hover:text-base-content/60 transition-colors mb-3 group"
+              className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors mb-3 group"
               onClick={() => setArchivedOpen((v) => !v)}
             >
               <RiArrowDownSLine
@@ -455,25 +455,25 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
                   return (
                     <div
                       key={w.id}
-                      className="bg-base-200/50 border border-base-300/30 rounded-xl p-4 opacity-60 hover:opacity-80 transition-opacity flex items-center gap-3"
+                      className="bg-white/60 dark:bg-gray-900/60 border border-gray-300 dark:border-gray-700 rounded-2xl p-4 opacity-75 hover:opacity-100 transition-opacity flex items-center gap-3 shadow-xs"
                     >
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${style.bg} ${style.border}`}>
                         <Icon size={15} className={style.icon} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{w.name}</p>
-                        <p className="text-xs text-base-content/30">{w.action_step_count} steps · {w.total_prospects} prospects</p>
+                        <p className="text-sm font-medium truncate text-gray-900 dark:text-white">{w.name}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{w.action_step_count} steps · {w.total_prospects} prospects</p>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           title="Restore"
-                          className="inline-flex items-center p-1.5 rounded-md text-xs bg-base-300/60 text-base-content/50 border border-base-300/50 hover:bg-base-300 hover:text-base-content transition-colors"
+                          className="inline-flex items-center p-1.5 rounded-lg text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                           onClick={() => toggleArchive(w.id, false)}
                         >
                           <RiInboxUnarchiveLine size={12} />
                         </button>
                         <button
-                          className="inline-flex items-center p-1.5 rounded-md text-xs bg-error/10 text-error border border-error/20 hover:bg-error/20 transition-colors"
+                          className="inline-flex items-center p-1.5 rounded-lg text-xs bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 transition-colors"
                           onClick={() => setDeleteId(w.id)}
                         >
                           <RiDeleteBinLine size={12} />
@@ -492,13 +492,13 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
       {/* New campaign modal */}
       {showModal && (
         <div className="modal modal-open">
-          <div className="modal-box bg-base-200 border border-base-300/50 max-w-md">
-            <h3 className="font-semibold text-base mb-4">{t("workflows.newCampaign")}</h3>
+          <div className="modal-box bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xl max-w-md">
+            <h3 className="font-semibold text-base mb-4 text-gray-900 dark:text-white">{t("workflows.newCampaign")}</h3>
             <form onSubmit={createWorkflow} className="flex flex-col gap-3">
               <div>
-                <label className="label text-xs text-base-content/50 pb-1">{t("common.name")}</label>
+                <label className="label text-xs text-gray-600 dark:text-gray-400 pb-1">{t("common.name")}</label>
                 <input
-                  className="input input-bordered input-sm w-full bg-base-300/50"
+                  className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl focus:border-brand-500 focus:ring-1 focus:ring-brand-500 text-gray-900 dark:text-white"
                   placeholder={t("workflows.namePlaceholder")}
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -507,39 +507,39 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
                 />
               </div>
               <div>
-                <label className="label text-xs text-base-content/50 pb-1">{t("common.description")} {t("common.optional")}</label>
+                <label className="label text-xs text-gray-600 dark:text-gray-400 pb-1">{t("common.description")} {t("common.optional")}</label>
                 <input
-                  className="input input-bordered input-sm w-full bg-base-300/50"
+                  className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl focus:border-brand-500 focus:ring-1 focus:ring-brand-500 text-gray-900 dark:text-white"
                   placeholder={t("workflows.descPlaceholder")}
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                 />
               </div>
               <div className="modal-action mt-2">
-                <button type="button" className="px-4 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300 transition-colors" onClick={() => setShowModal(false)}>
+                <button type="button" className="px-4 py-2 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => setShowModal(false)}>
                   {t("common.cancel")}
                 </button>
-                <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-50" disabled={loading}>
+                <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-colors disabled:opacity-50 shadow-xs" disabled={loading}>
                   {loading ? <span className="loading loading-spinner loading-xs" /> : t("workflows.createCampaign")}
                 </button>
               </div>
             </form>
           </div>
-          <div className="modal-backdrop" onClick={() => setShowModal(false)} />
+          <div className="modal-backdrop bg-black/40 backdrop-blur-xs" onClick={() => setShowModal(false)} />
         </div>
       )}
 
       {/* Delete confirm */}
       {deleteId !== null && (
         <div className="modal modal-open">
-          <div className="modal-box bg-base-200 border border-base-300/50 max-w-sm">
-            <h3 className="font-semibold text-base mb-2">{t("workflows.deleteConfirm")}</h3>
+          <div className="modal-box bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xl max-w-sm">
+            <h3 className="font-semibold text-base mb-2 text-gray-900 dark:text-white">{t("workflows.deleteConfirm")}</h3>
             <div className="modal-action">
-              <button className="px-4 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300 transition-colors" onClick={() => setDeleteId(null)}>{t("common.cancel")}</button>
-              <button className="px-4 py-1.5 rounded-lg text-sm font-medium bg-error/15 text-error border border-error/25 hover:bg-error/25 transition-colors" onClick={() => deleteWorkflow(deleteId)}>{t("common.delete")}</button>
+              <button className="px-4 py-2 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => setDeleteId(null)}>{t("common.cancel")}</button>
+              <button className="px-4 py-2 rounded-xl text-sm font-semibold bg-rose-500 hover:bg-rose-600 !text-white transition-colors shadow-xs" onClick={() => deleteWorkflow(deleteId)}>{t("common.delete")}</button>
             </div>
           </div>
-          <div className="modal-backdrop" onClick={() => setDeleteId(null)} />
+          <div className="modal-backdrop bg-black/40 backdrop-blur-xs" onClick={() => setDeleteId(null)} />
         </div>
       )}
     </div>

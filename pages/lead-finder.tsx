@@ -391,7 +391,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
             </Link>
             <Link
               href="/settings"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
             >
               <RiSettings4Line size={16} /> {t("leadFinder.accounts")}
             </Link>
@@ -401,8 +401,8 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
         {/* 2-Column Grid: Form & Results (50% / 50%) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
           {/* Left Column: Search Form (50% on lg) */}
-          <div className="w-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 md:p-6 shadow-theme-xs space-y-5">
-            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
+          <div className="w-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-300 dark:border-gray-700 p-5 md:p-6 shadow-theme-xs space-y-5">
+            <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-3">
               <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                 <RiSearchLine className="text-brand-500" /> {t("leadFinder.searchCriteria")}
               </h2>
@@ -424,7 +424,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     onChange={(e) => setTitle(e.target.value)}
                     disabled={isSearching}
                     placeholder={t("leadFinder.jobTitlePlaceholder")}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
+                    className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                   />
                 </div>
                 {/* Suggestions (Max 4, Multi-select) */}
@@ -437,10 +437,10 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                         type="button"
                         onClick={() => setTitle(toggleOrAppendPill(title, st))}
                         disabled={isSearching}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
                           active
-                            ? "bg-brand-500 text-white shadow-xs"
-                            : "bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
+                            ? "bg-brand-500 border-brand-500 text-white shadow-xs"
+                            : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
                         }`}
                       >
                         {active ? `✓ ${st}` : `+${st}`}
@@ -465,7 +465,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                         setCity("");
                       }}
                       disabled={isSearching}
-                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 transition-all focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
+                      className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-xs transition-all focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                     >
                       {COUNTRIES_LIST.map((c) => (
                         <option key={c.name} value={c.name}>
@@ -488,7 +488,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                         onChange={(e) => setCity(e.target.value)}
                         disabled={isSearching}
                         placeholder="Ej: Santiago, Antofagasta..."
-                        className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
+                        className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                       />
                     </div>
                   </div>
@@ -506,10 +506,10 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                           type="button"
                           onClick={() => setCity(active ? "" : cName)}
                           disabled={isSearching}
-                          className={`px-2.5 py-0.5 rounded-lg text-xs font-medium transition-all ${
+                          className={`px-2.5 py-0.5 rounded-lg text-xs font-medium border transition-all ${
                             active
-                              ? "bg-brand-500 text-white shadow-xs"
-                              : "bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
+                              ? "bg-brand-500 border-brand-500 text-white shadow-xs"
+                              : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
                           }`}
                         >
                           {active ? `✓ ${cName}` : `+${cName}`}
@@ -533,7 +533,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     onChange={(e) => setCompany(e.target.value)}
                     disabled={isSearching}
                     placeholder={t("leadFinder.companyPlaceholder")}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
+                    className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                   />
                 </div>
                 {/* Industry Suggestions (Max 4, Multi-select) */}
@@ -546,10 +546,10 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                         type="button"
                         onClick={() => setCompany(toggleOrAppendPill(company, si))}
                         disabled={isSearching}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
                           active
-                            ? "bg-brand-500 text-white shadow-xs"
-                            : "bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
+                            ? "bg-brand-500 border-brand-500 text-white shadow-xs"
+                            : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
                         }`}
                       >
                         {active ? `✓ ${si}` : `+${si}`}
@@ -574,7 +574,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                       className={`py-2 rounded-xl text-xs font-semibold border transition-all ${
                         limit === val
                           ? "bg-brand-500 border-brand-500 !text-white shadow-xs"
-                          : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-750"
+                          : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750"
                       }`}
                     >
                       {t("leadFinder.leadsCount", { count: String(val) })}
@@ -599,7 +599,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     }}
                     disabled={isSearching}
                     placeholder={t("leadFinder.listNamePlaceholder")}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-3.5 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
+                    className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                   />
                 </div>
               </div>
@@ -641,7 +641,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
           <div className="w-full space-y-6">
             {/* Live Progress Card (Visible when searching or completed) */}
             {(isSearching || completedResult) && (
-              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 md:p-6 shadow-theme-xs space-y-4">
+              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-300 dark:border-gray-700 p-5 md:p-6 shadow-theme-xs space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500/10 text-brand-500">
@@ -677,7 +677,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                 </div>
 
                 {/* Progress Bar */}
-                <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
+                <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2 overflow-hidden border border-gray-200 dark:border-gray-700">
                   <div
                     className={`h-2 rounded-full transition-all duration-500 ${
                       completedResult ? "bg-emerald-500" : "bg-gradient-to-r from-brand-500 to-indigo-500"
@@ -688,7 +688,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
 
                 {/* Completion Action Banner */}
                 {completedResult && completedResult.totalFound > 0 && (
-                  <div className="mt-3 p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="mt-3 p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
                       <div className="h-7 w-7 rounded-full bg-emerald-500 !text-white flex items-center justify-center shrink-0">
                         <RiCheckLine size={16} />
@@ -713,7 +713,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                 )}
 
                 {completedResult && completedResult.totalFound === 0 && (
-                  <div className="mt-3 p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 flex items-start gap-2.5">
+                  <div className="mt-3 p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800/60 flex items-start gap-2.5">
                     <RiAlertLine size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                     <div className="text-xs space-y-1 text-amber-800 dark:text-amber-300">
                       <p className="font-semibold">{t("leadFinder.noResultsTitle")}</p>
@@ -727,8 +727,8 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
             )}
 
             {/* Results Table / Cards */}
-            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-theme-xs overflow-hidden">
-              <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-300 dark:border-gray-700 shadow-theme-xs overflow-hidden">
+              <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-800">
                 <div className="flex items-center gap-2">
                   <RiUserSearchLine className="text-brand-500" size={18} />
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white">
@@ -745,7 +745,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
 
               {leads.length === 0 ? (
                 <div className="p-12 text-center space-y-3">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-500 dark:bg-brand-950/30">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-500 dark:bg-brand-950/30 border border-brand-200 dark:border-brand-900">
                     <RiUserSearchLine size={28} />
                   </div>
                   <div className="space-y-1">
@@ -765,7 +765,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                   </div>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-100 dark:divide-gray-800 max-h-[580px] overflow-y-auto">
+                <div className="divide-y divide-gray-200 dark:divide-gray-800 max-h-[580px] overflow-y-auto">
                   {leads.map((lead, idx) => (
                     <div
                       key={lead.linkedinUrl || idx}

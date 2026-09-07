@@ -99,15 +99,15 @@ export default function EmailHealth() {
 
         {/* Summary pills */}
         <div className="flex items-center gap-4 mb-8">
-          <div className="px-4 py-3 rounded-xl bg-base-200 border border-base-300/50">
+          <div className="px-4 py-3 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs">
             <div className="text-xs text-base-content/40 mb-1">{t("emailHealth.sentToday")}</div>
             <div className="text-2xl font-semibold text-base-content">{totalToday}</div>
           </div>
-          <div className="px-4 py-3 rounded-xl bg-base-200 border border-base-300/50">
+          <div className="px-4 py-3 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs">
             <div className="text-xs text-base-content/40 mb-1">{t("emailHealth.totalLimitToday")}</div>
             <div className="text-2xl font-semibold text-base-content">{totalLimit}</div>
           </div>
-          <div className="px-4 py-3 rounded-xl bg-base-200 border border-base-300/50">
+          <div className="px-4 py-3 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs">
             <div className="text-xs text-base-content/40 mb-1">{t("emailHealth.accountsActive")}</div>
             <div className="text-2xl font-semibold text-base-content">
               {data?.accounts.filter(a => a.sent_today > 0).length ?? 0}
@@ -131,15 +131,15 @@ export default function EmailHealth() {
         </div>
 
         {/* Per-account table */}
-        <div className="bg-base-200 rounded-xl border border-base-300/50 mb-8 overflow-hidden">
-          <div className="px-5 py-3 border-b border-base-300/40 flex items-center gap-2">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-300 dark:border-gray-700 shadow-xs mb-8 overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center gap-2">
             <RiMailLine size={14} className="text-base-content/40" />
             <span className="text-sm font-medium text-base-content">Accounts — last 7 days</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-base-300/30">
+                <tr className="border-b border-gray-200 dark:border-gray-800">
                   <th className="text-left px-5 py-2.5 text-xs font-medium text-base-content/40 whitespace-nowrap">Account</th>
                   <th className="text-right px-4 py-2.5 text-xs font-medium text-base-content/40 whitespace-nowrap">
                     Today<br/>
@@ -220,8 +220,8 @@ export default function EmailHealth() {
 
         <div className="grid grid-cols-2 gap-6">
           {/* Recent send log */}
-          <div className="bg-base-200 rounded-xl border border-base-300/50 overflow-hidden">
-            <div className="px-5 py-3 border-b border-base-300/40">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-300 dark:border-gray-700 shadow-xs overflow-hidden">
+            <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-800">
               <span className="text-sm font-medium text-base-content">Recent sends</span>
               <span className="ml-2 text-xs text-base-content/30">last 50</span>
             </div>
@@ -245,8 +245,8 @@ export default function EmailHealth() {
           </div>
 
           {/* Guard trips */}
-          <div className="bg-base-200 rounded-xl border border-base-300/50 overflow-hidden">
-            <div className="px-5 py-3 border-b border-base-300/40">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-300 dark:border-gray-700 shadow-xs overflow-hidden">
+            <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-800">
               <span className="text-sm font-medium text-base-content">Limit guard trips</span>
               <span className="ml-2 text-xs text-base-content/30">today</span>
             </div>

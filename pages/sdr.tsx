@@ -428,7 +428,7 @@ export default function SdrPage() {
         )}
 
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 border-b border-base-300/40 pb-1 overflow-x-auto">
+        <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-800 pb-1 overflow-x-auto">
           <button
             onClick={() => setActiveTab("overview")}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
@@ -495,28 +495,28 @@ export default function SdrPage() {
           <div className="space-y-8">
             {/* Quick Metrics */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="p-5 rounded-2xl bg-base-200/60 border border-base-300/60 shadow-sm">
+              <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs">
                 <div className="text-xs font-medium text-base-content/50 mb-1 flex items-center gap-1.5">
                   <RiChatCheckLine className="text-violet-400" /> {t("sdr.totalDecisions")}
                 </div>
                 <div className="text-2xl font-bold text-base-content">{data?.stats.totalDecisions ?? 0}</div>
               </div>
 
-              <div className="p-5 rounded-2xl bg-base-200/60 border border-base-300/60 shadow-sm">
+              <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs">
                 <div className="text-xs font-medium text-base-content/50 mb-1 flex items-center gap-1.5">
                   <RiAlertLine className="text-amber-400" /> {t("sdr.totalHandoffs")}
                 </div>
                 <div className="text-2xl font-bold text-amber-400">{data?.stats.totalHandoffs ?? 0}</div>
               </div>
 
-              <div className="p-5 rounded-2xl bg-base-200/60 border border-base-300/60 shadow-sm">
+              <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs">
                 <div className="text-xs font-medium text-base-content/50 mb-1 flex items-center gap-1.5">
                   <RiRobotLine className="text-emerald-400" /> {t("sdr.activeThreads")}
                 </div>
                 <div className="text-2xl font-bold text-emerald-400">{data?.stats.activeThreads ?? 0}</div>
               </div>
 
-              <div className="p-5 rounded-2xl bg-base-200/60 border border-base-300/60 shadow-sm">
+              <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs">
                 <div className="text-xs font-medium text-base-content/50 mb-1 flex items-center gap-1.5">
                   <RiShieldCheckLine className="text-blue-400" /> {t("sdr.confidenceLevel")}
                 </div>
@@ -540,7 +540,7 @@ export default function SdrPage() {
                   className={`p-5 rounded-2xl border cursor-pointer transition-all ${
                     mode === "off"
                       ? "bg-base-200 border-slate-400 ring-2 ring-slate-400/20 shadow-md"
-                      : "bg-base-200/40 border-base-300/60 hover:bg-base-200/70"
+                      : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 hover:border-brand-500 shadow-xs"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-3">
@@ -561,7 +561,7 @@ export default function SdrPage() {
                   className={`p-5 rounded-2xl border cursor-pointer transition-all ${
                     mode === "shadow"
                       ? "bg-amber-500/10 border-amber-500/40 ring-2 ring-amber-500/20 shadow-md"
-                      : "bg-base-200/40 border-base-300/60 hover:bg-base-200/70"
+                      : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 hover:border-brand-500 shadow-xs"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-3">
@@ -582,7 +582,7 @@ export default function SdrPage() {
                   className={`p-5 rounded-2xl border cursor-pointer transition-all ${
                     mode === "approval"
                       ? "bg-blue-500/10 border-blue-500/40 ring-2 ring-blue-500/20 shadow-md"
-                      : "bg-base-200/40 border-base-300/60 hover:bg-base-200/70"
+                      : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 hover:border-brand-500 shadow-xs"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-3">
@@ -603,7 +603,7 @@ export default function SdrPage() {
                   className={`p-5 rounded-2xl border cursor-pointer transition-all ${
                     mode === "auto"
                       ? "bg-emerald-500/10 border-emerald-500/40 ring-2 ring-emerald-500/20 shadow-md"
-                      : "bg-base-200/40 border-base-300/60 hover:bg-base-200/70"
+                      : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 hover:border-brand-500 shadow-xs"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-3">
@@ -621,7 +621,7 @@ export default function SdrPage() {
             </div>
 
             {/* Core Settings */}
-            <div className="p-6 rounded-2xl bg-base-200/60 border border-base-300/60 space-y-6">
+            <div className="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs space-y-6">
               <h3 className="font-semibold text-base-content text-base flex items-center gap-2">
                 <RiSettings4Line className="text-violet-400" /> {t("sdr.engineParameters")}
               </h3>
@@ -634,7 +634,7 @@ export default function SdrPage() {
                   <select
                     value={model}
                     onChange={(e) => setModel(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl bg-base-100 border border-base-300/80 text-sm font-medium text-base-content focus:outline-none focus:border-violet-500"
+                    className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs text-sm font-medium text-base-content focus:outline-none focus:border-violet-500"
                   >
                     <option value="gemini-3.7-flash">Google Gemini 3.7 Flash ({t("sdr.aiModelRecommended") || "Recomendado"})</option>
                     <option value="gemini-3.8-flash">Google Gemini 3.8 Flash</option>
@@ -673,7 +673,7 @@ export default function SdrPage() {
                     max="10"
                     value={maxAutoTurns}
                     onChange={(e) => setMaxAutoTurns(parseInt(e.target.value, 10))}
-                    className="w-full px-4 py-2.5 rounded-xl bg-base-100 border border-base-300/80 text-sm font-medium text-base-content focus:outline-none focus:border-violet-500"
+                    className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs text-sm font-medium text-base-content focus:outline-none focus:border-violet-500"
                   />
                   <p className="text-xs text-base-content/40 mt-1.5">
                     {t("sdr.maxAutoTurnsDesc")}
@@ -687,7 +687,7 @@ export default function SdrPage() {
         {/* ─── TAB 2: PROMPTS & PERSONALITY ──────────────────────────────────── */}
         {activeTab === "prompts" && (
           <div className="space-y-6">
-            <div className="p-6 rounded-2xl bg-base-200/60 border border-base-300/60 space-y-4">
+            <div className="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-base-content mb-1">
                   {t("sdr.systemPromptTitle")}
@@ -699,14 +699,14 @@ export default function SdrPage() {
                   rows={8}
                   value={systemPrompt}
                   onChange={(e) => setSystemPrompt(e.target.value)}
-                  className="w-full p-4 rounded-xl bg-base-100 border border-base-300/80 font-mono text-xs text-base-content leading-relaxed focus:outline-none focus:border-violet-500"
+                  className="w-full p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs font-mono text-xs text-base-content leading-relaxed focus:outline-none focus:border-violet-500"
                   placeholder={t("sdr.systemPromptPlaceholder")}
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="p-6 rounded-2xl bg-base-200/60 border border-base-300/60 space-y-3">
+              <div className="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3">
                 <label className="block text-sm font-semibold text-base-content">
                   {t("sdr.handoffRulesTitle")}
                 </label>
@@ -717,12 +717,12 @@ export default function SdrPage() {
                   rows={5}
                   value={handoffRules}
                   onChange={(e) => setHandoffRules(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-base-100 border border-base-300/80 text-xs text-base-content focus:outline-none focus:border-violet-500"
+                  className="w-full p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs text-xs text-base-content focus:outline-none focus:border-violet-500"
                   placeholder={t("sdr.handoffRulesPlaceholder")}
                 />
               </div>
 
-              <div className="p-6 rounded-2xl bg-base-200/60 border border-base-300/60 space-y-3">
+              <div className="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3">
                 <label className="block text-sm font-semibold text-base-content">
                   {t("sdr.customInstructionsTitle")}
                 </label>
@@ -733,7 +733,7 @@ export default function SdrPage() {
                   rows={5}
                   value={customInstructions}
                   onChange={(e) => setCustomInstructions(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-base-100 border border-base-300/80 text-xs text-base-content focus:outline-none focus:border-violet-500"
+                  className="w-full p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs text-xs text-base-content focus:outline-none focus:border-violet-500"
                   placeholder={t("sdr.customInstructionsPlaceholder")}
                 />
               </div>
@@ -745,7 +745,7 @@ export default function SdrPage() {
         {activeTab === "knowledge" && (
           <div className="space-y-6">
             {/* General Company Context */}
-            <div className="p-6 rounded-2xl bg-base-200/60 border border-base-300/60 space-y-3">
+            <div className="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3">
               <label className="block text-sm font-semibold text-base-content">
                 {t("sdr.companyContextTitle")}
               </label>
@@ -756,13 +756,13 @@ export default function SdrPage() {
                 rows={6}
                 value={companyContext}
                 onChange={(e) => setCompanyContext(e.target.value)}
-                className="w-full p-4 rounded-xl bg-base-100 border border-base-300/80 text-xs text-base-content leading-relaxed focus:outline-none focus:border-violet-500"
+                className="w-full p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs text-xs text-base-content leading-relaxed focus:outline-none focus:border-violet-500"
                 placeholder={t("sdr.companyContextPlaceholder")}
               />
             </div>
 
             {/* Add Knowledge Item Form */}
-            <form onSubmit={handleAddKnowledge} className="p-6 rounded-2xl bg-base-200/60 border border-base-300/60 space-y-4">
+            <form onSubmit={handleAddKnowledge} className="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs space-y-4">
               <h3 className="font-semibold text-base-content text-base flex items-center gap-2">
                 <RiAddLine className="text-violet-400" /> {t("sdr.addKnowledgeTitle")}
               </h3>
@@ -774,14 +774,14 @@ export default function SdrPage() {
                     value={newSourceTitle}
                     onChange={(e) => setNewSourceTitle(e.target.value)}
                     placeholder={t("sdr.sourceTitlePlaceholder")}
-                    className="w-full px-4 py-2 rounded-xl bg-base-100 border border-base-300/80 text-sm text-base-content focus:outline-none focus:border-violet-500"
+                    className="w-full px-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs text-sm text-base-content focus:outline-none focus:border-violet-500"
                   />
                 </div>
                 <div>
                   <select
                     value={newSourceType}
                     onChange={(e) => setNewSourceType(e.target.value)}
-                    className="w-full px-4 py-2 rounded-xl bg-base-100 border border-base-300/80 text-sm text-base-content focus:outline-none focus:border-violet-500"
+                    className="w-full px-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs text-sm text-base-content focus:outline-none focus:border-violet-500"
                   >
                     <option value="catalog">{t("sdr.typeCatalog")}</option>
                     <option value="policy">{t("sdr.typePolicy")}</option>
@@ -796,7 +796,7 @@ export default function SdrPage() {
                   value={newSourceContent}
                   onChange={(e) => setNewSourceContent(e.target.value)}
                   placeholder={t("sdr.sourceContentPlaceholder")}
-                  className="w-full p-4 rounded-xl bg-base-100 border border-base-300/80 text-xs text-base-content focus:outline-none focus:border-violet-500"
+                  className="w-full p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs text-xs text-base-content focus:outline-none focus:border-violet-500"
                 />
               </div>
 
@@ -816,13 +816,13 @@ export default function SdrPage() {
             <div className="space-y-3">
               <h3 className="font-semibold text-base-content text-sm">{t("sdr.savedDocs", { count: knowledgeSources.length })}</h3>
               {knowledgeSources.length === 0 ? (
-                <div className="p-8 text-center rounded-2xl bg-base-200/30 border border-base-300/40 text-sm text-base-content/40">
+                <div className="p-8 text-center rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs text-sm text-base-content/40">
                   {t("sdr.noSavedDocs")}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {knowledgeSources.map((s) => (
-                    <div key={s.id} className="p-5 rounded-2xl bg-base-200/40 border border-base-300/60 flex flex-col justify-between">
+                    <div key={s.id} className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs flex flex-col justify-between">
                       <div>
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400 uppercase">
@@ -865,7 +865,7 @@ export default function SdrPage() {
         {activeTab === "simulator" && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Input Simulation Form */}
-            <div className="p-6 rounded-2xl bg-base-200/60 border border-base-300/60 space-y-4">
+            <div className="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs space-y-4">
               <h3 className="font-semibold text-base-content text-base flex items-center gap-2">
                 <RiSparklingLine className="text-violet-400" /> {t("sdr.simTitle")}
               </h3>
@@ -881,7 +881,7 @@ export default function SdrPage() {
                   type="text"
                   value={simSenderName}
                   onChange={(e) => setSimSenderName(e.target.value)}
-                  className="w-full px-4 py-2 rounded-xl bg-base-100 border border-base-300/80 text-sm text-base-content focus:outline-none focus:border-violet-500"
+                  className="w-full px-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs text-sm text-base-content focus:outline-none focus:border-violet-500"
                 />
               </div>
 
@@ -893,7 +893,7 @@ export default function SdrPage() {
                   rows={5}
                   value={simMessage}
                   onChange={(e) => setSimMessage(e.target.value)}
-                  className="w-full p-4 rounded-xl bg-base-100 border border-base-300/80 text-sm text-base-content leading-relaxed focus:outline-none focus:border-violet-500"
+                  className="w-full p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs text-sm text-base-content leading-relaxed focus:outline-none focus:border-violet-500"
                   placeholder={t("sdr.simMessagePlaceholder")}
                 />
               </div>
@@ -910,10 +910,10 @@ export default function SdrPage() {
             </div>
 
             {/* Simulation Results Display */}
-            <div className="p-6 rounded-2xl bg-base-200/60 border border-base-300/60 flex flex-col justify-between">
+            <div className="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs flex flex-col justify-between">
               {simResult ? (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between border-b border-base-300/40 pb-3">
+                  <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-3">
                     <span className="text-xs font-semibold uppercase tracking-wider text-base-content/50">
                       {t("sdr.analysisResult")}
                     </span>
@@ -923,28 +923,28 @@ export default function SdrPage() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 rounded-xl bg-base-100 border border-base-300/60">
+                    <div className="p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs">
                       <div className="text-[10px] uppercase font-bold text-base-content/40">{t("sdr.intent")}</div>
                       <div className="text-sm font-bold text-violet-400 uppercase mt-0.5">
                         {simResult.decision.intent}
                       </div>
                     </div>
 
-                    <div className="p-3 rounded-xl bg-base-100 border border-base-300/60">
+                    <div className="p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs">
                       <div className="text-[10px] uppercase font-bold text-base-content/40">{t("sdr.confidence")}</div>
                       <div className="text-sm font-bold text-emerald-400 mt-0.5">
                         {(simResult.decision.confidence * 100).toFixed(1)}%
                       </div>
                     </div>
 
-                    <div className="p-3 rounded-xl bg-base-100 border border-base-300/60">
+                    <div className="p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs">
                       <div className="text-[10px] uppercase font-bold text-base-content/40">{t("sdr.suggestedAction")}</div>
                       <div className="text-sm font-semibold text-base-content mt-0.5">
                         {simResult.decision.recommended_action}
                       </div>
                     </div>
 
-                    <div className="p-3 rounded-xl bg-base-100 border border-base-300/60">
+                    <div className="p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs">
                       <div className="text-[10px] uppercase font-bold text-base-content/40">{t("sdr.requiresHuman")}</div>
                       <div
                         className={`text-sm font-semibold mt-0.5 ${
@@ -982,7 +982,7 @@ export default function SdrPage() {
 
         {/* ─── TAB 5: DECISION HISTORY ───────────────────────────────────────── */}
         {activeTab === "history" && (
-          <div className="p-6 rounded-2xl bg-base-200/60 border border-base-300/60 space-y-4">
+          <div className="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs space-y-4">
             <h3 className="font-semibold text-base-content text-base flex items-center gap-2">
               <RiHistoryLine className="text-violet-400" /> {t("sdr.historyTitle")}
             </h3>
@@ -998,7 +998,7 @@ export default function SdrPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-base-300/40 text-left text-xs font-semibold text-base-content/40 uppercase">
+                    <tr className="border-b border-gray-200 dark:border-gray-800 text-left text-xs font-semibold text-base-content/40 uppercase">
                       <th className="py-3 px-4">{t("sdr.colDate")}</th>
                       <th className="py-3 px-4">{t("sdr.colProspect")}</th>
                       <th className="py-3 px-4">{t("sdr.colIntent")}</th>

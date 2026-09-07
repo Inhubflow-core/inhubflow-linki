@@ -57,7 +57,7 @@
   --bg-app: #f9fafb;
   --bg-sidebar: #ffffff;
   --bg-card: #ffffff;
-  --border-color: #e4e7ec;
+  --border-color: #d0d5dd;
   --text-main: #101828;
   --text-muted: #667085;
   --brand-primary: #465fff;
@@ -68,7 +68,7 @@ html.dark {
   --bg-app: #0c111d;
   --bg-sidebar: #101828;
   --bg-card: #101828;
-  --border-color: #1d2939;
+  --border-color: #344054;
   --text-main: #fcfcfd;
   --text-muted: #98a2b3;
   --brand-primary: #465fff;

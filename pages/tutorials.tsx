@@ -50,7 +50,7 @@ export default function TutorialsPage() {
 
         {/* Content Placeholder Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          <div className="p-6 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 shadow-xs space-y-3">
+          <div className="p-6 rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xs space-y-3">
             <div className="w-10 h-10 rounded-xl bg-brand-500/10 text-brand-500 flex items-center justify-center">
               <RiPlayCircleLine size={22} />
             </div>
@@ -63,7 +63,7 @@ export default function TutorialsPage() {
             <span className="inline-block text-[11px] font-medium text-brand-500">Video tutorial en preparación</span>
           </div>
 
-          <div className="p-6 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 shadow-xs space-y-3">
+          <div className="p-6 rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xs space-y-3">
             <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center">
               <RiSparklingLine size={22} />
             </div>
@@ -76,7 +76,7 @@ export default function TutorialsPage() {
             <span className="inline-block text-[11px] font-medium text-purple-500">Video tutorial en preparación</span>
           </div>
 
-          <div className="p-6 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 shadow-xs space-y-3">
+          <div className="p-6 rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xs space-y-3">
             <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
               <RiBookOpenLine size={22} />
             </div>

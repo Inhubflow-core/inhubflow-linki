@@ -233,10 +233,10 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
 
           <div className="flex items-center gap-2 shrink-0">
             {/* View Switcher: Table vs Kanban */}
-            <div className="join border border-base-300 rounded-lg p-0.5 bg-base-200/50">
+            <div className="join border border-gray-300 dark:border-gray-700 rounded-xl p-0.5 bg-gray-100 dark:bg-gray-800">
               <button
                 type="button"
-                className="join-item btn btn-xs btn-primary gap-1 font-semibold"
+                className="join-item btn btn-xs btn-primary gap-1 font-semibold rounded-lg"
                 title="Vista actual: Tabla"
               >
                 <RiListCheck2 size={13} />
@@ -244,7 +244,7 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
               </button>
               <Link
                 href="/pipeline"
-                className="join-item btn btn-xs btn-ghost gap-1 text-base-content/60 hover:text-base-content"
+                className="join-item btn btn-xs btn-ghost gap-1 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg"
                 title="Ir al Tablero Kanban"
               >
                 <RiKanbanView size={13} />
@@ -254,7 +254,7 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
 
             <Link
               href="/lead-finder"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
             >
               <RiUserSearchLine size={16} /> {t("nav.leadFinder")}
             </Link>
@@ -271,12 +271,12 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
         <div className="flex items-center gap-3 mb-5 flex-wrap" data-tour="contacts-filters">
           {/* Search */}
           <div className="relative">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-base-content/30 pointer-events-none">
-              <RiSearchLine size={13} />
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+              <RiSearchLine size={14} />
             </span>
             <input
               type="text"
-              className="w-56 bg-base-200 border border-base-300/50 rounded-lg pl-8 pr-3 py-1.5 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:border-primary/40"
+              className="w-56 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl pl-8 pr-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 shadow-xs"
               placeholder={t("contacts.searchPlaceholder")}
               value={search}
               onChange={(e) => changeSearch(e.target.value)}
@@ -285,7 +285,7 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
 
           {/* List selector */}
           <select
-            className="bg-base-200 border border-base-300/50 rounded-lg px-2.5 py-1.5 text-sm text-base-content focus:outline-none focus:border-primary/40 h-8"
+            className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:border-brand-500 shadow-xs h-9 cursor-pointer"
             value={listId}
             onChange={(e) => changeList(e.target.value)}
           >
@@ -298,29 +298,29 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
           </select>
 
           {/* Divider */}
-          <div className="w-px h-4 bg-base-300/60" />
+          <div className="w-px h-5 bg-gray-300 dark:bg-gray-700" />
 
           {/* FilterBar */}
           <FilterBar filters={filters} onChange={changeFilters} />
         </div>
 
         {selected.size > 0 && (
-          <div className="flex items-center gap-3 mb-3 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20">
-            <span className="text-xs text-base-content/60 flex-1">{selected.size} selected</span>
+          <div className="flex items-center gap-3 mb-3 px-3.5 py-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs">
+            <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex-1">{selected.size} selected</span>
             <button
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-base-300/60 text-base-content/70 hover:bg-base-300 transition-colors"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 transition-colors"
               onClick={() => setShowAddToList(true)}
             >
               <RiListCheck2 size={13} /> Add to list
             </button>
             <button
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-error/10 text-error border border-error/20 hover:bg-error/20 transition-colors"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-error/10 text-error border border-error/20 hover:bg-error/20 transition-colors"
               onClick={() => setShowDeleteConfirm(true)}
             >
               <RiDeleteBinLine size={13} /> {t("common.delete")}
             </button>
             <button
-              className="text-xs text-base-content/40 hover:text-base-content transition-colors"
+              className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
               onClick={() => setSelected(new Set())}
             >
               {t("common.clear")}
@@ -339,12 +339,12 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto rounded-lg border border-base-300/50">
+            <div className="overflow-x-auto rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-theme-xs">
               <table className="table w-full text-sm">
                 <thead>
-                  <tr className="border-base-300/50 text-base-content/50 text-xs uppercase tracking-wide">
+                  <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/40 text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide">
                     <th className="w-8" data-tour="contacts-select">
-                      <input type="checkbox" className="w-3.5 h-3.5 rounded border border-base-300 bg-base-300/50 accent-primary cursor-pointer" checked={allPageSelected} onChange={toggleAll} />
+                      <input type="checkbox" className="w-3.5 h-3.5 rounded border border-gray-300 dark:border-gray-600 accent-brand-500 cursor-pointer" checked={allPageSelected} onChange={toggleAll} />
                     </th>
                     <th>{t("contacts.columns.name")}</th>
                     <th>{t("contacts.columns.title")}</th>
@@ -355,33 +355,33 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
                     <th className="w-8"></th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                   {contacts.map((c) => (
                     <tr
                       key={c.id}
-                      className={`border-base-300/30 hover:bg-base-200/50 cursor-pointer ${selected.has(c.id) ? "bg-primary/5" : ""}`}
+                      className={`hover:bg-gray-50/80 dark:hover:bg-gray-800/50 cursor-pointer transition-colors ${selected.has(c.id) ? "bg-brand-50/50 dark:bg-brand-950/20" : ""}`}
                       onClick={() => router.push(`/contacts/${c.id}`)}
                     >
                       <td onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
-                          className="w-3.5 h-3.5 rounded border border-base-300 bg-base-300/50 accent-primary cursor-pointer"
+                          className="w-3.5 h-3.5 rounded border border-gray-300 dark:border-gray-600 accent-brand-500 cursor-pointer"
                           checked={selected.has(c.id)}
                           onChange={() => toggleOne(c.id)}
                         />
                       </td>
                       <td>
                         <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-base-300 flex items-center justify-center text-xs font-semibold text-base-content/50 shrink-0">
+                          <div className="w-7 h-7 rounded-full bg-brand-500/10 text-brand-600 dark:text-brand-400 flex items-center justify-center text-xs font-semibold shrink-0 border border-brand-500/20">
                             {(c.full_name ?? "?").charAt(0).toUpperCase()}
                           </div>
-                          <span className="font-medium truncate max-w-36">{c.full_name ?? "—"}</span>
+                          <span className="font-semibold text-gray-900 dark:text-white truncate max-w-36">{c.full_name ?? "—"}</span>
                         </div>
                       </td>
-                      <td className="text-base-content/60 max-w-44 truncate">{c.title ?? "—"}</td>
-                      <td className="text-base-content/60 truncate max-w-36">{c.company ?? "—"}</td>
-                      <td className="text-base-content/40 text-xs truncate max-w-32">{c.location ?? "—"}</td>
-                      <td className="text-base-content/60 text-xs font-mono truncate max-w-40">{c.email ?? <span className="text-base-content/20">—</span>}</td>
+                      <td className="text-gray-600 dark:text-gray-300 max-w-44 truncate">{c.title ?? "—"}</td>
+                      <td className="text-gray-600 dark:text-gray-300 truncate max-w-36">{c.company ?? "—"}</td>
+                      <td className="text-gray-400 text-xs truncate max-w-32">{c.location ?? "—"}</td>
+                      <td className="text-gray-600 dark:text-gray-300 text-xs font-mono truncate max-w-40">{c.email ?? <span className="text-gray-300 dark:text-gray-600">—</span>}</td>
                       <td onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1.5">
                           <ConnectionIcon t={c} />
@@ -408,7 +408,7 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
                             href={c.linkedin_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center p-1 rounded text-base-content/30 hover:text-base-content transition-colors"
+                            className="inline-flex items-center p-1 rounded text-gray-400 hover:text-brand-500 transition-colors"
                           >
                             <RiExternalLinkLine size={13} />
                           </a>
@@ -455,14 +455,14 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
       </div>
       {showNewContact && (
         <div className="modal modal-open">
-          <div className="modal-box bg-base-200 border border-base-300/50 max-w-md">
-            <h3 className="font-semibold text-base mb-4">New Contact</h3>
+          <div className="modal-box bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xl max-w-md p-6">
+            <h3 className="font-bold text-base mb-4 text-gray-900 dark:text-white">New Contact</h3>
             <form onSubmit={createContact} className="flex flex-col gap-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <label className="label text-xs text-base-content/50 pb-1">Full name *</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Full name *</label>
                   <input
-                    className="input input-bordered input-sm w-full bg-base-300/50"
+                    className="w-full rounded-xl border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-3.5 py-2 text-xs text-gray-900 dark:text-gray-100 shadow-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none"
                     placeholder="Jane Smith"
                     value={newContactForm.full_name}
                     onChange={(e) => setNewContactForm({ ...newContactForm, full_name: e.target.value })}
@@ -470,9 +470,9 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="label text-xs text-base-content/50 pb-1">LinkedIn URL *</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">LinkedIn URL *</label>
                   <input
-                    className="input input-bordered input-sm w-full bg-base-300/50 font-mono text-xs"
+                    className="w-full rounded-xl border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-3.5 py-2 font-mono text-xs text-gray-900 dark:text-gray-100 shadow-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none"
                     placeholder="https://linkedin.com/in/..."
                     value={newContactForm.linkedin_url}
                     onChange={(e) => setNewContactForm({ ...newContactForm, linkedin_url: e.target.value })}
@@ -480,47 +480,47 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
                   />
                 </div>
                 <div>
-                  <label className="label text-xs text-base-content/50 pb-1">Title</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Title</label>
                   <input
-                    className="input input-bordered input-sm w-full bg-base-300/50"
+                    className="w-full rounded-xl border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-3.5 py-2 text-xs text-gray-900 dark:text-gray-100 shadow-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none"
                     placeholder="CEO"
                     value={newContactForm.title}
                     onChange={(e) => setNewContactForm({ ...newContactForm, title: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label className="label text-xs text-base-content/50 pb-1">Company</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Company</label>
                   <input
-                    className="input input-bordered input-sm w-full bg-base-300/50"
+                    className="w-full rounded-xl border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-3.5 py-2 text-xs text-gray-900 dark:text-gray-100 shadow-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none"
                     placeholder="Acme Inc."
                     value={newContactForm.company}
                     onChange={(e) => setNewContactForm({ ...newContactForm, company: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label className="label text-xs text-base-content/50 pb-1">Location</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Location</label>
                   <input
-                    className="input input-bordered input-sm w-full bg-base-300/50"
+                    className="w-full rounded-xl border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-3.5 py-2 text-xs text-gray-900 dark:text-gray-100 shadow-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none"
                     placeholder="Berlin, Germany"
                     value={newContactForm.location}
                     onChange={(e) => setNewContactForm({ ...newContactForm, location: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label className="label text-xs text-base-content/50 pb-1">Email</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Email</label>
                   <input
                     type="email"
-                    className="input input-bordered input-sm w-full bg-base-300/50"
+                    className="w-full rounded-xl border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-3.5 py-2 text-xs text-gray-900 dark:text-gray-100 shadow-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none"
                     placeholder="jane@acme.com"
                     value={newContactForm.email}
                     onChange={(e) => setNewContactForm({ ...newContactForm, email: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label className="label text-xs text-base-content/50 pb-1">Phone</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Phone</label>
                   <input
                     type="tel"
-                    className="input input-bordered input-sm w-full bg-base-300/50"
+                    className="w-full rounded-xl border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-3.5 py-2 text-xs text-gray-900 dark:text-gray-100 shadow-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none"
                     placeholder="+49 30 1234567"
                     value={newContactForm.phone}
                     onChange={(e) => setNewContactForm({ ...newContactForm, phone: e.target.value })}
@@ -528,9 +528,9 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
                 </div>
                 {lists.length > 0 && (
                   <div className="col-span-2">
-                    <label className="label text-xs text-base-content/50 pb-1">Add to list (optional)</label>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Add to list (optional)</label>
                     <select
-                      className="w-full px-3 py-1.5 rounded-lg text-sm bg-base-300 border border-base-300/80 text-base-content focus:outline-none focus:border-primary/50 cursor-pointer"
+                      className="w-full px-3 py-2 rounded-xl text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 shadow-xs focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 cursor-pointer"
                       value={newContactForm.list_id}
                       onChange={(e) => setNewContactForm({ ...newContactForm, list_id: e.target.value })}
                     >
@@ -542,13 +542,13 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
                   </div>
                 )}
               </div>
-              <div className="modal-action mt-2">
-                <button type="button" className="btn btn-ghost btn-sm text-base-content/60" onClick={() => setShowNewContact(false)}>
+              <div className="modal-action mt-2 pt-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-2">
+                <button type="button" className="btn btn-ghost btn-sm text-gray-600 dark:text-gray-400" onClick={() => setShowNewContact(false)}>
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white shadow-xs transition-colors disabled:opacity-50"
                   disabled={newContactLoading}
                 >
                   {newContactLoading ? <span className="loading loading-spinner loading-xs" /> : "Create"}
@@ -561,13 +561,13 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
       )}
       {showAddToList && (
         <div className="modal modal-open">
-          <div className="modal-box bg-base-200 border border-base-300/50 max-w-sm">
-            <h3 className="font-semibold text-base mb-1">Add to list</h3>
-            <p className="text-xs text-base-content/50 mb-4">
+          <div className="modal-box bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xl max-w-sm p-6">
+            <h3 className="font-bold text-base mb-1 text-gray-900 dark:text-white">Add to list</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
               {selected.size} contact{selected.size !== 1 ? "s" : ""} will be added. Contacts already in the list are skipped.
             </p>
             <select
-              className="w-full px-3 py-2 rounded-lg text-sm bg-base-300 border border-base-300/80 text-base-content focus:outline-none focus:border-primary/50 cursor-pointer"
+              className="w-full px-3 py-2 rounded-xl text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 shadow-xs focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 cursor-pointer"
               value={addToListId}
               onChange={(e) => setAddToListId(e.target.value)}
             >
@@ -576,13 +576,13 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
                 <option key={l.id} value={l.id}>{l.name}</option>
               ))}
             </select>
-            <div className="modal-action mt-4">
-              <button type="button" className="btn btn-ghost btn-sm text-base-content/60" onClick={() => { setShowAddToList(false); setAddToListId(""); }}>
+            <div className="modal-action mt-4 pt-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-2">
+              <button type="button" className="btn btn-ghost btn-sm text-gray-600 dark:text-gray-400" onClick={() => { setShowAddToList(false); setAddToListId(""); }}>
                 Cancel
               </button>
               <button
                 type="button"
-                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white shadow-xs transition-colors disabled:opacity-50"
                 disabled={!addToListId || addToListLoading}
                 onClick={addSelectedToList}
               >
@@ -595,18 +595,18 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
       )}
       {showDeleteConfirm && (
         <div className="modal modal-open">
-          <div className="modal-box bg-base-200 border border-base-300/50 max-w-sm">
-            <h3 className="font-semibold text-base mb-1">Delete {selected.size} contact{selected.size !== 1 ? "s" : ""}?</h3>
-            <p className="text-xs text-base-content/50 mb-4 leading-relaxed">
+          <div className="modal-box bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xl max-w-sm p-6">
+            <h3 className="font-bold text-base mb-1 text-gray-900 dark:text-white">Delete {selected.size} contact{selected.size !== 1 ? "s" : ""}?</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">
               This permanently deletes {selected.size === 1 ? "this contact" : "these contacts"} and their run history — not just from this list, but from InHubFlow entirely. This can&apos;t be undone.
             </p>
-            <div className="modal-action mt-2">
-              <button type="button" className="btn btn-ghost btn-sm text-base-content/60" onClick={() => setShowDeleteConfirm(false)} disabled={deleteLoading}>
+            <div className="modal-action mt-2 pt-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-2">
+              <button type="button" className="btn btn-ghost btn-sm text-gray-600 dark:text-gray-400" onClick={() => setShowDeleteConfirm(false)} disabled={deleteLoading}>
                 Cancel
               </button>
               <button
                 type="button"
-                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-error text-white hover:bg-error/90 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-error text-white hover:bg-error/90 transition-colors shadow-xs disabled:opacity-50"
                 disabled={deleteLoading}
                 onClick={deleteSelected}
               >

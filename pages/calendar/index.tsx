@@ -196,7 +196,7 @@ export default function CalendarPage({ initialEvents }: CalendarPageProps) {
 
           <div className="flex items-center gap-2 shrink-0">
             {/* View switcher: Mes | Semana | Agenda */}
-            <div className="join border border-base-300 rounded-lg p-0.5 bg-base-200/50">
+            <div className="join border border-gray-300 dark:border-gray-700 rounded-xl p-0.5 bg-base-200/50">
               <button
                 type="button"
                 onClick={() => setViewMode("month")}
@@ -328,7 +328,7 @@ export default function CalendarPage({ initialEvents }: CalendarPageProps) {
               </span>
               <input
                 type="text"
-                className="w-56 bg-base-200 border border-base-300/50 rounded-lg pl-8 pr-3 py-1.5 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:border-primary/40"
+                className="w-56 bg-base-200 border border-gray-300 dark:border-gray-700 rounded-xl pl-8 pr-3 py-1.5 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:border-primary/40"
                 placeholder="Buscar por prospecto o título..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -336,7 +336,7 @@ export default function CalendarPage({ initialEvents }: CalendarPageProps) {
             </div>
 
             {/* Status pills */}
-            <div className="join border border-base-300/50 rounded-lg p-0.5 bg-base-200 h-8 flex items-center">
+            <div className="join border border-gray-300 dark:border-gray-700 rounded-xl p-0.5 bg-base-200 h-8 flex items-center">
               <button
                 type="button"
                 onClick={() => setStatusFilter("all")}

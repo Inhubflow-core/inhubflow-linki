@@ -451,7 +451,7 @@ function ModelPicker({ models, value, open, search, collapsedProviders, onOpen, 
           <div className="fixed inset-0 z-40" onClick={onClose} />
           <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-base-300 border border-base-300/80 rounded-xl shadow-xl overflow-hidden">
             {/* Search */}
-            <div className="p-2 border-b border-base-300/50">
+            <div className="p-2 border-b border-gray-200 dark:border-gray-800">
               <input
                 autoFocus
                 type="text"
@@ -478,7 +478,7 @@ function ModelPicker({ models, value, open, search, collapsedProviders, onOpen, 
                       <button
                         type="button"
                         onClick={() => !isSearching && onToggleProvider(provider)}
-                        className={`w-full flex items-center justify-between px-3 py-1.5 sticky top-0 bg-base-300/90 backdrop-blur-sm border-b border-base-300/30 ${isSearching ? "cursor-default" : "hover:bg-base-300 cursor-pointer"}`}
+                        className={`w-full flex items-center justify-between px-3 py-1.5 sticky top-0 bg-base-300/90 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 ${isSearching ? "cursor-default" : "hover:bg-base-300 cursor-pointer"}`}
                       >
                         <span className="text-[10px] uppercase tracking-wider text-base-content/40 font-semibold">{displayName}</span>
                         {!isSearching && (
@@ -999,7 +999,7 @@ function Wizard({
   return (
     <div className="fixed inset-0 z-50 bg-base-100 flex flex-col">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-base-300/50 shrink-0">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 shrink-0">
         <div className="flex items-center gap-3">
           {editingName ? (
             <input
@@ -1034,7 +1034,7 @@ function Wizard({
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left nav */}
-        <div className="w-56 shrink-0 border-r border-base-300/50 p-4 flex flex-col gap-1 overflow-y-auto">
+        <div className="w-56 shrink-0 border-r border-gray-200 dark:border-gray-800 p-4 flex flex-col gap-1 overflow-y-auto">
           {pages.map((p) => {
             const active = page === p;
             const canNav = canGoTo(p);
@@ -1212,7 +1212,7 @@ function Wizard({
                               </div>
                             ) : (
                               <div className="flex-1 min-h-0 border border-base-300/50 rounded-xl overflow-hidden flex flex-col">
-                                <div className="px-4 py-2.5 bg-base-200 border-b border-base-300/50 flex items-center gap-3 shrink-0">
+                                <div className="px-4 py-2.5 bg-base-200 border-b border-gray-200 dark:border-gray-800 flex items-center gap-3 shrink-0">
                                   <input
                                     type="checkbox"
                                     className="w-3.5 h-3.5 rounded border border-base-300 bg-base-300/50 accent-primary cursor-pointer"
@@ -1229,7 +1229,7 @@ function Wizard({
                                   {listTargets.map((t) => (
                                     <label
                                       key={t.id}
-                                      className="flex items-center gap-3 px-4 py-2.5 hover:bg-base-200/60 cursor-pointer border-b border-base-300/30 last:border-0"
+                                      className="flex items-center gap-3 px-4 py-2.5 hover:bg-base-200/60 cursor-pointer border-b border-gray-200 dark:border-gray-800 last:border-0"
                                     >
                                       <input
                                         type="checkbox"
@@ -1533,9 +1533,9 @@ function Wizard({
                     </div>
 
                     {/* Campaign overview card */}
-                    <div className="bg-base-200 border border-base-300/50 rounded-xl overflow-hidden">
+                    <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs overflow-hidden">
                       {/* Header strip */}
-                      <div className="bg-primary/10 border-b border-base-300/50 px-5 py-3 flex items-center gap-3">
+                      <div className="bg-primary/10 border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
                           <RiRobot2Line size={15} className="text-primary" />
                         </div>
@@ -1593,7 +1593,7 @@ function Wizard({
                       function SummaryTrack({ steps, trackLabel, trackColor }: { steps: { ws: WizardStep; i: number }[]; trackLabel: string; trackColor: string }) {
                         return (
                           <div>
-                            <div className={`px-4 py-2 border-b border-base-300/30 text-xs font-semibold ${trackColor}`}>{trackLabel}</div>
+                            <div className={`px-4 py-2 border-b border-gray-200 dark:border-gray-800 text-xs font-semibold ${trackColor}`}>{trackLabel}</div>
                             <div className="divide-y divide-base-300/20">
                               {steps.map(({ ws, i }) => {
                                 const label = ws.type === "email" ? getEmailStepLabel(wizardSteps, i, t) : ws.type === "message" ? getMessageStepLabel(wizardSteps, i, t) : getStepLabel(ws.type, t);
@@ -1627,7 +1627,7 @@ function Wizard({
                       }
 
                       return (
-                        <div className="bg-base-200 border border-base-300/50 rounded-xl overflow-hidden">
+                        <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs overflow-hidden">
                           <div className="px-5 py-3 border-b border-base-300/40 flex items-center justify-between">
                             <p className="text-xs font-medium text-base-content/40 uppercase tracking-widest">{t("campaignWizard.summary.sequence")}</p>
                             {isDualSummary && (
@@ -1678,7 +1678,7 @@ function Wizard({
                     {/* AI Cost estimate */}
                     {aiSteps.length > 0 && (
                       <div className={`rounded-xl border overflow-hidden ${hasCostData ? "border-primary/20 bg-primary/5" : "border-base-300/50 bg-base-200"}`}>
-                        <div className="px-5 py-3 border-b border-base-300/30 flex items-center gap-2">
+                        <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center gap-2">
                           <RiRobot2Line size={13} className={hasCostData ? "text-primary" : "text-base-content/30"} />
                           <p className="text-xs font-medium text-base-content/40 uppercase tracking-widest">{t("campaignWizard.summary.aiCostEstimate")}</p>
                         </div>
@@ -1735,7 +1735,7 @@ function Wizard({
           </div>
 
           {/* Bottom nav */}
-          <div className="border-t border-base-300/50 px-10 py-4 flex justify-between items-center shrink-0">
+          <div className="border-t border-gray-200 dark:border-gray-800 px-10 py-4 flex justify-between items-center shrink-0">
             <div className="flex items-center gap-2">
               <button
                 className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors disabled:opacity-40"
@@ -1816,12 +1816,12 @@ function Wizard({
         return (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setConfigIdx(null)}>
             <div
-              className="bg-base-200 border border-base-300/50 rounded-2xl shadow-2xl w-full max-w-xl flex flex-col overflow-hidden"
+              className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xl shadow-2xl w-full max-w-xl flex flex-col overflow-hidden"
               style={{ maxHeight: "85vh" }}
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal header */}
-              <div className="flex items-center gap-3 px-5 py-4 border-b border-base-300/50 shrink-0">
+              <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-200 dark:border-gray-800 shrink-0">
                 <span className={`w-8 h-8 rounded-lg flex items-center justify-center border ${STEP_COLORS[ws.type]}`}>
                   {STEP_ICONS[ws.type]}
                 </span>
@@ -1840,7 +1840,7 @@ function Wizard({
               <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
 
                 {/* Delay field */}
-                <div className="flex items-center gap-3 pb-4 border-b border-base-300/30">
+                <div className="flex items-center gap-3 pb-4 border-b border-gray-200 dark:border-gray-800">
                   <RiTimeLine size={14} className="text-base-content/30 shrink-0" />
                   <span className="text-sm text-base-content/50">{t("campaignWizard.config.waitBefore")}</span>
                   <div className="flex items-center gap-2 ml-auto">
@@ -2052,7 +2052,7 @@ function Wizard({
                     )}
 
                     {/* Signature — always visible for email steps regardless of AI mode */}
-                    <div className="border-t border-base-300/30 pt-4">
+                    <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
                       <div className="flex items-center justify-between mb-1.5">
                         <label className="text-sm text-base-content/50">{t("campaignWizard.config.signature")}</label>
                         <button
@@ -2091,7 +2091,7 @@ function Wizard({
               </div>
 
               {/* Modal footer */}
-              <div className="flex items-center justify-between px-5 py-3.5 border-t border-base-300/50 shrink-0">
+              <div className="flex items-center justify-between px-5 py-3.5 border-t border-gray-200 dark:border-gray-800 shrink-0">
                 <button
                   type="button"
                   onClick={() => { removeWizardStep(idx); setConfigIdx(null); }}
@@ -2190,7 +2190,7 @@ function Wizard({
         const ws = wizardSteps[previewIdx];
         return (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="bg-base-200 border border-base-300/50 rounded-2xl shadow-2xl w-full max-w-lg p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xl shadow-2xl w-full max-w-lg p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <RiRobot2Line size={16} className="text-primary" />
@@ -2291,7 +2291,7 @@ function Wizard({
       {/* ── Test Email Modal ── */}
       {testEmailIdx !== null && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-base-200 border border-base-300/50 rounded-2xl shadow-2xl w-full max-w-sm p-6">
+          <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xl shadow-2xl w-full max-w-sm p-6">
             <h3 className="font-semibold text-base mb-1">{t("campaignWizard.config.sendTestTitle")}</h3>
             <p className="text-xs text-base-content/50 mb-5">
               {t("campaignWizard.config.sendTestDesc")}
@@ -2449,7 +2449,7 @@ function AnalyticsPanel({ workflowId, days: initialDays }: { workflowId: string;
           { label: "Email reply rate",value: funnel.emails_sent > 0     ? Math.round((funnel.email_replies / funnel.emails_sent) * 100)   : 0, color: "#fb923c" },
           { label: "Completion rate", value: funnel.total > 0           ? Math.round((funnel.completed / funnel.total) * 100)             : 0, color: "#5aa2ff" },
         ].map(card => (
-          <div key={card.label} className="bg-base-200 border border-base-300/50 rounded-xl p-3">
+          <div key={card.label} className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs p-3">
             <div className="text-xl font-bold tabular-nums" style={{ color: card.color }}>{card.value}%</div>
             <div className="text-[10px] text-base-content/40 mt-1 leading-tight">{card.label}</div>
           </div>
@@ -2460,7 +2460,7 @@ function AnalyticsPanel({ workflowId, days: initialDays }: { workflowId: string;
         {/* Left: activity chart + AI cost */}
         <div className="space-y-4">
           {/* Activity chart */}
-          <div className="bg-base-200 border border-base-300/50 rounded-xl p-5">
+          <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs p-5">
             <div className="flex items-center justify-between mb-4">
               <span className="text-sm font-medium text-base-content">Daily activity</span>
               <div className="flex items-center gap-3">
@@ -2514,7 +2514,7 @@ function AnalyticsPanel({ workflowId, days: initialDays }: { workflowId: string;
           </div>
 
           {/* AI cost card */}
-          <div className="bg-base-200 border border-base-300/50 rounded-xl p-5">
+          <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <RiRobot2Line size={13} className="text-base-content/30" />
@@ -2555,7 +2555,7 @@ function AnalyticsPanel({ workflowId, days: initialDays }: { workflowId: string;
 
                 {/* Per-step breakdown */}
                 {aiByStep.length > 0 && (
-                  <div className="border-t border-base-300/30 pt-4">
+                  <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
                     <p className="text-xs text-base-content/30 uppercase tracking-widest mb-3">By step</p>
                     <div className="space-y-2">
                       {aiByStep.map(step => {
@@ -2594,7 +2594,7 @@ function AnalyticsPanel({ workflowId, days: initialDays }: { workflowId: string;
 
         {/* Right: funnel + rate cards */}
         <div className="space-y-3">
-          <div className="bg-base-200 border border-base-300/50 rounded-xl p-4">
+          <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs p-4">
             <div className="mb-4">
               <span className="text-xs font-medium text-base-content/30 uppercase tracking-widest">Funnel</span>
             </div>
@@ -2607,7 +2607,7 @@ function AnalyticsPanel({ workflowId, days: initialDays }: { workflowId: string;
               <FunnelBar label="LI Replies" value={funnel.li_replies} color="#c084fc" />
               <FunnelBar label="Emails sent" value={funnel.emails_sent} color="#fb923c" />
               <FunnelBar label="Email replies" value={funnel.email_replies} color="#32d583" />
-              <div className="pt-2 border-t border-base-300/30 mt-2">
+              <div className="pt-2 border-t border-gray-200 dark:border-gray-800 mt-2">
                 <FunnelBar label="Completed" value={funnel.completed} color="#5aa2ff" />
               </div>
             </div>
@@ -2667,7 +2667,7 @@ function LogsPanel({ workflowId }: { workflowId: string }) {
         </button>
       </div>
 
-      <div className="bg-base-200 border border-base-300/50 rounded-xl overflow-hidden shadow-xs">
+      <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs overflow-hidden shadow-xs">
         <div className="overflow-x-auto max-h-[calc(100vh-230px)]">
           <table className="table table-sm w-full">
             <thead className="sticky top-0 bg-base-200 z-10">
@@ -3153,7 +3153,7 @@ export default function WorkflowDetailPage({
       </div>
 
       {/* Tab switcher */}
-      <div className="flex items-center gap-1 border-b border-base-300/30 mb-0 -mb-px pl-11">
+      <div className="flex items-center gap-1 border-b border-gray-200 dark:border-gray-800 mb-0 -mb-px pl-11">
         {[
           { id: "prospects", label: t("campaignDetail.tabProspects") },
           { id: "analytics", label: t("campaignDetail.tabAnalytics") },
@@ -3263,7 +3263,7 @@ export default function WorkflowDetailPage({
 
               {/* Outcome filters */}
               {displayStats.total_prospects > 0 && (
-                <div className="mt-4 pt-4 border-t border-base-300/30 flex flex-col gap-1.5">
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800 flex flex-col gap-1.5">
                   <button
                     onClick={() => setSelectedStep(selectedStep === "completed" ? null : "completed")}
                     className={`w-full text-left px-3 py-2.5 rounded-xl text-xs transition-all flex items-center gap-2.5 border ${selectedStep === "completed" ? "text-success bg-success/10 border-success/20" : "text-base-content/50 hover:text-success bg-base-200 border-base-300/40 hover:border-success/20"}`}
@@ -3360,7 +3360,7 @@ export default function WorkflowDetailPage({
                 })()}
               </div>
 
-              <div className="overflow-x-auto rounded-lg border border-base-300/50">
+              <div className="overflow-x-auto rounded-xl border border-gray-300 dark:border-gray-700 shadow-xs">
                 <table className="table w-full text-sm">
                   <thead>
                     <tr className="border-base-300/50 text-base-content/50 text-xs uppercase tracking-wide">
@@ -3551,7 +3551,7 @@ export default function WorkflowDetailPage({
       {/* Error details modal */}
       {errorModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setErrorModal(null)}>
-          <div className="bg-base-200 border border-base-300/50 rounded-xl p-5 max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs p-5 max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 mb-3">
               <RiErrorWarningLine className="text-error" size={16} />
               <span className="text-sm font-semibold">Error details</span>
@@ -3567,7 +3567,7 @@ export default function WorkflowDetailPage({
       {/* Stop confirm */}
       {showStop && (
         <div className="modal modal-open">
-          <div className="modal-box bg-base-200 border border-base-300/50 max-w-sm">
+          <div className="modal-box bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xl max-w-sm">
             <h3 className="font-semibold text-base mb-2">{t("campaignDetail.stopCampaignTitle")}</h3>
             <p className="text-sm text-base-content/60 mb-4">
               {t("campaignDetail.stopCampaignDesc")}

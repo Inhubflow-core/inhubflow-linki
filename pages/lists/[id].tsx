@@ -487,18 +487,18 @@ export default function ListDetailPage({
       {targets.length > 0 && (
         <div className="flex items-center gap-3 mb-4 flex-wrap">
           <div className="relative">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-base-content/30 pointer-events-none">
-              <RiSearchLine size={13} />
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+              <RiSearchLine size={14} />
             </span>
             <input
               type="text"
-              className="w-52 bg-base-200 border border-base-300/50 rounded-lg pl-8 pr-3 py-1.5 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:border-primary/40"
+              className="w-56 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl pl-8 pr-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 shadow-xs"
               placeholder="Search name, company…"
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(0); }}
             />
           </div>
-          <div className="w-px h-4 bg-base-300/60" />
+          <div className="w-px h-5 bg-gray-300 dark:bg-gray-700" />
           <FilterBar
             filters={filters}
             onChange={(f) => { setFilters(f); setPage(0); }}
@@ -509,7 +509,7 @@ export default function ListDetailPage({
       {/* Import progress banner */}
       {/* Plan banner — shown whenever a list is being imported in batches over days */}
       {importJob?.plan?.exceedsCap && (importing || (importJob.plan.remaining > 0)) && (
-        <div className="mb-4 p-3 rounded-lg bg-warning/10 border border-warning/20 text-xs text-warning">
+        <div className="mb-4 p-3.5 rounded-xl bg-warning/10 border border-warning/30 text-xs text-warning">
           This list has <strong>{importJob.plan.total.toLocaleString()}</strong> contacts — over the{" "}
           <strong>{importJob.plan.dailyCap.toLocaleString()}/day</strong> limit, so it&apos;s imported in batches across days.{" "}
           {importJob.plan.importedSoFar.toLocaleString()} imported, {importJob.plan.remaining.toLocaleString()} remaining (see Lists → Import jobs for the schedule).
@@ -523,32 +523,32 @@ export default function ListDetailPage({
           importJob.phase === 'enriching' ? 'Resolving profile URLs…' :
           'Scraping leads…';
         return (
-          <div className="mb-4 p-4 rounded-lg bg-primary/10 border border-primary/20">
+          <div className="mb-4 p-4 rounded-xl bg-brand-50 dark:bg-brand-950/40 border border-brand-500/30">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <span className="loading loading-spinner loading-xs text-primary" />
-                <span className="text-sm font-medium text-primary">{label}</span>
+                <span className="text-sm font-semibold text-primary">{label}</span>
               </div>
-              {!scheduled && <span className="text-xs text-base-content/40 tabular-nums">{pct}%</span>}
+              {!scheduled && <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">{pct}%</span>}
             </div>
             {!scheduled && (
-              <div className="w-full bg-base-300 rounded-full h-1.5">
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
                 <div
-                  className="bg-primary h-1.5 rounded-full transition-all duration-500"
+                  className="bg-brand-500 h-1.5 rounded-full transition-all duration-500"
                   style={{ width: `${pct}%` }}
                 />
               </div>
             )}
-            <p className="text-xs text-base-content/40 mt-2">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
               This runs in the background — you can leave this page and come back.
             </p>
           </div>
         );
       })()}
       {importing && !importJob && (
-        <div className="mb-4 p-4 rounded-lg bg-primary/10 border border-primary/20 flex items-center gap-2">
+        <div className="mb-4 p-4 rounded-xl bg-brand-50 dark:bg-brand-950/40 border border-brand-500/30 flex items-center gap-2">
           <span className="loading loading-spinner loading-xs text-primary" />
-          <span className="text-sm font-medium text-primary">Starting import…</span>
+          <span className="text-sm font-semibold text-primary">Starting import…</span>
         </div>
       )}
 
@@ -586,25 +586,25 @@ export default function ListDetailPage({
           <div className="relative mb-2" style={{ minHeight: "2.25rem" }}>
             {effectiveSelectedCount > 0 ? (
               <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-base-200 border border-base-300/50 rounded-lg">
-                  <span className="text-xs text-base-content/50 flex-1">{effectiveSelectedCount} selected</span>
+                <div className="flex items-center gap-2 px-3.5 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl shadow-xs">
+                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex-1">{effectiveSelectedCount} selected</span>
                   {allLists.length > 0 && (
                     <button
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20 hover:bg-brand-500/20 transition-colors"
                       onClick={() => setShowMoveModal(true)}
                     >
                       <RiArrowRightLine size={12} /> Move to list
                     </button>
                   )}
                   <button
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium bg-error/10 text-error border border-error/20 hover:bg-error/20 transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-error/10 text-error border border-error/20 hover:bg-error/20 transition-colors"
                     onClick={removeFromList}
                     disabled={deleting}
                   >
                     <RiDeleteBinLine size={12} /> Remove from list
                   </button>
                   <button
-                    className="text-xs text-base-content/30 hover:text-base-content/60 transition-colors px-1"
+                    className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors px-1"
                     onClick={() => { setSelected(new Set()); setAllFilteredSelected(false); }}
                   >
                     Cancel
@@ -612,12 +612,12 @@ export default function ListDetailPage({
                 </div>
                 {/* Select-all-filtered banner */}
                 {!allFilteredSelected && allPageSelected && filteredTargets.length > PAGE_SIZE && (
-                  <div className="flex items-center gap-2 px-3 py-1 bg-primary/5 border border-primary/15 rounded-lg">
-                    <span className="text-xs text-base-content/50 flex-1">
+                  <div className="flex items-center gap-2 px-3 py-1 bg-brand-50 dark:bg-brand-950/30 border border-brand-200 dark:border-brand-800 rounded-lg">
+                    <span className="text-xs text-gray-600 dark:text-gray-400 flex-1">
                       Only the {pageTargets.length} leads on this page are selected.
                     </span>
                     <button
-                      className="text-xs text-primary hover:underline"
+                      className="text-xs text-brand-600 dark:text-brand-400 font-semibold hover:underline"
                       onClick={() => setAllFilteredSelected(true)}
                     >
                       Select all {filteredTargets.length} leads
@@ -625,12 +625,12 @@ export default function ListDetailPage({
                   </div>
                 )}
                 {allFilteredSelected && (
-                  <div className="flex items-center gap-2 px-3 py-1 bg-primary/5 border border-primary/15 rounded-lg">
-                    <span className="text-xs text-base-content/50 flex-1">
+                  <div className="flex items-center gap-2 px-3 py-1 bg-brand-50 dark:bg-brand-950/30 border border-brand-200 dark:border-brand-800 rounded-lg">
+                    <span className="text-xs text-gray-600 dark:text-gray-400 flex-1">
                       All {filteredTargets.length} leads are selected.
                     </span>
                     <button
-                      className="text-xs text-primary hover:underline"
+                      className="text-xs text-brand-600 dark:text-brand-400 font-semibold hover:underline"
                       onClick={() => { setAllFilteredSelected(false); setSelected(new Set()); }}
                     >
                       Clear selection
@@ -640,12 +640,12 @@ export default function ListDetailPage({
               </div>
             ) : null}
           </div>
-          <div className="overflow-x-auto rounded-lg border border-base-300/50">
+          <div className="overflow-x-auto rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-theme-xs">
             <table className="table w-full text-sm">
               <thead>
-                <tr className="border-base-300/50 text-base-content/50 text-xs uppercase tracking-wide">
+                <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/40 text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide">
                   <th className="w-8">
-                    <input type="checkbox" className="w-3.5 h-3.5 rounded border border-base-300 bg-base-300/50 accent-primary cursor-pointer" checked={allPageSelected} onChange={toggleAll} />
+                    <input type="checkbox" className="w-3.5 h-3.5 rounded border border-gray-300 dark:border-gray-600 accent-brand-500 cursor-pointer" checked={allPageSelected} onChange={toggleAll} />
                   </th>
                   <th>Name</th>
                   <th>Title</th>
@@ -656,38 +656,38 @@ export default function ListDetailPage({
                   <th></th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                 {pageTargets.map((t) => (
                   <tr
                     key={t.id}
                     onClick={() => router.push(`/contacts/${t.id}`)}
-                    className={`border-base-300/30 hover:bg-base-200/50 cursor-pointer ${selected.has(t.id) ? "bg-primary/5" : ""}`}
+                    className={`hover:bg-gray-50/80 dark:hover:bg-gray-800/50 cursor-pointer transition-colors ${selected.has(t.id) ? "bg-brand-50/50 dark:bg-brand-950/20" : ""}`}
                   >
                     <td onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
-                        className="w-3.5 h-3.5 rounded border border-base-300 bg-base-300/50 accent-primary cursor-pointer"
+                        className="w-3.5 h-3.5 rounded border border-gray-300 dark:border-gray-600 accent-brand-500 cursor-pointer"
                         checked={selected.has(t.id)}
                         onChange={() => toggleOne(t.id)}
                       />
                     </td>
-                    <td className="font-medium">{t.full_name ?? "—"}</td>
-                    <td className="text-base-content/60 max-w-50 truncate">{t.title ?? "—"}</td>
-                    <td className="text-base-content/60">{t.company ?? "—"}</td>
-                    <td className="text-base-content/40 text-xs">{t.location ?? "—"}</td>
+                    <td className="font-semibold text-gray-900 dark:text-white">{t.full_name ?? "—"}</td>
+                    <td className="text-gray-600 dark:text-gray-300 max-w-50 truncate">{t.title ?? "—"}</td>
+                    <td className="text-gray-600 dark:text-gray-300">{t.company ?? "—"}</td>
+                    <td className="text-gray-400 text-xs">{t.location ?? "—"}</td>
                     <td onClick={(e) => e.stopPropagation()}>
                       {t.email ? (
                         <a
                           href={`mailto:${t.email}`}
-                          className="inline-flex items-center gap-1 text-xs font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded hover:underline max-w-[180px] truncate"
+                          className="inline-flex items-center gap-1 text-xs font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-800/60 hover:underline max-w-[180px] truncate"
                           title={t.email}
                         >
                           <RiMailLine size={11} className="shrink-0" /> {t.email}
                         </a>
                       ) : t.apollo_enriched_at ? (
-                        <span className="text-[11px] text-base-content/30 italic">No email</span>
+                        <span className="text-[11px] text-gray-400 italic">No email</span>
                       ) : (
-                        <span className="text-[11px] text-base-content/25">—</span>
+                        <span className="text-[11px] text-gray-300 dark:text-gray-600">—</span>
                       )}
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
@@ -717,7 +717,7 @@ export default function ListDetailPage({
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
                       {t.linkedin_url && (
-                        <a href={t.linkedin_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center p-1 rounded text-base-content/40 hover:text-base-content transition-colors">
+                        <a href={t.linkedin_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center p-1 rounded text-gray-400 hover:text-brand-500 transition-colors">
                           <RiExternalLinkLine size={13} />
                         </a>
                       )}
@@ -729,14 +729,14 @@ export default function ListDetailPage({
           </div>
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-3 text-sm text-base-content/50">
+            <div className="flex items-center justify-between mt-3 text-sm text-gray-500 dark:text-gray-400">
               <span>{page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filteredTargets.length)} of {filteredTargets.length}</span>
               <div className="flex items-center gap-1">
-                <button className="inline-flex items-center justify-center w-6 h-6 rounded text-base-content/50 hover:text-base-content hover:bg-base-300/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" onClick={() => setPage((p) => p - 1)} disabled={page === 0}>
+                <button className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" onClick={() => setPage((p) => p - 1)} disabled={page === 0}>
                   <RiArrowLeftSLine size={15} />
                 </button>
                 <span className="px-2">{page + 1} / {totalPages}</span>
-                <button className="inline-flex items-center justify-center w-6 h-6 rounded text-base-content/50 hover:text-base-content hover:bg-base-300/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" onClick={() => setPage((p) => p + 1)} disabled={page >= totalPages - 1}>
+                <button className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" onClick={() => setPage((p) => p + 1)} disabled={page >= totalPages - 1}>
                   <RiArrowRightSLine size={15} />
                 </button>
               </div>
@@ -749,13 +749,13 @@ export default function ListDetailPage({
       {runHistory.length > 0 && (
         <div className="mt-8">
           <div className="flex items-center gap-2 mb-3">
-            <RiHistoryLine size={14} className="text-base-content/40" />
-            <h2 className="text-sm font-medium text-base-content/60 uppercase tracking-wide">Campaign History</h2>
+            <RiHistoryLine size={14} className="text-gray-400" />
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Campaign History</h2>
           </div>
-          <div className="overflow-x-auto rounded-lg border border-base-300/50">
+          <div className="overflow-x-auto rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-theme-xs">
             <table className="table w-full text-sm">
               <thead>
-                <tr className="border-base-300/50 text-base-content/50 text-xs uppercase tracking-wide">
+                <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/40 text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide">
                   <th>Campaign</th>
                   <th>Account</th>
                   <th>Status</th>
@@ -763,22 +763,22 @@ export default function ListDetailPage({
                   <th>Started</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                 {runHistory.map((r) => {
                   const pct = r.total_profiles > 0 ? Math.round((r.completed_profiles / r.total_profiles) * 100) : 0;
                   const statusColors: Record<string, string> = {
                     running: "text-success",
                     paused: "text-warning",
-                    completed: "text-base-content/40",
+                    completed: "text-gray-400",
                     failed: "text-error",
-                    pending: "text-base-content/30",
+                    pending: "text-gray-400",
                   };
                   return (
-                    <tr key={r.id} className="border-base-300/30">
-                      <td className="font-medium">{r.workflow_name ?? "—"}</td>
-                      <td className="text-base-content/50 text-xs">{r.account_name ?? "—"}</td>
+                    <tr key={r.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-800/50 transition-colors">
+                      <td className="font-semibold text-gray-900 dark:text-white">{r.workflow_name ?? "—"}</td>
+                      <td className="text-gray-500 text-xs">{r.account_name ?? "—"}</td>
                       <td>
-                        <span className={`inline-flex items-center gap-1 text-xs font-medium ${statusColors[r.status] ?? "text-base-content/40"}`}>
+                        <span className={`inline-flex items-center gap-1 text-xs font-semibold ${statusColors[r.status] ?? "text-gray-400"}`}>
                           {r.status === 'running' && <RiPlayLine size={11} />}
                           {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
                         </span>
@@ -786,16 +786,16 @@ export default function ListDetailPage({
                       <td>
                         {r.total_profiles > 0 ? (
                           <div className="flex items-center gap-2">
-                            <div className="w-16 bg-base-300 rounded-full h-1">
-                              <div className="bg-primary h-1 rounded-full" style={{ width: `${pct}%` }} />
+                            <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                              <div className="bg-brand-500 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
                             </div>
-                            <span className="text-xs text-base-content/40 tabular-nums">{r.completed_profiles}/{r.total_profiles}</span>
+                            <span className="text-xs text-gray-400 tabular-nums">{r.completed_profiles}/{r.total_profiles}</span>
                           </div>
                         ) : (
-                          <span className="text-base-content/20 text-xs">—</span>
+                          <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>
                         )}
                       </td>
-                      <td className="text-base-content/40 text-xs">{r.started_at ? new Date(r.started_at).toLocaleDateString() : new Date(r.created_at).toLocaleDateString()}</td>
+                      <td className="text-gray-400 text-xs">{r.started_at ? new Date(r.started_at).toLocaleDateString() : new Date(r.created_at).toLocaleDateString()}</td>
                     </tr>
                   );
                 })}
@@ -808,17 +808,17 @@ export default function ListDetailPage({
       {/* Import modal — source picker → Sales Nav form or CSV wizard */}
       {showImport && (
         <div className="modal modal-open">
-          <div className="modal-box bg-base-200 border border-base-300/50 max-w-md">
+          <div className="modal-box bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xl max-w-md p-6">
 
             {/* Step 1: pick source */}
             {importSource === "pick" && (
               <>
-                <h3 className="font-semibold text-base mb-1">{t("lists.importLeads") || "Import leads"}</h3>
-                <p className="text-base-content/50 text-xs mb-4">{t("lists.importSourceDesc") || "Choose where these leads are coming from."}</p>
+                <h3 className="font-semibold text-base mb-1 text-gray-900 dark:text-white">{t("lists.importLeads") || "Import leads"}</h3>
+                <p className="text-gray-500 dark:text-gray-400 text-xs mb-4">{t("lists.importSourceDesc") || "Choose where these leads are coming from."}</p>
                 <div className="flex flex-col gap-2">
                   <button
                     type="button"
-                    className="flex items-start gap-3 p-3 rounded-lg border border-base-300/60 hover:border-primary/50 hover:bg-base-300/30 transition-colors text-left"
+                    className="flex items-start gap-3 p-3 rounded-xl border border-gray-300 dark:border-gray-700 hover:border-brand-500 dark:hover:border-brand-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
                     onClick={() => setImportSource("sales_nav")}
                   >
                     <div className="w-5 h-5 flex items-center justify-center rounded text-[#0a66c2] bg-[#0a66c2]/10 mt-0.5 shrink-0">
@@ -827,24 +827,24 @@ export default function ListDetailPage({
                       </svg>
                     </div>
                     <span>
-                      <span className="block text-sm font-medium">{t("lists.salesNavSearch") || "Sales Navigator search"}</span>
-                      <span className="block text-xs text-base-content/50 mt-0.5">{t("lists.salesNavSearchDesc") || "Paste a Sales Nav list/search URL — InHubFlow scrapes it using a connected LinkedIn account."}</span>
+                      <span className="block text-sm font-semibold text-gray-900 dark:text-white">{t("lists.salesNavSearch") || "Sales Navigator search"}</span>
+                      <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{t("lists.salesNavSearchDesc") || "Paste a Sales Nav list/search URL — InHubFlow scrapes it using a connected LinkedIn account."}</span>
                     </span>
                   </button>
                   <button
                     type="button"
-                    className="flex items-start gap-3 p-3 rounded-lg border border-base-300/60 hover:border-primary/50 hover:bg-base-300/30 transition-colors text-left"
+                    className="flex items-start gap-3 p-3 rounded-xl border border-gray-300 dark:border-gray-700 hover:border-brand-500 dark:hover:border-brand-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
                     onClick={() => setImportSource("csv")}
                   >
-                    <RiDownloadLine size={18} className="text-primary mt-0.5 shrink-0" />
+                    <RiDownloadLine size={18} className="text-brand-500 mt-0.5 shrink-0" />
                     <span>
-                      <span className="block text-sm font-medium">{t("lists.csvFile") || "CSV file"}</span>
-                      <span className="block text-xs text-base-content/50 mt-0.5">{t("lists.csvFileDesc") || "Upload leads you already have — from another export, or emails scraped from websites."}</span>
+                      <span className="block text-sm font-semibold text-gray-900 dark:text-white">{t("lists.csvFile") || "CSV file"}</span>
+                      <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{t("lists.csvFileDesc") || "Upload leads you already have — from another export, or emails scraped from websites."}</span>
                     </span>
                   </button>
                 </div>
-                <div className="modal-action mt-4">
-                  <button type="button" className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors" onClick={closeImportModal}>{t("common.cancel") || "Cancel"}</button>
+                <div className="modal-action mt-4 pt-3 border-t border-gray-200 dark:border-gray-800">
+                  <button type="button" className="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={closeImportModal}>{t("common.cancel") || "Cancel"}</button>
                 </div>
               </>
             )}

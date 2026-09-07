@@ -242,7 +242,7 @@ export default function TeamManagementPage() {
             <button
               onClick={loadTeamData}
               title={t("team.refresh")}
-              className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors shadow-xs cursor-pointer"
+              className="p-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors shadow-xs cursor-pointer"
             >
               <RiRefreshLine className={loading ? "animate-spin" : ""} size={18} />
             </button>
@@ -302,7 +302,7 @@ export default function TeamManagementPage() {
 
         {/* ── KPI Stats Grid (Exact match of Admin style) ── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
+          <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs">
             <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
               <span className="text-xs font-semibold uppercase tracking-wider">{t("team.statContractedSlots")}</span>
               <span className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
@@ -315,7 +315,7 @@ export default function TeamManagementPage() {
             <div className="text-xs text-gray-400 mt-1">{t("team.statContractedDesc")}</div>
           </div>
 
-          <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
+          <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs">
             <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
               <span className="text-xs font-semibold uppercase tracking-wider">{t("team.statAssignedSlots")}</span>
               <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -328,7 +328,7 @@ export default function TeamManagementPage() {
             <div className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1">{t("team.statAssignedDesc")}</div>
           </div>
 
-          <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
+          <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs">
             <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
               <span className="text-xs font-semibold uppercase tracking-wider">{t("team.statAvailableSlots")}</span>
               <span className="p-2 rounded-xl bg-indigo-500/10 text-brand-600 dark:text-brand-400">
@@ -341,7 +341,7 @@ export default function TeamManagementPage() {
             <div className="text-xs text-gray-400 mt-1">{t("team.statAvailableDesc")}</div>
           </div>
 
-          <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
+          <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs">
             <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
               <span className="text-xs font-semibold uppercase tracking-wider">{t("team.statPendingInvites")}</span>
               <span className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
@@ -356,7 +356,7 @@ export default function TeamManagementPage() {
         </div>
 
         {/* ── Filters and Search ── */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs">
           <div className="relative w-full sm:w-80">
             <RiSearchLine className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <input
@@ -364,7 +364,7 @@ export default function TeamManagementPage() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder={activeTab === "members" ? t("team.searchPlaceholderMembers") : t("team.searchPlaceholderInvites")}
-              className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-xs"
             />
           </div>
 
@@ -417,8 +417,8 @@ export default function TeamManagementPage() {
 
         {/* ── SECTION 1: ACTIVE MEMBERS ── */}
         {activeTab === "members" && (
-          <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs overflow-hidden">
-            <div className="p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+          <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs overflow-hidden">
+            <div className="p-5 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold text-gray-900 dark:text-white">
                   {t("team.activeMembersTitle")}
@@ -432,7 +432,7 @@ export default function TeamManagementPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="bg-gray-50/50 dark:bg-gray-800/40 border-b border-gray-100 dark:border-gray-800 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <tr className="bg-gray-50/50 dark:bg-gray-800/40 border-b border-gray-200 dark:border-gray-800 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     <th className="py-3 px-5">{t("team.colUser")}</th>
                     <th className="py-3 px-5">{t("team.colRole")}</th>
                     <th className="py-3 px-5">{t("team.colAccount")}</th>
@@ -440,7 +440,7 @@ export default function TeamManagementPage() {
                     <th className="py-3 px-5 text-right">{t("team.colActions")}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-800/60">
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-800/60">
                   {/* Row for Workspace Owner */}
                   {showOwnerRow && (
                     <tr className="hover:bg-gray-50/80 dark:hover:bg-gray-800/40 transition-colors">
@@ -543,8 +543,8 @@ export default function TeamManagementPage() {
 
         {/* ── SECTION 2: PENDING INVITATIONS ── */}
         {activeTab === "invitations" && (
-          <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xs overflow-hidden">
-            <div className="p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+          <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs overflow-hidden">
+            <div className="p-5 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold text-gray-900 dark:text-white">
                   {t("team.pendingInvitesTitle")}
@@ -558,7 +558,7 @@ export default function TeamManagementPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="bg-gray-50/50 dark:bg-gray-800/40 border-b border-gray-100 dark:border-gray-800 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <tr className="bg-gray-50/50 dark:bg-gray-800/40 border-b border-gray-200 dark:border-gray-800 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     <th className="py-3 px-5">{t("team.colInvitedEmail")}</th>
                     <th className="py-3 px-5">{t("team.colCodeLink")}</th>
                     <th className="py-3 px-5">{t("team.colAccount")}</th>
@@ -566,7 +566,7 @@ export default function TeamManagementPage() {
                     <th className="py-3 px-5 text-right">{t("team.colActions")}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-800/60">
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-800/60">
                   {filteredInvitations.map((inv) => (
                     <tr key={inv.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-800/40 transition-colors">
                       <td className="py-4 px-5 font-semibold text-gray-900 dark:text-white">
@@ -582,7 +582,7 @@ export default function TeamManagementPage() {
                           </code>
                           <button
                             onClick={() => copyToClipboard(inv.invite_url, inv.id)}
-                            className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors cursor-pointer"
+                            className="p-1.5 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors cursor-pointer"
                             title={t("team.copyInviteLink")}
                           >
                             {copiedId === inv.id ? (
@@ -644,7 +644,7 @@ export default function TeamManagementPage() {
       {/* ── Invite Member Modal (Matching Standard Modal Design) ── */}
       {isInviteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-6 shadow-xl space-y-5 animate-in fade-in zoom-in-95">
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 p-6 shadow-xl space-y-5 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="p-1.5 rounded-lg bg-brand-500/10 text-brand-600 dark:text-brand-400">
@@ -705,7 +705,7 @@ export default function TeamManagementPage() {
                     placeholder={t("team.inputEmailPlaceholder")}
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-white"
                   />
                 </div>
 
@@ -716,7 +716,7 @@ export default function TeamManagementPage() {
                   <select
                     value={inviteRole}
                     onChange={(e) => setInviteRole(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-white"
                   >
                     <option value="member">{t("team.roleOptionMember")}</option>
                     <option value="admin">{t("team.roleOptionAdmin")}</option>
@@ -731,7 +731,7 @@ export default function TeamManagementPage() {
                     <select
                       value={inviteAccount}
                       onChange={(e) => setInviteAccount(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-white"
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-white"
                     >
                       <option value="">{t("team.accountOptionNone")}</option>
                       {accounts.map((acc) => (
@@ -754,7 +754,7 @@ export default function TeamManagementPage() {
                   <button
                     type="button"
                     onClick={() => setIsInviteModalOpen(false)}
-                    className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-800 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                    className="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
                   >
                     {t("team.cancel")}
                   </button>

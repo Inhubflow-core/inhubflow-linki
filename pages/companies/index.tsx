@@ -138,7 +138,7 @@ export default function CompaniesPage({ initialCompanies }: { initialCompanies: 
 
         <div className="mb-4">
           <input
-            className="input input-bordered input-sm w-72 bg-base-300/50"
+            className="input input-bordered input-sm w-72 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl shadow-xs text-gray-900 dark:text-white"
             placeholder={t("companies.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -150,7 +150,7 @@ export default function CompaniesPage({ initialCompanies }: { initialCompanies: 
             {search ? t("companies.noCompaniesMatching") : t("companies.noCompanies")}
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-base-300/50">
+          <div className="overflow-x-auto rounded-2xl border border-gray-300 dark:border-gray-700 shadow-xs">
             <table className="table w-full text-sm">
               <thead>
                 <tr className="border-base-300/50 text-base-content/50 text-xs uppercase tracking-wide">
@@ -210,40 +210,40 @@ export default function CompaniesPage({ initialCompanies }: { initialCompanies: 
 
         {showModal && (
           <div className="modal modal-open">
-            <div className="modal-box bg-base-200 border border-base-300/50 max-w-md">
+            <div className="modal-box bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xl max-w-md">
               <h3 className="font-semibold text-base mb-4">{editId ? t("common.edit") : t("companies.addCompany")}</h3>
               <form onSubmit={submit} className="flex flex-col gap-3">
                 <div>
                   <label className="label text-xs text-base-content/50 pb-1">{t("companies.companyName")} <span className="text-error">*</span></label>
-                  <input className="input input-bordered input-sm w-full bg-base-300/50" placeholder="Acme Inc." value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+                  <input className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl shadow-xs text-gray-900 dark:text-white" placeholder="Acme Inc." value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="label text-xs text-base-content/50 pb-1">{t("companies.domain")}</label>
-                    <input className="input input-bordered input-sm w-full bg-base-300/50" placeholder="acme.com" value={form.domain} onChange={(e) => setForm({ ...form, domain: e.target.value })} />
+                    <input className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl shadow-xs text-gray-900 dark:text-white" placeholder="acme.com" value={form.domain} onChange={(e) => setForm({ ...form, domain: e.target.value })} />
                   </div>
                   <div>
                     <label className="label text-xs text-base-content/50 pb-1">{t("companies.industry")}</label>
-                    <input className="input input-bordered input-sm w-full bg-base-300/50" placeholder="SaaS" value={form.industry} onChange={(e) => setForm({ ...form, industry: e.target.value })} />
+                    <input className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl shadow-xs text-gray-900 dark:text-white" placeholder="SaaS" value={form.industry} onChange={(e) => setForm({ ...form, industry: e.target.value })} />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="label text-xs text-base-content/50 pb-1">{t("companies.location")}</label>
-                    <input className="input input-bordered input-sm w-full bg-base-300/50" placeholder="Berlin, Germany" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+                    <input className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl shadow-xs text-gray-900 dark:text-white" placeholder="Berlin, Germany" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
                   </div>
                   <div>
                     <label className="label text-xs text-base-content/50 pb-1">{t("companies.domain")}</label>
-                    <input className="input input-bordered input-sm w-full bg-base-300/50" placeholder="https://acme.com" value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} />
+                    <input className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl shadow-xs text-gray-900 dark:text-white" placeholder="https://acme.com" value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} />
                   </div>
                 </div>
                 <div>
                   <label className="label text-xs text-base-content/50 pb-1">{t("companies.linkedinUrl")}</label>
-                  <input className="input input-bordered input-sm w-full bg-base-300/50" placeholder="https://linkedin.com/company/acme" value={form.linkedin_url} onChange={(e) => setForm({ ...form, linkedin_url: e.target.value })} />
+                  <input className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl shadow-xs text-gray-900 dark:text-white" placeholder="https://linkedin.com/company/acme" value={form.linkedin_url} onChange={(e) => setForm({ ...form, linkedin_url: e.target.value })} />
                 </div>
                 <div>
                   <label className="label text-xs text-base-content/50 pb-1">{t("companies.notes")}</label>
-                  <textarea className="textarea textarea-bordered w-full bg-base-300/50 text-sm h-20 resize-none" placeholder="Notes..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+                  <textarea className="textarea textarea-bordered w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl shadow-xs text-gray-900 dark:text-white text-sm h-20 resize-none" placeholder="Notes..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
                 </div>
                 <div className="modal-action mt-1">
                   <button type="button" className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors" onClick={() => setShowModal(false)}>{t("common.cancel")}</button>

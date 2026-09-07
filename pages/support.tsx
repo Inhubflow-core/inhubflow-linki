@@ -288,14 +288,14 @@ export default function SupportPage() {
                 fetchTickets();
                 if (selectedTicketId) loadTicketDetail(selectedTicketId);
               }}
-              className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+              className="p-2.5 rounded-xl border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition shadow-xs"
               title="Refrescar"
             >
               <RiRefreshLine size={18} />
             </button>
             <button
               onClick={() => setIsModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs sm:text-sm font-semibold transition shadow-sm cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs sm:text-sm font-semibold transition shadow-xs cursor-pointer"
             >
               <RiAddLine size={18} />
               <span>{t("support.newTicket")}</span>
@@ -319,15 +319,15 @@ export default function SupportPage() {
               <span>{t("support.backToList")}</span>
             </button>
 
-            <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-6 shadow-sm">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-gray-100 dark:border-gray-800">
+            <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 p-6 shadow-xs">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-gray-200 dark:border-gray-800">
                 <div>
                   <div className="flex items-center gap-3 mb-2 flex-wrap">
                     <span className="px-2.5 py-0.5 rounded-md font-mono text-xs font-bold bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200">
                       #TCK-{selectedTicket.ticket_number}
                     </span>
                     {getStatusBadge(selectedTicket.status)}
-                    <span className="text-xs px-2 py-0.5 rounded-md bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border border-gray-200 dark:border-gray-700 font-medium">
+                    <span className="text-xs px-2 py-0.5 rounded-md bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border border-gray-300 dark:border-gray-700 font-medium">
                       {getCategoryLabel(selectedTicket.category)}
                     </span>
                     {getPriorityBadge(selectedTicket.priority)}
@@ -355,10 +355,10 @@ export default function SupportPage() {
                     return (
                       <div
                         key={msg.id}
-                        className={`p-5 rounded-2xl border transition ${
+                        className={`p-5 rounded-2xl border transition shadow-xs ${
                           isAdmin
-                            ? "bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-200/80 dark:border-indigo-900/50"
-                            : "bg-white dark:bg-gray-800/60 border-gray-200/80 dark:border-gray-700/60"
+                            ? "bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-300 dark:border-indigo-800"
+                            : "bg-white dark:bg-gray-800/80 border-gray-300 dark:border-gray-700"
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2 mb-3">
@@ -398,7 +398,7 @@ export default function SupportPage() {
 
               {/* Reply Form */}
               {selectedTicket.status !== "closed" ? (
-                <form onSubmit={handleSendReply} className="pt-6 border-t border-gray-100 dark:border-gray-800">
+                <form onSubmit={handleSendReply} className="pt-6 border-t border-gray-200 dark:border-gray-800">
                   <div className="space-y-3">
                     <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
                       {t("support.replyPlaceholder")}
@@ -408,13 +408,13 @@ export default function SupportPage() {
                       value={replyText}
                       onChange={(e) => setReplyText(e.target.value)}
                       placeholder={t("support.replyPlaceholder")}
-                      className="w-full p-3.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-xs sm:text-sm text-gray-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500 transition"
+                      className="w-full p-3.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs sm:text-sm text-gray-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500 transition shadow-xs"
                     />
                     <div className="flex justify-end">
                       <button
                         type="submit"
                         disabled={sendingReply || !replyText.trim()}
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white font-semibold text-xs sm:text-sm transition cursor-pointer shadow-sm"
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white font-semibold text-xs sm:text-sm transition cursor-pointer shadow-xs"
                       >
                         <RiSendPlaneFill size={15} />
                         <span>{sendingReply ? t("support.sendingReply") : t("support.sendReply")}</span>
@@ -423,7 +423,7 @@ export default function SupportPage() {
                   </div>
                 </form>
               ) : (
-                <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-800 text-center text-xs text-gray-500">
+                <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-800 text-center text-xs text-gray-500 border border-gray-200 dark:border-gray-800">
                   Este ticket ha sido cerrado. Si tienes una nueva incidencia, por favor abre un nuevo ticket de soporte.
                 </div>
               )}
@@ -433,11 +433,11 @@ export default function SupportPage() {
           /* Tickets Table / List View */
           <div className="space-y-6">
             {loading ? (
-              <div className="p-12 text-center text-sm text-gray-500 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
+              <div className="p-12 text-center text-sm text-gray-500 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs">
                 Cargando tickets de soporte...
               </div>
             ) : tickets.length === 0 ? (
-              <div className="p-12 text-center rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm">
+              <div className="p-12 text-center rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs">
                 <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-400 flex items-center justify-center">
                   <RiMessage3Line size={28} />
                 </div>
@@ -449,18 +449,18 @@ export default function SupportPage() {
                 </p>
                 <button
                   onClick={() => setIsModalOpen(true)}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs sm:text-sm transition shadow-sm cursor-pointer"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs sm:text-sm transition shadow-xs cursor-pointer"
                 >
                   <RiAddLine size={18} />
                   <span>{t("support.newTicket")}</span>
                 </button>
               </div>
             ) : (
-              <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
+              <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 overflow-hidden shadow-xs">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs sm:text-sm">
                     <thead>
-                      <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/40 text-gray-500 dark:text-gray-400 font-semibold">
+                      <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/40 text-gray-500 dark:text-gray-400 font-semibold">
                         <th className="py-3.5 px-4 sm:px-6">{t("support.ticketNumber")}</th>
                         <th className="py-3.5 px-4 sm:px-6">{t("support.subject")}</th>
                         <th className="py-3.5 px-4">{t("support.category")}</th>
@@ -469,7 +469,7 @@ export default function SupportPage() {
                         <th className="py-3.5 px-4 text-right pr-6">{t("support.lastUpdate")}</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-gray-700 dark:text-gray-300">
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-800 text-gray-700 dark:text-gray-300">
                       {tickets.map((tck) => (
                         <tr
                           key={tck.id}
@@ -511,7 +511,7 @@ export default function SupportPage() {
         {/* Modal: New Ticket */}
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-            <div className="w-full max-w-xl rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-6 sm:p-8 shadow-2xl">
+            <div className="w-full max-w-xl rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 p-6 sm:p-8 shadow-2xl">
               <div className="mb-6">
                 <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
                   {t("support.modalNewTicket")}
@@ -532,7 +532,7 @@ export default function SupportPage() {
                     value={newSubject}
                     onChange={(e) => setNewSubject(e.target.value)}
                     placeholder={t("support.subjectPlaceholder")}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-xs sm:text-sm text-gray-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500 transition"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs sm:text-sm text-gray-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500 transition shadow-xs"
                   />
                 </div>
 
@@ -544,7 +544,7 @@ export default function SupportPage() {
                     <select
                       value={newCategory}
                       onChange={(e) => setNewCategory(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-xs sm:text-sm text-gray-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500 transition"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs sm:text-sm text-gray-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500 transition shadow-xs"
                     >
                       <option value="general">{t("support.categoryGeneral")}</option>
                       <option value="campaigns">{t("support.categoryCampaigns")}</option>
@@ -564,7 +564,7 @@ export default function SupportPage() {
                     <select
                       value={newPriority}
                       onChange={(e) => setNewPriority(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-xs sm:text-sm text-gray-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500 transition"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs sm:text-sm text-gray-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500 transition shadow-xs"
                     >
                       <option value="low">{t("support.priorityLow")}</option>
                       <option value="normal">{t("support.priorityNormal")}</option>
@@ -584,22 +584,22 @@ export default function SupportPage() {
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     placeholder={t("support.messagePlaceholder")}
-                    className="w-full p-3.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-xs sm:text-sm text-gray-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500 transition"
+                    className="w-full p-3.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs sm:text-sm text-gray-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500 transition shadow-xs"
                   />
                 </div>
 
-                <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-xs sm:text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition cursor-pointer"
+                    className="px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 text-xs sm:text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition cursor-pointer shadow-xs"
                   >
                     {t("common.cancel") || "Cancelar"}
                   </button>
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-xs sm:text-sm font-semibold transition shadow-sm cursor-pointer"
+                    className="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-xs sm:text-sm font-semibold transition shadow-xs cursor-pointer"
                   >
                     {submitting ? t("support.submitting") : t("support.submitTicket")}
                   </button>
