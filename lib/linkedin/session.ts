@@ -28,17 +28,20 @@ type PersistedStorageState = BrowserStorageState & { userAgent?: string };
  * options so the LinkedIn session is BORN under the exact fingerprint it will
  * later be used with — a mismatch (or a drift) triggers a forced re-auth.
  */
-function contextOptions(storageState?: PersistedStorageState): BrowserContextOptions {
+function contextOptions(storageState?: PersistedStorageState, accountTimezone?: string | null): BrowserContextOptions {
   const customUserAgent =
     (typeof storageState?.userAgent === "string" && storageState.userAgent) ||
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+  const timezoneId = (accountTimezone && accountTimezone !== "UTC") ? accountTimezone : "America/Sao_Paulo";
+  const locale = timezoneId.includes("Sao_Paulo") ? "pt-BR" : (timezoneId.includes("Madrid") || timezoneId.includes("Bogota") || timezoneId.includes("Mexico") ? "es-ES" : "en-US");
 
   return {
     storageState,
     viewport: { width: 1920, height: 1080 },
     userAgent: customUserAgent,
-    locale: "en-US",
-    timezoneId: "America/New_York",
+    locale,
+    timezoneId,
     permissions: ["clipboard-read", "clipboard-write"] as ("clipboard-read" | "clipboard-write")[],
   };
 }
@@ -64,7 +67,7 @@ async function getBrowser(headless = HEADLESS): Promise<Browser> {
 async function getOrCreateContext(accountId: string): Promise<BrowserContext> {
   const db = getDb();
   const account = db.prepare("SELECT * FROM accounts WHERE id = ?").get(accountId) as
-    | { cookies_json: string | null; email: string }
+    | { cookies_json: string | null; email: string; timezone?: string }
     | undefined;
 
   if (!account) throw new Error(`Account ${accountId} not found`);
@@ -97,7 +100,7 @@ async function getOrCreateContext(accountId: string): Promise<BrowserContext> {
       }
     }
 
-    const ctx = await b.newContext(contextOptions(storageState));
+    const ctx = await b.newContext(contextOptions(storageState, account.timezone));
 
     // Auto-evict from map when context closes for any reason (crash, session expiry, etc.)
     ctx.on("close", () => { if (contexts.get(accountId) === ctx) contexts.delete(accountId); });
