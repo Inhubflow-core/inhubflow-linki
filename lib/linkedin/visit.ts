@@ -152,18 +152,28 @@ export async function visitProfile(page: Page, linkedinUrl: string): Promise<Pro
 
   let isFirstDegree = false;
   let reason = "no_positive_connection_evidence";
-  if (hasConnectAction || hasPendingAction) {
+  if (explicitSecondOrThird) {
+    reason = "explicit_second_or_third_degree";
+  } else if (hasConnectAction || hasPendingAction) {
     reason = hasPendingAction ? "explicit_pending_action" : "explicit_connect_action";
   } else if (explicitFirst) {
     isFirstDegree = true;
     reason = "explicit_first_degree_badge";
-  } else if ((hasMessageAction || messageHref) && !hasConnectAction && !hasPendingAction) {
-    isFirstDegree = true;
-    reason = "message_action_without_connect_or_pending";
-  } else if (explicitSecondOrThird) {
-    reason = "explicit_second_or_third_degree";
   } else if (hasMessageAction || messageHref) {
-    reason = messageHref ? "message_link_without_degree" : "message_action_without_degree";
+    // If no degree badge was detected, verify if "Connect" or "Pending" is
+    // hidden inside the More / 3-dots menu (common in Creator Mode & Open Profiles).
+    const moreMenu = await inspectMoreMenuForConnectionState(page, topCard);
+    if (moreMenu.hasConnect) {
+      reason = "more_menu_has_connect_action";
+    } else if (moreMenu.hasPending) {
+      reason = "more_menu_has_pending_action";
+    } else if (moreMenu.hasRemoveConnection) {
+      isFirstDegree = true;
+      reason = "more_menu_has_remove_connection_action";
+    } else {
+      isFirstDegree = true;
+      reason = "message_action_without_connect_or_pending";
+    }
   }
 
   return {
@@ -180,4 +190,58 @@ export async function visitProfile(page: Page, linkedinUrl: string): Promise<Pro
       reason,
     },
   };
+}
+
+async function inspectMoreMenuForConnectionState(
+  page: Page,
+  topCard: import("playwright").Locator
+): Promise<{ hasConnect: boolean; hasPending: boolean; hasRemoveConnection: boolean }> {
+  const result = { hasConnect: false, hasPending: false, hasRemoveConnection: false };
+
+  const moreTrigger = topCard.locator(`
+    button[aria-label*="más acciones" i],
+    button[aria-label*="more actions" i],
+    button[aria-label*="mais ações" i],
+    button[aria-label*="más opciones" i],
+    button[aria-label*="more options" i],
+    button[aria-label*="mais opções" i],
+    button:has(svg[data-test-icon*="overflow"]),
+    button:has(li-icon[type*="overflow"]),
+    button[aria-label*="más" i],
+    button[aria-label*="mais" i],
+    button[aria-label*="more" i],
+    button.artdeco-dropdown__trigger
+  `).first();
+
+  if ((await moreTrigger.count().catch(() => 0)) === 0 || !(await moreTrigger.isVisible().catch(() => false))) {
+    return result;
+  }
+
+  try {
+    await moreTrigger.scrollIntoViewIfNeeded().catch(() => {});
+    await moreTrigger.click({ force: true }).catch(() => {});
+    await page.waitForTimeout(600);
+
+    const menu = page.locator('.artdeco-dropdown__content:visible, [role="menu"]:visible, .artdeco-dropdown__menu:visible').first();
+    if ((await menu.count().catch(() => 0)) > 0 && (await menu.isVisible().catch(() => false))) {
+      const menuText = (await menu.innerText().catch(() => "")).toLowerCase();
+
+      if (/(?:^|\s)(?:conectar|connect|convidar|invitar|invite|se connecter)(?:\s|$)/i.test(menuText)) {
+        result.hasConnect = true;
+      }
+      if (/(?:pendente|pending|pendiente|aguardando|cancelar convite|retirar convite|retirar invitaci[oó]n|cancelar solicitud|withdraw)/i.test(menuText)) {
+        result.hasPending = true;
+      }
+      if (/(?:remove connection|eliminar contacto|remover conex[aã]o|desconectar)/i.test(menuText)) {
+        result.hasRemoveConnection = true;
+      }
+    }
+  } catch (err) {
+    console.warn("[visit] Warning while inspecting More menu:", err);
+  } finally {
+    await page.keyboard.press("Escape").catch(() => {});
+    await page.waitForTimeout(200);
+  }
+
+  return result;
 }
