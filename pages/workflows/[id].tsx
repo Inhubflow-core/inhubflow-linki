@@ -220,12 +220,21 @@ const STATE_PILL: Record<string, string> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function parseUtcDate(dateStr: string): Date {
+  if (!dateStr) return new Date();
+  const normalized = dateStr.includes("T")
+    ? (dateStr.endsWith("Z") || /[+-]\d{2}:\d{2}$/.test(dateStr) ? dateStr : `${dateStr}Z`)
+    : `${dateStr.replace(" ", "T")}Z`;
+  return new Date(normalized);
+}
+
 function formatNextAction(next_step_at: string | null, state: string, t?: (key: string, params?: any) => string): string {
   if (state === "completed" || state === "failed" || state === "skipped") return "—";
   if (!next_step_at) return t ? t("campaignDetail.idle") : "Soon";
-  const diff = new Date(next_step_at).getTime() - Date.now();
-  if (diff <= 0) return "Ahora";
+  const diff = parseUtcDate(next_step_at).getTime() - Date.now();
+  if (diff <= 60_000) return "Ahora";
   const hours = diff / 3600_000;
+  if (hours < 1) return `en ${Math.max(1, Math.round(diff / 60_000))}m`;
   if (hours < 24) return `en ${Math.round(hours)}h`;
   return `en ${Math.round(hours / 24)}d`;
 }
@@ -2924,10 +2933,12 @@ export default function WorkflowDetailPage({
     });
     if (res.ok) {
       toast.success(targetId ? "⚡ Disparando acción ahora..." : "⚡ Disparando acción para todos ahora...");
-      setTimeout(() => {
-        refreshStats();
-        refreshProspects();
-      }, 1000);
+      [1000, 5000, 15000, 30000].forEach((delay) => {
+        setTimeout(() => {
+          refreshStats();
+          refreshProspects();
+        }, delay);
+      });
     } else {
       const err = await res.json();
       toast.error(err.error ?? "Error al forzar acción");
