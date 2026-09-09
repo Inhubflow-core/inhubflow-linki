@@ -36,54 +36,62 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Retrieve all relevant cookies for linkedin.com
-    chrome.cookies.getAll({ domain: "linkedin.com" }, (cookies) => {
-      stateLoading.classList.add("hidden");
+    // Retrieve all cookies for linkedin.com across domain and url queries
+    chrome.cookies.getAll({ url: "https://www.linkedin.com" }, (cookiesByUrl) => {
+      chrome.cookies.getAll({ domain: "linkedin.com" }, (cookiesByDomain) => {
+        stateLoading.classList.add("hidden");
 
-      if (!cookies || cookies.length === 0) {
-        rawToken = "";
-        displayToken = "";
-        stateError.classList.remove("hidden");
-        return;
-      }
+        const allCookies = [...(cookiesByUrl || []), ...(cookiesByDomain || [])];
+        if (allCookies.length === 0) {
+          rawToken = "";
+          displayToken = "";
+          stateError.classList.remove("hidden");
+          return;
+        }
 
-      const liAt = cookies.find((c) => c.name === "li_at" && c.value && c.value.length > 20);
-      if (!liAt) {
-        rawToken = "";
-        displayToken = "";
-        stateError.classList.remove("hidden");
-        return;
-      }
+        const cookieMap = new Map();
+        for (const c of allCookies) {
+          if (c && c.name && c.value && !cookieMap.has(c.name)) {
+            cookieMap.set(c.name, c);
+          }
+        }
 
-      displayToken = liAt.value.trim();
+        const liAt = cookieMap.get("li_at");
+        if (!liAt || !liAt.value || liAt.value.length < 20) {
+          rawToken = "";
+          displayToken = "";
+          stateError.classList.remove("hidden");
+          return;
+        }
 
-      // Gather matching session companions required by LinkedIn anti-bot (JSESSIONID, bcookie, bscookie, etc.)
-      const allowedNames = new Set(["li_at", "JSESSIONID", "bcookie", "bscookie", "liap", "li_theme", "lang"]);
-      const sessionCookies = cookies
-        .filter((c) => allowedNames.has(c.name))
-        .map((c) => ({
+        displayToken = liAt.value.trim();
+
+        // Include all valid session cookies normalized for Playwright
+        const sessionCookies = Array.from(cookieMap.values()).map((c) => ({
           name: c.name,
           value: c.value,
-          domain: c.domain.startsWith(".") ? c.domain : `.${c.domain}`,
-          path: c.path || "/",
-          httpOnly: c.httpOnly ?? true,
-          secure: c.secure ?? true,
+          domain: ".linkedin.com",
+          path: "/",
+          httpOnly: Boolean(c.httpOnly),
+          secure: Boolean(c.secure ?? true),
           sameSite: c.sameSite === "no_restriction" ? "None" : (c.sameSite === "strict" ? "Strict" : "Lax"),
+          expires: c.expirationDate ? Math.round(c.expirationDate) : Math.floor(Date.now() / 1000) + 31536000,
         }));
 
-      const payload = {
-        v: 1,
-        li_at: displayToken,
-        userAgent: navigator.userAgent,
-        cookies: sessionCookies,
-      };
+        const payload = {
+          v: 2,
+          li_at: displayToken,
+          userAgent: navigator.userAgent,
+          cookies: sessionCookies,
+        };
 
-      rawToken = "ihf_" + btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-      fullTokenVal.value = rawToken;
-      isMasked = true;
-      tokenPreview.textContent = maskToken(displayToken);
-      btnToggleView.textContent = "👁️ Ver";
-      stateSuccess.classList.remove("hidden");
+        rawToken = "ihf_" + btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+        fullTokenVal.value = rawToken;
+        isMasked = true;
+        tokenPreview.textContent = maskToken(displayToken);
+        btnToggleView.textContent = "👁️ Ver";
+        stateSuccess.classList.remove("hidden");
+      });
     });
   }
 

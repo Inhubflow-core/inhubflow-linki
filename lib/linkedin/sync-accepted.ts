@@ -148,8 +148,19 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
     await page.goto("https://www.linkedin.com/mynetwork/invite-connect/connections/", {
       waitUntil: "domcontentloaded",
       timeout: 35_000,
-    });
-    await page.waitForTimeout(3500 + Math.random() * 1500);
+    }).catch(() => {});
+    await page.waitForTimeout(3000 + Math.random() * 1500);
+    if (AUTH_WALL.test(page.url())) {
+      // Warm up session on /feed/ and retry once
+      await page.goto("https://www.linkedin.com/feed/", { waitUntil: "domcontentloaded", timeout: 25_000 }).catch(() => {});
+      await page.waitForTimeout(2000);
+      if (!AUTH_WALL.test(page.url())) {
+        await page.goto("https://www.linkedin.com/mynetwork/invite-connect/connections/", {
+          waitUntil: "domcontentloaded",
+          timeout: 35_000,
+        }).catch(() => {});
+      }
+    }
     if (AUTH_WALL.test(page.url())) {
       sessionWall = true;
       return { success: false, partial: false, stamped: 0, unmarked: 0, pages: 0, connectionsRead: 0, pendingTargets: pendingTargets.length, matchedTargets: 0, declaredTotal: null, reason: "auth_wall" };
@@ -303,9 +314,7 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
       let url = "";
       try { url = page.url(); } catch { /* page gone */ }
       try { await page.close(); } catch { /* ignore */ }
-      if (sessionWall || AUTH_WALL.test(url)) {
-        try { await markNeedsReauth(accountId); } catch { /* ignore */ }
-      } else {
+      if (!sessionWall && !AUTH_WALL.test(url)) {
         try { await saveSessionState(accountId); } catch { /* ignore */ }
       }
     }

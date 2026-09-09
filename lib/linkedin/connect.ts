@@ -566,6 +566,20 @@ async function confirmConnectionRequest(page: Page, linkedinUrl: string): Promis
  * direct Connect actions and Creator-mode More/Mais dropdown menus.
  */
 export async function sendConnectionRequest(page: Page, linkedinUrl: string): Promise<void> {
+  // 1. Preventive warm up on /feed/ — direct navigations to /in/ profiles trigger LinkedIn's profile authwall
+  try {
+    await page.goto("https://www.linkedin.com/feed/", { waitUntil: "domcontentloaded", timeout: 25000 });
+    await page.waitForTimeout(2000);
+  } catch (feedErr) {
+    console.warn("[connect] Initial feed warm-up warning:", feedErr);
+  }
+
+  const feedUrl = page.url();
+  if (feedUrl.includes("/login") || feedUrl.includes("/checkpoint") || feedUrl.includes("/uas/")) {
+    throw new Error("Sesión de LinkedIn caducada o cerrada. Por favor actualiza tu Código de Conexión en Configuración.");
+  }
+
+  // 2. Navigate to target profile
   try {
     await page.goto(linkedinUrl, { waitUntil: "domcontentloaded", timeout: 35000 });
   } catch (err) {

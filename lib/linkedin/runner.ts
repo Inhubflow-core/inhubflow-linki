@@ -290,11 +290,11 @@ function trAdvance(db: ReturnType<typeof getDb>, tr: TrackRun, steps: WorkflowSt
 }
 
 function trWait(db: ReturnType<typeof getDb>, tr: TrackRun, hours: number) {
-  db.prepare("UPDATE run_profile_tracks SET next_step_at = ? WHERE id = ?").run(addHours(hours), tr.id);
+  db.prepare("UPDATE run_profile_tracks SET state = 'in_progress', error_message = NULL, next_step_at = ? WHERE id = ?").run(addHours(hours), tr.id);
 }
 
 function trReschedule(db: ReturnType<typeof getDb>, tr: TrackRun, isoTimestamp: string) {
-  db.prepare("UPDATE run_profile_tracks SET next_step_at = ? WHERE id = ?").run(isoTimestamp, tr.id);
+  db.prepare("UPDATE run_profile_tracks SET state = 'in_progress', error_message = NULL, next_step_at = ? WHERE id = ?").run(isoTimestamp, tr.id);
 }
 
 function trSkip(db: ReturnType<typeof getDb>, tr: TrackRun, reason: string) {
