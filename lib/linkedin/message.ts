@@ -50,27 +50,28 @@ export async function sendMessage(
     }
   }
 
-  // 3. If on profile and detected as 1st-degree, open compose box directly from page button
-  if (resolved.isFirstDegree) {
-    console.log(`[message] Attempting openComposeFromProfilePage`);
+  // 3. If on profile, open compose box directly from page button
+  if (resolved.isFirstDegree || resolved.evidence?.reason === "profile_main_missing") {
+    console.log(`[message] Attempting openComposeFromProfilePage (degree=${resolved.isFirstDegree}, reason=${resolved.evidence?.reason})`);
     const openedOnPage = await openComposeFromProfilePage(page);
     if (openedOnPage) {
       await sendFromComposeBox(page, text, attachmentPath);
-      return resolved;
+      return { messagingUrn: resolved.messagingUrn, isFirstDegree: true };
     }
   }
 
   if (!resolved.isFirstDegree) {
     if (resolved.evidence?.reason === "profile_main_missing") {
-      throw new Error(`LinkedIn profile container did not load in time for "${fullName}" — retrying`);
+      console.log(`[message] Profile container hydration delayed for "${fullName}", proceeding via messaging fallback`);
+    } else {
+      throw new NotConnectedError(`${fullName} is not a 1st-degree connection — refusing to message`);
     }
-    throw new NotConnectedError(`${fullName} is not a 1st-degree connection — refusing to message`);
   }
 
   // 4. Connected, but compose URN not found — fallback to LinkedIn Messaging
   console.log(`[message] Falling back to sendMessageViaTypeahead for "${fullName}"`);
   await sendMessageViaTypeahead(page, fullName, text, attachmentPath);
-  return resolved;
+  return { messagingUrn: resolved.messagingUrn, isFirstDegree: true };
 }
 
 async function openComposeFromProfilePage(page: Page): Promise<boolean> {

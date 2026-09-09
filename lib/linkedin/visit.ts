@@ -78,22 +78,26 @@ export async function visitProfile(page: Page, linkedinUrl: string): Promise<Pro
     throw new LinkedInAuthenticationError(`LinkedIn authentication wall while checking profile (${pageUrl})`);
   }
 
-  // Robustly wait up to 15s for the profile main content or h1 heading to mount
-  const mainLocator = page.locator("main, div[role='main'], .scaffold-layout__main, .profile-detail").first();
-  const h1Locator = page.locator("h1").first();
+  // Robustly wait up to 20s for the profile container or heading to mount
+  const profileAnchor = page.locator("main, div[role='main'], .scaffold-layout__main, .profile-detail, .pv-top-card, h1").first();
+  await profileAnchor.waitFor({ state: "attached", timeout: 20_000 }).catch(() => {});
 
-  await Promise.race([
-    mainLocator.waitFor({ state: "attached", timeout: 15_000 }).catch(() => {}),
-    h1Locator.waitFor({ state: "attached", timeout: 15_000 }).catch(() => {}),
-  ]);
-
-  let main = mainLocator;
+  let main = page.locator("main, div[role='main'], .scaffold-layout__main, .profile-detail").first();
   let mainCount = await main.count().catch(() => 0);
   if (mainCount === 0) {
-    const h1Count = await h1Locator.count().catch(() => 0);
+    const h1Count = await page.locator("h1").count().catch(() => 0);
     if (h1Count > 0) {
       main = page.locator("body").first();
       mainCount = 1;
+    }
+  }
+
+  // If still not found, give a final 3s grace period for slow hydrate
+  if (mainCount === 0) {
+    await page.waitForTimeout(3000);
+    mainCount = await page.locator("main, div[role='main'], .scaffold-layout__main, h1").count().catch(() => 0);
+    if (mainCount > 0) {
+      main = page.locator("main, div[role='main'], body").first();
     }
   }
 
