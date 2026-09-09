@@ -12,6 +12,7 @@ import {
   calculateConnectionScanFloor,
   canonicalLinkedInVanity,
   matchAcceptedConnection,
+  normalizeVanitySlug,
   parseVoyagerConnections,
   type PendingConnectionTarget,
 } from "./connection-reconciliation";
@@ -198,6 +199,7 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
   let apiError = false;
   const seenIdentities = new Set<string>();
   const seenVanities = new Set<string>();
+  const seenNormalizedVanities = new Set<string>();
 
   try {
     if (leaseLost) throw new AcceptedSyncLeaseLostError();
@@ -265,6 +267,9 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
         }
         if (connection.vanity) {
           seenVanities.add(connection.vanity);
+          const normV = normalizeVanitySlug(connection.vanity);
+          if (normV) seenNormalizedVanities.add(normV);
+
           const matches = matchAcceptedConnection(connection, pendingTargets);
           if (matches.targetId) {
             matchedTargets++;
@@ -320,6 +325,7 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
         JOIN runs r ON r.id = rp.run_id
         WHERE r.account_id = ?
           AND t.degree = 1
+          AND (t.connected_at IS NULL OR t.connected_at < datetime('now', '-7 days'))
           AND t.linkedin_url LIKE '%/in/%'
           AND NOT EXISTS (
             SELECT 1
@@ -328,12 +334,22 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
             WHERE other_rp.target_id = t.id
               AND other_r.account_id != ?
           )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM run_profile_tracks rpt
+            JOIN workflow_steps ws ON ws.id = rpt.current_step_id
+            WHERE rpt.run_profile_id = rp.id
+              AND rpt.status = 'active'
+              AND ws.step_type = 'message'
+          )
       `).all(accountId, accountId) as Array<{ id: string; linkedin_url: string }>;
       const unmark = db.prepare("UPDATE targets SET degree = NULL, connected_at = NULL WHERE id = ?");
       db.transaction(() => {
         for (const target of degreeOne) {
           const vanity = canonicalLinkedInVanity(target.linkedin_url);
-          if (vanity && !seenVanities.has(vanity)) {
+          const normVanity = normalizeVanitySlug(vanity);
+          const isSeen = (vanity && seenVanities.has(vanity)) || (normVanity && seenNormalizedVanities.has(normVanity));
+          if (vanity && !isSeen) {
             unmark.run(target.id);
             unmarked++;
           }

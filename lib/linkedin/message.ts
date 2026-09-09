@@ -61,6 +61,9 @@ export async function sendMessage(
   }
 
   if (!resolved.isFirstDegree) {
+    if (resolved.evidence?.reason === "profile_main_missing") {
+      throw new Error(`LinkedIn profile container did not load in time for "${fullName}" — retrying`);
+    }
     throw new NotConnectedError(`${fullName} is not a 1st-degree connection — refusing to message`);
   }
 
@@ -89,7 +92,14 @@ async function openComposeFromProfilePage(page: Page): Promise<boolean> {
       main button[aria-label*="mensaje" i],
       main button[aria-label*="message" i],
       main a[href*="/messaging/compose"],
-      main a[href*="/messaging/thread/"]
+      main a[href*="/messaging/thread/"],
+      div[role="main"] button:has-text("Enviar mensagem"),
+      div[role="main"] button:has-text("Mensagem"),
+      div[role="main"] button:has-text("Mensaje"),
+      div[role="main"] button:has-text("Message"),
+      div[role="main"] button[aria-label*="mensagem" i],
+      div[role="main"] button[aria-label*="mensaje" i],
+      div[role="main"] button[aria-label*="message" i]
     `).first();
 
     const btnCount = await msgBtn.count().catch(() => 0);
@@ -107,7 +117,7 @@ async function openComposeFromProfilePage(page: Page): Promise<boolean> {
       console.log("[message] Clicking message button on profile with Playwright native click");
       await msgBtn.scrollIntoViewIfNeeded().catch(() => {});
       await msgBtn.click({ force: true });
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(1500);
 
       // Maximize any minimized conversation bubble via DOM
       await page.evaluate(() => {
@@ -126,9 +136,7 @@ async function openComposeFromProfilePage(page: Page): Promise<boolean> {
       });
     }
 
-    await page.waitForTimeout(1000);
-
-    // Locate and focus compose textbox
+    // Locate and focus compose textbox — wait up to 12s for it to appear
     const msgInput = page.locator(`
       div.msg-form__contenteditable[contenteditable="true"],
       div.msg-form__contenteditable,
@@ -141,15 +149,15 @@ async function openComposeFromProfilePage(page: Page): Promise<boolean> {
       [contenteditable="true"]
     `).first();
 
-    const count = await msgInput.count().catch(() => 0);
-    if (count > 0) {
+    try {
+      await msgInput.waitFor({ state: "visible", timeout: 12000 });
       await msgInput.focus().catch(() => {});
-      await msgInput.waitFor({ state: "visible", timeout: 8000 });
       console.log("[message] openComposeFromProfilePage: compose box successfully focused");
       return true;
+    } catch {
+      console.warn("[message] openComposeFromProfilePage: compose box not visible within 12s after button click");
+      return false;
     }
-    console.warn("[message] openComposeFromProfilePage: compose box not found after button click");
-    return false;
   } catch (err) {
     console.warn("[message] openComposeFromProfilePage error:", err instanceof Error ? err.message : String(err));
     return false;

@@ -118,12 +118,21 @@ function exactUrns(target: PendingConnectionTarget): string[] {
     .filter(Boolean);
 }
 
+export function normalizeVanitySlug(v: string | null | undefined): string | null {
+  if (!v) return null;
+  return v.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() || null;
+}
+
 export function matchAcceptedConnection(
   connection: AcceptedConnectionIdentity,
   targets: readonly PendingConnectionTarget[],
 ): ConnectionMatch {
-  const vanityMatches = connection.vanity
-    ? targets.filter((target) => canonicalLinkedInVanity(target.linkedinUrl) === connection.vanity)
+  const normConnVanity = normalizeVanitySlug(connection.vanity);
+  const vanityMatches = normConnVanity
+    ? targets.filter((target) => {
+        const tVanity = canonicalLinkedInVanity(target.linkedinUrl);
+        return tVanity === connection.vanity || normalizeVanitySlug(tVanity) === normConnVanity;
+      })
     : [];
 
   if (vanityMatches.length === 1) {

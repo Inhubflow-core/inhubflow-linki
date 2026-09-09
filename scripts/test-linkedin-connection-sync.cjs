@@ -25,6 +25,7 @@ const {
   canonicalLinkedInVanity,
   calculateConnectionScanFloor,
   matchAcceptedConnection,
+  normalizeVanitySlug,
   parseVoyagerConnections,
 } = require("../lib/linkedin/connection-reconciliation.ts");
 const {
@@ -65,6 +66,14 @@ function target(id, url, urn = null, memberUrn = null) {
 assert.equal(canonicalLinkedInVanity("https://www.linkedin.com/in/RobertoOrSe-Agencia/?trk=foo#x"), "robertoorse-agencia");
 assert.equal(canonicalLinkedInVanity("RobertoOrSe%2DAgencia"), "robertoorse-agencia");
 assert.equal(canonicalLinkedInVanity("https://linkedin.com/company/not-a-person"), null);
+
+assert.equal(normalizeVanitySlug("more-fernández"), "more-fernandez");
+assert.equal(normalizeVanitySlug("roberto-gómez"), "roberto-gomez");
+const accentMatch = matchAcceptedConnection(
+  { vanity: "more-fernandez", memberUrn: null, createdAt: 1787780000000 },
+  [{ id: "target-accent", linkedinUrl: "https://www.linkedin.com/in/more-fern%C3%A1ndez/", messagingUrn: null, linkedinMemberUrn: null, connectionRequestedAt: null }]
+);
+assert.equal(accentMatch.targetId, "target-accent");
 
 const parsed = parseVoyagerConnections({
   data: { "*elements": ["urn:connection:1"] },

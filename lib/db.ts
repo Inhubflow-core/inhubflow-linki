@@ -947,6 +947,7 @@ function runMigrations(db: Database.Database) {
 
   cleanExistingMessyTargetsMigration(db);
   encryptLegacySecretsMigration(db);
+  healPendingMessageTracksMigration(db);
 
   // Optional SDR module: additive tables only. Applying the schema does not
   // initialize a provider, start a worker, or alter existing core behavior.
@@ -957,6 +958,39 @@ function runMigrations(db: Database.Database) {
 
   // Calendar and scheduling module
   applyCalendarSchema(db);
+}
+
+// Unblocks any tracks in a 'message' step that were rescheduled due to transient profile render delays
+function healPendingMessageTracksMigration(db: Database.Database) {
+  try {
+    db.exec(`
+      UPDATE run_profile_tracks
+      SET next_action_at = datetime('now', '-1 minute'),
+          force_run_once = 1
+      WHERE id IN (
+        SELECT rpt.id
+        FROM run_profile_tracks rpt
+        JOIN workflow_steps ws ON ws.id = rpt.current_step_id
+        WHERE ws.step_type = 'message'
+          AND rpt.status = 'active'
+          AND rpt.next_action_at > datetime('now')
+      )
+    `);
+
+    db.exec(`
+      UPDATE targets
+      SET degree = 1,
+          connected_at = COALESCE(connected_at, datetime('now'))
+      WHERE id IN (
+        SELECT rp.target_id
+        FROM run_profiles rp
+        JOIN run_profile_tracks rpt ON rpt.run_profile_id = rp.id
+        JOIN workflow_steps ws ON ws.id = rpt.current_step_id
+        WHERE ws.step_type = 'message'
+          AND rpt.status = 'active'
+      ) AND (degree IS NULL OR degree != 1)
+    `);
+  } catch { /* ignore */ }
 }
 
 // Cleanup migration for previously inserted targets that had concatenated DOM card strings

@@ -744,6 +744,7 @@ async function executeStep(
         }
       }
 
+      let lastLiveCheckReason: string | null = null;
       if (freshTarget.degree !== 1) {
         // Perform a live verification check by visiting the profile. This is the
         // final read-only check immediately before send and writes no action.
@@ -751,6 +752,7 @@ async function executeStep(
         const page = await getSessionPage(accountId);
         try {
           const check = await visitProfile(page, messageLinkedinUrl);
+          lastLiveCheckReason = check.evidence.reason;
           if (check.isFirstDegree) {
             db.prepare("UPDATE targets SET degree = 1, connected_at = COALESCE(connected_at, ?), messaging_urn = COALESCE(messaging_urn, ?) WHERE id = ?")
               .run(nowIso(), check.messagingUrn, target.id);
@@ -772,6 +774,10 @@ async function executeStep(
         if (requested && hoursSince(requested) / 24 > CONNECTION_MAX_WAIT_DAYS) {
           log(db, runId, target.id, "warn", `${name} never accepted — skipping message step`);
           trSkip(db, tr, "Never accepted connection");
+          return;
+        }
+        if (lastLiveCheckReason === "profile_main_missing") {
+          log(db, runId, target.id, "warn", `${name} profile container did not load in time — retrying shortly`);
           return;
         }
         log(db, runId, target.id, "info", `${name} not yet connected after API and live checks — rescheduling message in ${CONNECTION_RECHECK_HOURS}h`);

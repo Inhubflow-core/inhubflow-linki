@@ -66,8 +66,25 @@ export async function visitProfile(page: Page, linkedinUrl: string): Promise<Pro
     throw new LinkedInAuthenticationError(`LinkedIn authentication wall while checking profile (${pageUrl})`);
   }
 
-  const main = page.locator("main").first();
-  const mainCount = await main.count().catch(() => 0);
+  // Robustly wait up to 15s for the profile main content or h1 heading to mount
+  const mainLocator = page.locator("main, div[role='main'], .scaffold-layout__main, .profile-detail").first();
+  const h1Locator = page.locator("h1").first();
+
+  await Promise.race([
+    mainLocator.waitFor({ state: "attached", timeout: 15_000 }).catch(() => {}),
+    h1Locator.waitFor({ state: "attached", timeout: 15_000 }).catch(() => {}),
+  ]);
+
+  let main = mainLocator;
+  let mainCount = await main.count().catch(() => 0);
+  if (mainCount === 0) {
+    const h1Count = await h1Locator.count().catch(() => 0);
+    if (h1Count > 0) {
+      main = page.locator("body").first();
+      mainCount = 1;
+    }
+  }
+
   if (mainCount === 0) {
     return {
       isFirstDegree: false,
@@ -86,11 +103,14 @@ export async function visitProfile(page: Page, linkedinUrl: string): Promise<Pro
   }
 
   // 1. Locate the top profile card container containing h1
-  const topCard = page.locator("main section, main > div, .pv-top-card")
+  const topCard = page.locator("main section, div[role='main'] section, main > div, .pv-top-card, header")
     .filter({ has: page.locator("h1") })
     .first();
   const topCardFound = (await topCard.count().catch(() => 0)) > 0;
-  const headerCard = topCardFound ? topCard : page.locator("main").first();
+  const headerCard = topCardFound ? topCard : main;
+
+  // Wait briefly for action buttons to be attached in the profile header
+  await headerCard.locator("button, a[href*='/messaging/']").first().waitFor({ state: "attached", timeout: 8_000 }).catch(() => {});
 
   const topCardText = (await headerCard.innerText().catch(() => "")).replace(/\s+/g, " ").trim();
   const badgeLocator = headerCard.locator(".dist-value, span[class*='distance-badge'], span[class*='dist-value']").first();
