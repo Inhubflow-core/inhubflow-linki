@@ -24,13 +24,15 @@ const LAUNCH_ARGS = [
  * options so the LinkedIn session is BORN under the exact fingerprint it will
  * later be used with — a mismatch (or a drift) triggers a forced re-auth.
  */
-function contextOptions(storageState?: object) {
+function contextOptions(storageState?: any) {
+  const customUserAgent =
+    (typeof storageState?.userAgent === "string" && storageState.userAgent) ||
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
   return {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     storageState: storageState as any,
     viewport: { width: 1920, height: 1080 },
-    userAgent:
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    userAgent: customUserAgent,
     locale: "en-US",
     timezoneId: "America/New_York",
     permissions: ["clipboard-read", "clipboard-write"] as ("clipboard-read" | "clipboard-write")[],

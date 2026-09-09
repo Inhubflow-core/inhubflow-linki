@@ -366,7 +366,7 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
 
     const cleanLiAt = authForm.li_at.trim();
     if (!cleanLiAt) {
-      toast.error("Por favor ingresa el valor de la cookie li_at");
+      toast.error("Por favor ingresa el Código de Conexión");
       return;
     }
 
@@ -694,8 +694,8 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
             <form onSubmit={submitAuth} className="flex flex-col gap-3">
               <div>
                 <div className="flex items-center justify-between pb-1">
-                  <label className="label text-xs text-base-content/70 font-semibold p-0">
-                    Valor de la Cookie <code className="text-primary font-bold">li_at</code> <span className="text-error">*</span>
+                  <label className="label text-xs text-base-content/70 font-semibold uppercase tracking-wide p-0">
+                    CÓDIGO DE CONEXIÓN <span className="text-error">*</span>
                   </label>
                   <button
                     type="button"
@@ -704,7 +704,7 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                         const text = await navigator.clipboard.readText();
                         if (text) {
                           setAuthForm({ ...authForm, li_at: text.trim() });
-                          toast.success("¡Cookie pegada desde el portapapeles!");
+                          toast.success("¡Código pegado desde el portapapeles!");
                         }
                       } catch {
                         toast.error("Por favor presiona Ctrl + V en el campo");

@@ -22,6 +22,8 @@ document.addEventListener("DOMContentLoaded", () => {
     return `${start}••••••••••••••••••••••${end}`;
   }
 
+  let displayToken = "";
+
   function checkSession() {
     stateLoading.classList.remove("hidden");
     stateSuccess.classList.add("hidden");
@@ -34,35 +36,66 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    chrome.cookies.get(
-      { url: "https://www.linkedin.com", name: "li_at" },
-      (cookie) => {
-        stateLoading.classList.add("hidden");
+    // Retrieve all relevant cookies for linkedin.com
+    chrome.cookies.getAll({ domain: "linkedin.com" }, (cookies) => {
+      stateLoading.classList.add("hidden");
 
-        if (cookie && cookie.value && cookie.value.length > 20) {
-          rawToken = cookie.value.trim();
-          fullTokenVal.value = rawToken;
-          isMasked = true;
-          tokenPreview.textContent = maskToken(rawToken);
-          btnToggleView.textContent = "👁️ Ver";
-          stateSuccess.classList.remove("hidden");
-        } else {
-          rawToken = "";
-          stateError.classList.remove("hidden");
-        }
+      if (!cookies || cookies.length === 0) {
+        rawToken = "";
+        displayToken = "";
+        stateError.classList.remove("hidden");
+        return;
       }
-    );
+
+      const liAt = cookies.find((c) => c.name === "li_at" && c.value && c.value.length > 20);
+      if (!liAt) {
+        rawToken = "";
+        displayToken = "";
+        stateError.classList.remove("hidden");
+        return;
+      }
+
+      displayToken = liAt.value.trim();
+
+      // Gather matching session companions required by LinkedIn anti-bot (JSESSIONID, bcookie, bscookie, etc.)
+      const allowedNames = new Set(["li_at", "JSESSIONID", "bcookie", "bscookie", "liap", "li_theme", "lang"]);
+      const sessionCookies = cookies
+        .filter((c) => allowedNames.has(c.name))
+        .map((c) => ({
+          name: c.name,
+          value: c.value,
+          domain: c.domain.startsWith(".") ? c.domain : `.${c.domain}`,
+          path: c.path || "/",
+          httpOnly: c.httpOnly ?? true,
+          secure: c.secure ?? true,
+          sameSite: c.sameSite === "no_restriction" ? "None" : (c.sameSite === "strict" ? "Strict" : "Lax"),
+        }));
+
+      const payload = {
+        v: 1,
+        li_at: displayToken,
+        userAgent: navigator.userAgent,
+        cookies: sessionCookies,
+      };
+
+      rawToken = "ihf_" + btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+      fullTokenVal.value = rawToken;
+      isMasked = true;
+      tokenPreview.textContent = maskToken(displayToken);
+      btnToggleView.textContent = "👁️ Ver";
+      stateSuccess.classList.remove("hidden");
+    });
   }
 
   // Toggle view full token vs masked
   btnToggleView.addEventListener("click", () => {
-    if (!rawToken) return;
+    if (!displayToken) return;
     isMasked = !isMasked;
     if (isMasked) {
-      tokenPreview.textContent = maskToken(rawToken);
+      tokenPreview.textContent = maskToken(displayToken);
       btnToggleView.textContent = "👁️ Ver";
     } else {
-      tokenPreview.textContent = rawToken;
+      tokenPreview.textContent = displayToken;
       btnToggleView.textContent = "🙈 Ocultar";
     }
   });

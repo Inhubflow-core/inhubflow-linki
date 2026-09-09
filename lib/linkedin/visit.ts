@@ -32,7 +32,31 @@ export function detectExplicitProfileDegree(text: string): "first" | "second_or_
  * treats the absence of a pending invite as proof of acceptance.
  */
 export async function visitProfile(page: Page, linkedinUrl: string): Promise<ProfileVisitResult> {
-  await page.goto(linkedinUrl, { waitUntil: "domcontentloaded", timeout: 35_000 });
+  try {
+    await page.goto(linkedinUrl, { waitUntil: "domcontentloaded", timeout: 35_000 });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("ERR_TOO_MANY_REDIRECTS") || msg.includes("ERR_HTTP_RESPONSE_CODE_FAILURE")) {
+      // Warm up session via /feed to establish cookies/CSRF tokens, then retry
+      try {
+        await page.goto("https://www.linkedin.com/feed/", { waitUntil: "domcontentloaded", timeout: 25_000 });
+        await page.waitForTimeout(2_000);
+        await page.goto(linkedinUrl, { waitUntil: "domcontentloaded", timeout: 35_000 });
+      } catch (retryErr) {
+        const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
+        if (
+          retryMsg.includes("ERR_TOO_MANY_REDIRECTS") ||
+          retryMsg.includes("ERR_HTTP_RESPONSE_CODE_FAILURE") ||
+          AUTH_WALL.test(page.url())
+        ) {
+          throw new Error("Sesión de LinkedIn caducada o bloqueada por verificación de seguridad. Por favor re-autentica tu cuenta en Configuración con un nuevo Código de Conexión.");
+        }
+        throw retryErr;
+      }
+    } else {
+      throw err;
+    }
+  }
   await page.waitForTimeout(3_000 + Math.random() * 2_000);
 
   const pageUrl = page.url();
