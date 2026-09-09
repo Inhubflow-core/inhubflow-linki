@@ -656,6 +656,8 @@ async function executeStep(
               log(db, runId, target.id, "info", `${name} verified as 1st-degree via live profile (${check.evidence.reason}) — advancing`);
               trAdvance(db, tr, steps);
               return;
+            } else {
+              log(db, runId, target.id, "info", `${name} live profile check: ${check.evidence.reason} (msg=${check.evidence.hasMessageAction}, conn=${check.evidence.hasConnectAction}, pend=${check.evidence.hasPendingAction})`);
             }
           } finally {
             await page.close();

@@ -428,6 +428,9 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
       };
     }
     console.warn(`[sync-accepted] Failed: ${error instanceof Error ? error.message : String(error)}`);
+    try {
+      db.prepare("UPDATE accounts SET accepted_sync_at = datetime('now') WHERE id = ?").run(accountId);
+    } catch { /* ignore */ }
     return {
       success: false,
       partial: true,
@@ -478,32 +481,48 @@ async function fetchConnectionsPage(page: Page, start: number, count: number): P
     return null;
   }
 
-  const payloadResult = await page.evaluate(
-    async ({ start, count, decoration, csrf }) => {
-      const url = `https://www.linkedin.com/voyager/api/relationships/dash/connections?decorationId=${decoration}&count=${count}&q=search&sortType=RECENTLY_ADDED&start=${start}`;
-      try {
-        const response = await fetch(url, {
-          headers: {
-            "csrf-token": csrf,
-            accept: "application/vnd.linkedin.normalized+json+2.1",
-            "x-restli-protocol-version": "2.0.0",
-            "x-li-lang": "en_US",
-          },
-          credentials: "include",
-        });
-        if (response.status === 401 || response.status === 403) {
-          return { status: response.status, payload: null };
-        }
-        if (!response.ok) return { status: response.status, payload: null };
-        const text = await response.text();
-        if (!text) return { status: response.status, payload: null };
-        return { status: response.status, payload: JSON.parse(text) };
-      } catch {
-        return { status: 0, payload: null };
+  let payloadResult: { status: number; payload: import("./connection-reconciliation").VoyagerConnectionsPayload | null } | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      payloadResult = (await page.evaluate(
+        async ({ start, count, decoration, csrf }) => {
+          const url = `https://www.linkedin.com/voyager/api/relationships/dash/connections?decorationId=${decoration}&count=${count}&q=search&sortType=RECENTLY_ADDED&start=${start}`;
+          try {
+            const response = await fetch(url, {
+              headers: {
+                "csrf-token": csrf,
+                accept: "application/vnd.linkedin.normalized+json+2.1",
+                "x-restli-protocol-version": "2.0.0",
+                "x-li-lang": "en_US",
+              },
+              credentials: "include",
+            });
+            if (response.status === 401 || response.status === 403) {
+              return { status: response.status, payload: null };
+            }
+            if (!response.ok) return { status: response.status, payload: null };
+            const text = await response.text();
+            if (!text) return { status: response.status, payload: null };
+            return { status: response.status, payload: JSON.parse(text) };
+          } catch {
+            return { status: 0, payload: null };
+          }
+        },
+        { start, count, decoration: DECORATION, csrf }
+      )) as { status: number; payload: import("./connection-reconciliation").VoyagerConnectionsPayload | null };
+      break;
+    } catch (evalErr) {
+      const msg = evalErr instanceof Error ? evalErr.message : String(evalErr);
+      if (attempt < 2 && (msg.includes("destroyed") || msg.includes("navigat") || msg.includes("Target closed"))) {
+        await page.waitForTimeout(2000);
+        continue;
       }
-    },
-    { start, count, decoration: DECORATION, csrf }
-  ) as { status: number; payload: import("./connection-reconciliation").VoyagerConnectionsPayload | null };
+      console.warn(`[sync-accepted] fetchConnectionsPage evaluate error: ${msg}`);
+      return null;
+    }
+  }
+
+  if (!payloadResult) return null;
 
   if (payloadResult.status === 401 || payloadResult.status === 403) {
     throw new LinkedInConnectionsApiAuthorizationError(payloadResult.status);

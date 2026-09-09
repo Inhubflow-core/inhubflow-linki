@@ -18,12 +18,13 @@ export interface ProfileVisitResult {
   evidence: ProfileConnectionEvidence;
 }
 
-const FIRST_DEGREE = /(?:^|[\s•(])1(?:st|er|º|ª|°)(?:\s*(?:degree|grado|grau))?(?=$|[\s•),.;])/i;
-const SECOND_OR_THIRD_DEGREE = /(?:^|[\s•(])(?:2nd|3rd|[23](?:er|º|ª|°))(?:\s*(?:degree|grado|grau))?(?=$|[\s•),.;])/i;
+const FIRST_DEGREE = /(?:^|[\s•·(])1(?:st|\.?[º°ª]|\.?er)(?:\s*(?:degree|grado|grau))?(?=$|[\s•·),.;])/i;
+const SECOND_OR_THIRD_DEGREE = /(?:^|[\s•·(])(?:2nd|3rd|[23](?:nd|rd|\.?[º°ª]|\.?er|\.?do|\.?ro))(?:\s*(?:degree|grado|grau))?(?=$|[\s•·),.;])/i;
 
 export function detectExplicitProfileDegree(text: string): "first" | "second_or_third" | null {
   if (SECOND_OR_THIRD_DEGREE.test(text)) return "second_or_third";
-  return FIRST_DEGREE.test(text) ? "first" : null;
+  if (FIRST_DEGREE.test(text)) return "first";
+  return null;
 }
 
 /**
@@ -83,44 +84,66 @@ export async function visitProfile(page: Page, linkedinUrl: string): Promise<Pro
     };
   }
 
-  // Restrict evidence to the profile main region so a global navigation Message
-  // link cannot be mistaken for the contact's message action.
+  // Restrict degree detection primarily to the top card / header area to avoid
+  // false positives from experience/education bodies (e.g. "3er año", "2º puesto").
   const scope = main;
+  const topCard = page.locator("main section:has(h1), main .pv-top-card, main section").first();
+  const topCardText = (await topCard.innerText().catch(() => "")).replace(/\s+/g, " ").trim();
+  const badgeLocator = topCard.locator(".dist-value, span[class*='distance-badge'], span[class*='dist-value']").first();
+  const badgeText = (await badgeLocator.innerText().catch(() => "")).trim();
+
   const visibleText = (await scope.innerText().catch(() => "")).replace(/\s+/g, " ").trim();
-  const explicitDegree = detectExplicitProfileDegree(visibleText);
+  const explicitDegree =
+    (badgeText ? detectExplicitProfileDegree(badgeText) : null) ??
+    (topCardText ? detectExplicitProfileDegree(topCardText) : null) ??
+    detectExplicitProfileDegree(visibleText.slice(0, 600));
+
   const explicitSecondOrThird = explicitDegree === "second_or_third";
   const explicitFirst = explicitDegree === "first";
 
   const messageAction = scope.locator(`
+    button:visible:has-text("Mensaje"),
     button:visible:has-text("Mensagem"),
     button:visible:has-text("Message"),
     button:visible:has-text("Enviar mensaje"),
-    button:visible[aria-label*="Mensagem"],
-    button:visible[aria-label*="Message"],
-    button:visible[aria-label*="Enviar mensaje"],
+    button:visible:has-text("Enviar mensagem"),
+    button:visible:has-text("Send message"),
+    button:visible[aria-label*="Mensaje" i],
+    button:visible[aria-label*="Mensagem" i],
+    button:visible[aria-label*="Message" i],
+    div[role="button"]:visible:has-text("Mensaje"),
+    div[role="button"]:visible:has-text("Mensagem"),
+    div[role="button"]:visible:has-text("Message"),
     a:visible[href*="/messaging/compose"],
-    a:visible[href*="/messaging/thread"]
+    a:visible[href*="/messaging/thread"],
+    a:visible[href*="/messaging/"]
   `).first();
   const connectAction = scope.locator(`
     button:visible:has-text("Conectar"),
     button:visible:has-text("Connect"),
-    button:visible[aria-label*="Conectar"],
-    button:visible[aria-label*="Connect"]
+    button:visible[aria-label*="Conectar" i],
+    button:visible[aria-label*="Connect" i],
+    div[role="button"]:visible:has-text("Conectar"),
+    div[role="button"]:visible:has-text("Connect")
   `).first();
   const pendingAction = scope.locator(`
     button:visible:has-text("Pendente"),
     button:visible:has-text("Pending"),
     button:visible:has-text("Pendiente"),
     button:visible:has-text("Aguardando"),
-    button:visible[aria-label*="Pendente"],
-    button:visible[aria-label*="Pending"],
-    button:visible[aria-label*="Pendiente"]
+    button:visible[aria-label*="Pendente" i],
+    button:visible[aria-label*="Pending" i],
+    button:visible[aria-label*="Pendiente" i],
+    button:visible[aria-label*="Aguardando" i],
+    div[role="button"]:visible:has-text("Pendiente"),
+    div[role="button"]:visible:has-text("Pending"),
+    div[role="button"]:visible:has-text("Pendente")
   `).first();
 
   const hasMessageAction = (await messageAction.count().catch(() => 0)) > 0;
   const hasConnectAction = (await connectAction.count().catch(() => 0)) > 0;
   const hasPendingAction = (await pendingAction.count().catch(() => 0)) > 0;
-  const messageLink = scope.locator('a:visible[href*="/messaging/compose"]').first();
+  const messageLink = scope.locator('a:visible[href*="/messaging/compose"], a:visible[href*="/messaging/thread"]').first();
   const messageHref = (await messageLink.count().catch(() => 0)) > 0
     ? await messageLink.getAttribute("href").catch(() => null)
     : null;
@@ -129,16 +152,17 @@ export async function visitProfile(page: Page, linkedinUrl: string): Promise<Pro
 
   let isFirstDegree = false;
   let reason = "no_positive_connection_evidence";
-  if (explicitSecondOrThird) {
-    reason = "explicit_second_or_third_degree";
-  } else if (hasConnectAction || hasPendingAction) {
+  if (hasConnectAction || hasPendingAction) {
     reason = hasPendingAction ? "explicit_pending_action" : "explicit_connect_action";
   } else if (explicitFirst) {
     isFirstDegree = true;
     reason = "explicit_first_degree_badge";
+  } else if ((hasMessageAction || messageHref) && !hasConnectAction && !hasPendingAction) {
+    isFirstDegree = true;
+    reason = "message_action_without_connect_or_pending";
+  } else if (explicitSecondOrThird) {
+    reason = "explicit_second_or_third_degree";
   } else if (hasMessageAction || messageHref) {
-    // Open Profiles can expose a Message action to non-connections. Keep the
-    // signal for diagnostics/URN discovery, but never promote degree from it.
     reason = messageHref ? "message_link_without_degree" : "message_action_without_degree";
   }
 
