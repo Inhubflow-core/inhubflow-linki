@@ -63,77 +63,101 @@ export async function sendMessage(
 
 async function openComposeFromProfilePage(page: Page): Promise<boolean> {
   try {
-    const msgBtn = page.locator(`
-      main section:has(h1) button:has-text("Mensaje"),
-      main section:has(h1) button:has-text("Message"),
-      main section:has(h1) button:has-text("Mensagem"),
-      main section:has(h1) a:has-text("Mensaje"),
-      main section:has(h1) a:has-text("Message"),
-      main section:has(h1) a:has-text("Mensagem"),
-      main section:has(h1) a[href*="/messaging/"],
-      main button:has-text("Mensaje"),
-      main button:has-text("Message"),
-      main button:has-text("Mensagem"),
-      main a:has-text("Mensaje"),
-      main a:has-text("Message"),
-      main a:has-text("Mensagem"),
-      main a[href*="/messaging/"],
-      button:visible:has-text("Mensaje"),
-      button:visible:has-text("Message"),
-      button:visible:has-text("Mensagem"),
-      button:visible:has-text("Enviar mensaje"),
-      button:visible:has-text("Send message"),
-      button:visible:has-text("Enviar mensagem"),
-      button:visible[aria-label*="Mensaje" i],
-      button:visible[aria-label*="Message" i],
-      button:visible[aria-label*="Mensagem" i],
-      div[role="button"]:visible:has-text("Mensaje"),
-      div[role="button"]:visible:has-text("Message"),
-      div[role="button"]:visible:has-text("Mensagem"),
-      a:visible:has-text("Mensaje"),
-      a:visible:has-text("Message"),
-      a:visible:has-text("Mensagem"),
-      a:visible[href*="/messaging/compose"],
-      a:visible[href*="/messaging/thread"],
-      a:visible[href*="/messaging/"]
-    `).first();
+    // 1. Locate the top profile card container containing h1
+    const topCard = page.locator("main section, main > div, .pv-top-card")
+      .filter({ has: page.locator("h1") })
+      .first();
+    const topCardFound = (await topCard.count().catch(() => 0)) > 0;
+    const headerCard = topCardFound ? topCard : page.locator("main").first();
 
-    if ((await msgBtn.count().catch(() => 0)) > 0 && (await msgBtn.isVisible().catch(() => false))) {
-      const href = await msgBtn.getAttribute("href").catch(() => null);
-      if (href && href.includes("/messaging/")) {
-        const targetUrl = href.startsWith("http") ? href : `https://www.linkedin.com${href}`;
-        console.log(`[message] Following direct messaging link: ${targetUrl}`);
-        await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
-      } else {
-        await msgBtn.scrollIntoViewIfNeeded().catch(() => {});
-        await msgBtn.click({ force: true });
+    // 2. Find message button or link strictly within headerCard
+    const candidateElements = headerCard.locator("button:visible, a:visible, div[role='button']:visible");
+    const elCount = await candidateElements.count().catch(() => 0);
+
+    let targetElement: import("playwright").Locator | null = null;
+    let targetHref: string | null = null;
+
+    for (let i = 0; i < elCount; i++) {
+      const el = candidateElements.nth(i);
+      const [rawText, rawAria, rawHref] = await Promise.all([
+        el.innerText().catch(() => ""),
+        el.getAttribute("aria-label").then((v) => v ?? "").catch(() => ""),
+        el.getAttribute("href").then((v) => v ?? "").catch(() => ""),
+      ]);
+      const text = rawText.replace(/\s+/g, " ").trim().toLowerCase();
+      const aria = rawAria.replace(/\s+/g, " ").trim().toLowerCase();
+
+      const isMessage =
+        /^(?:mensaje|message|mensagem|enviar mensaje|send message|enviar mensagem|envoyer|envoyer un message)$/i.test(text) ||
+        /^(?:mensaje|message|mensagem|enviar mensaje|send message|enviar mensagem|envoyer|envoyer un message)\b/i.test(aria) ||
+        rawHref.includes("/messaging/compose") ||
+        rawHref.includes("/messaging/thread");
+
+      if (isMessage) {
+        targetElement = el;
+        targetHref = rawHref;
+        break;
       }
-      await page.waitForTimeout(2000);
+    }
 
-      // Check if conversation bubble is minimized at bottom
-      const minimizedBubble = page.locator(".msg-overlay-bubble-header--is-minimized, .msg-overlay-conversation-bubble--is-minimized").first();
-      if ((await minimizedBubble.count().catch(() => 0)) > 0 && (await minimizedBubble.isVisible().catch(() => false))) {
+    if (!targetElement) {
+      console.warn("[message] openComposeFromProfilePage: message action not found in profile header");
+      return false;
+    }
+
+    if (targetHref && targetHref.includes("/messaging/")) {
+      const targetUrl = targetHref.startsWith("http") ? targetHref : `https://www.linkedin.com${targetHref}`;
+      console.log(`[message] Following direct messaging link from profile: ${targetUrl}`);
+      await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+    } else {
+      await targetElement.scrollIntoViewIfNeeded().catch(() => {});
+      await targetElement.click();
+    }
+    await page.waitForTimeout(2000);
+
+    // 3. Handle floating overlay bubble (might be minimized or behind another window)
+    const conversationBubble = page.locator(".msg-overlay-conversation-bubble").last();
+    if ((await conversationBubble.count().catch(() => 0)) > 0) {
+      const box = await conversationBubble.boundingBox().catch(() => null);
+      if (box && box.height < 100) {
+        const bubbleHeader = conversationBubble.locator("header, .msg-overlay-bubble-header, button[data-control-name*='overlay']").first();
+        await bubbleHeader.click().catch(() => {});
+        await page.waitForTimeout(1000);
+      }
+    } else {
+      const minimizedBubble = page.locator(`
+        .msg-overlay-bubble-header--is-minimized,
+        .msg-overlay-conversation-bubble--is-minimized,
+        aside.msg-overlay-container header.msg-overlay-bubble-header,
+        button[data-control-name="overlay.expand_conversation_window"],
+        button[aria-label*="maximizar" i],
+        button[aria-label*="expand" i]
+      `).first();
+      if (await minimizedBubble.isVisible().catch(() => false)) {
         await minimizedBubble.click().catch(() => {});
         await page.waitForTimeout(1000);
       }
-
-      const msgInput = page.locator(`
-        div.msg-form__contenteditable[contenteditable="true"],
-        div[role="textbox"][contenteditable="true"],
-        div.msg-form__contenteditable,
-        div[role="textbox"].msg-form__message-texteditor,
-        div.msg-form__message-texteditor,
-        div[role="textbox"],
-        div[aria-label*="mensaje" i],
-        div[aria-label*="message" i],
-        div[aria-label*="mensagem" i]
-      `).first();
-
-      await msgInput.waitFor({ state: "visible", timeout: 12000 });
-      return true;
     }
-    console.warn("[message] openComposeFromProfilePage: msgBtn not visible on profile");
-    return false;
+
+    // 4. Wait for the compose textbox
+    const msgInput = page.locator(`
+      div.msg-form__contenteditable[contenteditable="true"],
+      div.msg-form__contenteditable,
+      div[role="textbox"][contenteditable="true"],
+      div[role="textbox"].msg-form__message-texteditor,
+      div.msg-form__message-texteditor,
+      .msg-overlay-conversation-bubble div[role="textbox"],
+      .msg-overlay-conversation-bubble [contenteditable="true"],
+      p.msg-form__contenteditable,
+      div[role="textbox"],
+      div[aria-label*="mensaje" i],
+      div[aria-label*="message" i],
+      div[aria-label*="mensagem" i]
+    `).first();
+
+    await msgInput.waitFor({ state: "visible", timeout: 12000 });
+    await msgInput.focus().catch(() => {});
+    return true;
   } catch (err) {
     console.warn("[message] openComposeFromProfilePage error:", err instanceof Error ? err.message : String(err));
     return false;
@@ -145,18 +169,28 @@ async function openComposeByUrn(page: Page, messagingUrn: string): Promise<boole
     const recipientId = messagingUrn.split(":").pop();
     const composeUrl = `https://www.linkedin.com/messaging/compose/?profileUrn=${encodeURIComponent(messagingUrn)}&recipient=${recipientId}`;
     await page.goto(composeUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
-    await page.waitForTimeout(1500 + Math.random() * 1000);
+    await page.waitForTimeout(2000);
+
     const msgInput = page.locator(`
       div.msg-form__contenteditable[contenteditable="true"],
-      div[role="textbox"][contenteditable="true"],
       div.msg-form__contenteditable,
+      div[role="textbox"][contenteditable="true"],
       div[role="textbox"].msg-form__message-texteditor,
       div.msg-form__message-texteditor,
-      div[role="textbox"]
+      .msg-overlay-conversation-bubble div[role="textbox"],
+      .msg-overlay-conversation-bubble [contenteditable="true"],
+      p.msg-form__contenteditable,
+      div[role="textbox"],
+      div[aria-label*="mensaje" i],
+      div[aria-label*="message" i],
+      div[aria-label*="mensagem" i]
     `).first();
-    await msgInput.waitFor({ state: "visible", timeout: 8000 });
+
+    await msgInput.waitFor({ state: "visible", timeout: 12000 });
+    await msgInput.focus().catch(() => {});
     return true;
-  } catch {
+  } catch (err) {
+    console.warn("[message] openComposeByUrn failed:", err instanceof Error ? err.message : String(err));
     return false;
   }
 }
@@ -168,8 +202,20 @@ async function sendMessageViaTypeahead(page: Page, fullName: string, text: strin
   });
   await page.waitForTimeout(2500);
 
-  // Search for recipient by name
-  const searchField = page.locator(`
+  // If redirected to /messaging/ without an active composer, click "Compose" button
+  const composeTrigger = page.locator(`
+    a[href*="/messaging/thread/new/"]:visible,
+    button.msg-conversations-container__compose-btn:visible,
+    button[aria-label*="Redactar" i]:visible,
+    button[aria-label*="Compose" i]:visible,
+    button[aria-label*="Escrever" i]:visible,
+    button[aria-label*="New message" i]:visible,
+    button[aria-label*="Nuevo mensaje" i]:visible,
+    button:has(svg[data-test-icon*="compose"]):visible,
+    button:has(li-icon[type*="compose"]):visible
+  `).first();
+
+  const searchFieldLocator = `
     input.msg-connections-typeahead__search-field,
     input[name="search"],
     input[role="combobox"],
@@ -178,15 +224,28 @@ async function sendMessageViaTypeahead(page: Page, fullName: string, text: strin
     input[placeholder*="Digite um nome" i],
     input[placeholder*="nombre" i],
     input[placeholder*="name" i],
+    input[placeholder*="nome" i],
     input[aria-label*="Type a name" i],
     input[aria-label*="Escribe un nombre" i],
     input[aria-label*="Digite um nome" i],
     input[aria-label*="nombre" i],
+    input[aria-label*="name" i],
+    input[aria-label*="nome" i],
     input[aria-label*="destinatario" i],
     input[aria-label*="recipient" i],
     .msg-connections-typeahead input,
-    form.msg-connections-typeahead input
-  `).first();
+    form.msg-connections-typeahead input,
+    .msg-compose input
+  `;
+
+  let searchField = page.locator(searchFieldLocator).first();
+  const searchVisible = await searchField.isVisible().catch(() => false);
+
+  if (!searchVisible && (await composeTrigger.count().catch(() => 0)) > 0 && (await composeTrigger.isVisible().catch(() => false))) {
+    await composeTrigger.click().catch(() => {});
+    await page.waitForTimeout(1500);
+    searchField = page.locator(searchFieldLocator).first();
+  }
 
   await searchField.waitFor({ state: "visible", timeout: 15000 });
   await searchField.click();
@@ -212,7 +271,7 @@ async function sendMessageViaTypeahead(page: Page, fullName: string, text: strin
   await sendFromComposeBox(page, text, attachmentPath);
 }
 
-function resultNameMatches(resultText: string, fullName: string): boolean {
+export function resultNameMatches(resultText: string, fullName: string): boolean {
   const normalize = (s: string) =>
     s.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z\s]/g, " ").replace(/\s+/g, " ").trim();
   const target = normalize(fullName);
@@ -284,18 +343,50 @@ async function sendFromComposeBox(page: Page, text: string, attachmentPath?: str
 
   // 2. Paste or type text message into compose area if text provided
   if (text?.trim()) {
-    const msgInput = page.locator("div.msg-form__contenteditable, div[role='textbox'].msg-form__message-texteditor").first();
-    if (await msgInput.isVisible({ timeout: 8000 }).catch(() => false)) {
-      await msgInput.click();
-      try {
-        await page.evaluate((t) => navigator.clipboard.writeText(t), text);
-        await page.waitForTimeout(300);
-        await msgInput.press("Control+V");
-      } catch {
-        await msgInput.pressSequentially(text, { delay: 20 });
-      }
-      await page.waitForTimeout(500);
+    const msgInput = page.locator(`
+      div.msg-form__contenteditable[contenteditable="true"],
+      div.msg-form__contenteditable,
+      div[role="textbox"][contenteditable="true"],
+      div[role="textbox"].msg-form__message-texteditor,
+      div.msg-form__message-texteditor,
+      .msg-overlay-conversation-bubble div[role="textbox"],
+      .msg-overlay-conversation-bubble [contenteditable="true"],
+      p.msg-form__contenteditable,
+      div[role="textbox"],
+      div[aria-label*="mensaje" i],
+      div[aria-label*="message" i],
+      div[aria-label*="mensagem" i]
+    `).first();
+
+    await msgInput.waitFor({ state: "visible", timeout: 10000 });
+    await msgInput.click();
+    await page.waitForTimeout(300);
+
+    let pasted = false;
+    try {
+      await page.evaluate((t) => navigator.clipboard.writeText(t), text);
+      await page.waitForTimeout(200);
+      await msgInput.press("Control+V");
+      await page.waitForTimeout(300);
+      const content = await msgInput.innerText().catch(() => "");
+      pasted = content.trim().length > 0;
+    } catch {
+      pasted = false;
     }
+
+    if (!pasted) {
+      await msgInput.pressSequentially(text, { delay: 15 });
+    }
+
+    // Trigger input events so LinkedIn's Ember/React app enables the Send button
+    await page.evaluate(() => {
+      const el = document.querySelector('div.msg-form__contenteditable, div[role="textbox"].msg-form__message-texteditor, [contenteditable="true"]');
+      if (el) {
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    }).catch(() => {});
+    await page.waitForTimeout(600);
   }
 
   // 3. Send
@@ -305,10 +396,23 @@ async function sendFromComposeBox(page: Page, text: string, attachmentPath?: str
     button.msg-form__send-btn:visible,
     button:has-text("Send"):visible,
     button:has-text("Enviar"):visible,
+    button:has-text("Envoyer"):visible,
     button[aria-label*="Send" i]:visible,
-    button[aria-label*="Enviar" i]:visible
+    button[aria-label*="Enviar" i]:visible,
+    button[aria-label*="Envoyer" i]:visible
   `).first();
-  await sendBtn.waitFor({ timeout: 8000 });
+
+  await sendBtn.waitFor({ state: "visible", timeout: 10000 });
+
+  // If sendBtn is disabled, try pressing Space + Backspace in msgInput to trigger state change
+  if (await sendBtn.isDisabled().catch(() => false)) {
+    const msgInput = page.locator("div.msg-form__contenteditable, div[role='textbox'].msg-form__message-texteditor, [contenteditable='true']").first();
+    await msgInput.focus().catch(() => {});
+    await page.keyboard.press("Space");
+    await page.keyboard.press("Backspace");
+    await page.waitForTimeout(500);
+  }
+
   await sendBtn.click({ delay: 100 });
   await page.waitForTimeout(3000);
 }

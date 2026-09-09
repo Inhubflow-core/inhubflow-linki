@@ -1,5 +1,6 @@
 import type { Page } from "playwright";
 import { isLinkedInAuthenticationWall, LinkedInAuthenticationError } from "./auth-wall";
+import { canonicalLinkedInVanity } from "./connection-reconciliation";
 
 export interface ProfileConnectionEvidence {
   pageUrl: string;
@@ -140,8 +141,8 @@ export async function visitProfile(page: Page, linkedinUrl: string): Promise<Pro
 
     // Message action
     const isMessage =
-      /^(?:mensaje|message|mensagem|enviar mensaje|send message|enviar mensagem)$/i.test(text) ||
-      /^(?:mensaje|message|mensagem|enviar mensaje|send message|enviar mensagem)\b/i.test(aria) ||
+      /^(?:mensaje|message|mensagem|enviar mensaje|send message|enviar mensagem|envoyer|envoyer un message)$/i.test(text) ||
+      /^(?:mensaje|message|mensagem|enviar mensaje|send message|enviar mensagem|envoyer|envoyer un message)\b/i.test(aria) ||
       rawHref.includes("/messaging/compose") ||
       rawHref.includes("/messaging/thread");
 
@@ -200,6 +201,13 @@ export async function visitProfile(page: Page, linkedinUrl: string): Promise<Pro
     }
   }
 
+  if (isFirstDegree && !messagingUrn) {
+    const vanity = canonicalLinkedInVanity(linkedinUrl);
+    if (vanity) {
+      messagingUrn = await extractProfileUrnFromPage(page, vanity);
+    }
+  }
+
   return {
     isFirstDegree,
     messagingUrn: isFirstDegree ? messagingUrn : null,
@@ -214,6 +222,52 @@ export async function visitProfile(page: Page, linkedinUrl: string): Promise<Pro
       reason,
     },
   };
+}
+
+export async function extractProfileUrnFromPage(page: Page, vanity: string): Promise<string | null> {
+  return page.evaluate((targetVanity) => {
+    try {
+      const normalizedTarget = targetVanity.toLowerCase();
+      // 1. Scan <code id="bpr-guid-..."> elements which contain Voyager JSON
+      const codeElements = Array.from(document.querySelectorAll("code[id*='bpr-guid']"));
+      for (const code of codeElements) {
+        const text = code.textContent || "";
+        if (text.includes("urn:li:fsd_profile:") && text.toLowerCase().includes(normalizedTarget)) {
+          try {
+            const data = JSON.parse(text);
+            const list = Array.isArray(data.included) ? data.included : Array.isArray(data.data) ? data.data : [data];
+            for (const item of list) {
+              if (item && item.entityUrn && typeof item.entityUrn === "string" && item.entityUrn.startsWith("urn:li:fsd_profile:")) {
+                const pubId = (item.publicIdentifier || "").toLowerCase();
+                if (pubId === normalizedTarget) {
+                  return item.entityUrn;
+                }
+              }
+            }
+          } catch {
+            const regex = new RegExp(`"entityUrn":"(urn:li:fsd_profile:[^"]+)".*?"publicIdentifier":"${normalizedTarget}"`, "i");
+            const m = text.match(regex);
+            if (m) return m[1];
+            const revRegex = new RegExp(`"publicIdentifier":"${normalizedTarget}".*?"entityUrn":"(urn:li:fsd_profile:[^"]+)"`, "i");
+            const rm = text.match(revRegex);
+            if (rm) return rm[1];
+          }
+        }
+      }
+
+      // 2. Scan DOM attributes for fsd_profile URNs
+      const elementsWithUrn = document.querySelectorAll("[data-entity-urn*='fsd_profile'], [data-member-id*='fsd_profile']");
+      for (const el of Array.from(elementsWithUrn)) {
+        const urn = el.getAttribute("data-entity-urn") || el.getAttribute("data-member-id");
+        if (urn && urn.startsWith("urn:li:fsd_profile:")) {
+          return urn;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    return null;
+  }, vanity).catch(() => null);
 }
 
 async function inspectMoreMenuForConnectionState(

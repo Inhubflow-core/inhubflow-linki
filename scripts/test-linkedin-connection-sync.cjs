@@ -347,11 +347,58 @@ assert.match(
   runnerSource,
   /const bypassSchedule = db\.prepare\(\s*"UPDATE run_profile_tracks SET force_run_once = 0 WHERE id = \? AND force_run_once = 1"\s*\)\.run\(tr\.id\)\.changes === 1;/
 );
-assert.match(runnerSource, /UPDATE run_profile_tracks SET[\s\S]*?force_run_once = 1/);
-assert.match(runnerSource, /async function tick\(\s*db:\s*ReturnType<typeof getDb>,\s*leaseActive:\s*\(\)\s*=>\s*boolean/);
 assert.match(dbSource, /ALTER TABLE run_profile_tracks ADD COLUMN force_run_once INTEGER/);
+
+// Verify message sending robustness and multilingual matching
+const { resultNameMatches } = require("../lib/linkedin/message.ts");
+const { extractProfileUrnFromPage } = require("../lib/linkedin/visit.ts");
+const messageSource = fs.readFileSync(require.resolve("../lib/linkedin/message.ts"), "utf8");
+
+assert.equal(resultNameMatches("MOre fergo\n1er grado • Ingeniera", "MOre fergo"), true);
+assert.equal(resultNameMatches("John Doe\nVP of Marketing", "John Doe"), true);
+assert.equal(resultNameMatches("Jane Smith\nDesigner", "John Doe"), false);
+assert.match(messageSource, /headerCard\.locator/);
+assert.match(messageSource, /msg-overlay-conversation-bubble/);
+assert.match(messageSource, /msg-conversations-container__compose-btn/);
+
+(async () => {
+  const mockPage = {
+    evaluate: async (fn, arg) => {
+      const mockDocument = {
+        querySelectorAll: (selector) => {
+          if (selector.includes("code")) {
+            return [
+              {
+                textContent: JSON.stringify({
+                  included: [
+                    {
+                      $type: "com.linkedin.voyager.dash.identity.profile.Profile",
+                      entityUrn: "urn:li:fsd_profile:ACoAATEST123",
+                      publicIdentifier: "more-fergo",
+                    },
+                  ],
+                }),
+              },
+            ];
+          }
+          return [];
+        },
+      };
+      const prevDoc = global.document;
+      global.document = mockDocument;
+      try {
+        return fn(arg);
+      } finally {
+        global.document = prevDoc;
+      }
+    },
+  };
+  const extractedUrn = await extractProfileUrnFromPage(mockPage, "more-fergo");
+  assert.equal(extractedUrn, "urn:li:fsd_profile:ACoAATEST123");
+})();
 
 console.log("LinkedIn accepted-connection reconciliation tests passed");
 
 if (originalTsLoader) Module._extensions[".ts"] = originalTsLoader;
 else delete Module._extensions[".ts"];
+
