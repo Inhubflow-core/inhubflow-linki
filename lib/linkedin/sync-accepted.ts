@@ -391,22 +391,10 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
     if (error instanceof LinkedInConnectionsApiAuthorizationError) {
       const confirmedWall = page ? await probeLinkedInAuthenticationWall(page) : false;
       if (confirmedWall) {
-        sessionWall = true;
-        console.warn(`[sync-accepted] Authentication wall confirmed after API HTTP ${error.status}`);
-        return {
-          success: false,
-          partial: false,
-          stamped,
-          unmarked,
-          pages,
-          connectionsRead,
-          pendingTargets: pendingTargets.length,
-          matchedTargets,
-          declaredTotal,
-          reason: "auth_wall",
-        };
+        console.warn(`[sync-accepted] Authentication wall probe returned true after API HTTP ${error.status}, preserving account authentication for campaigns`);
+      } else {
+        console.warn(`[sync-accepted] Connections API returned HTTP ${error.status}, but the feed session remains authenticated`);
       }
-      console.warn(`[sync-accepted] Connections API returned HTTP ${error.status}, but the feed session remains authenticated`);
       try {
         db.prepare("UPDATE accounts SET accepted_sync_at = datetime('now') WHERE id = ?").run(accountId);
       } catch { /* ignore */ }

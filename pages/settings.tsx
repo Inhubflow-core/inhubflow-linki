@@ -257,6 +257,7 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
   const [authModal, setAuthModal] = useState<string | null>(null);
   const [authForm, setAuthForm] = useState({ li_at: "", document_cookie: "" });
   const [authLoading, setAuthLoading] = useState(false);
+  const [showSuccessAdviceModal, setShowSuccessAdviceModal] = useState(false);
 
   useEffect(() => {
     fetch("/api/instance/settings")
@@ -391,6 +392,7 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
     if (!res.ok) { toast.error((await res.json()).error ?? "Error al autenticar cuenta"); return; }
     toast.success("¡Cuenta de LinkedIn conectada con éxito!");
     closeAuthModal();
+    setShowSuccessAdviceModal(true);
     refresh();
   }
 
@@ -736,6 +738,42 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
             </form>
           </div>
           <div className="modal-backdrop" onClick={closeAuthModal} />
+        </div>
+      )}
+
+      {/* Modal elegante de recomendación para estabilidad */}
+      {showSuccessAdviceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative text-center">
+            <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">
+              🚀
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              ¡Cuenta Conectada con Éxito!
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
+              Tu espacio de trabajo ya está sincronizado con LinkedIn y listo para ejecutar campañas.
+            </p>
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-6 text-left">
+              <div className="flex items-start gap-3">
+                <span className="text-xl flex-shrink-0">💡</span>
+                <div>
+                  <h4 className="text-xs font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider mb-1">
+                    Consejo de Rendimiento y Estabilidad
+                  </h4>
+                  <p className="text-xs text-amber-900/80 dark:text-amber-200/90 leading-relaxed">
+                    Para que tus automatizaciones se ejecuten con total fluidez y evitar desconexiones por sesiones simultáneas en LinkedIn, <strong>te sugerimos cerrar la pestaña de LinkedIn en este navegador</strong> mientras tus campañas estén activas.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowSuccessAdviceModal(false)}
+              className="w-full py-3 px-6 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-xl shadow-lg shadow-brand-500/25 transition-all duration-200 cursor-pointer"
+            >
+              Entendido, ¡a prospectar!
+            </button>
+          </div>
         </div>
       )}
     </div>
