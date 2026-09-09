@@ -129,8 +129,14 @@ export async function processScheduledImports(db: DB): Promise<void> {
     .get() as ImportRow | undefined;
   if (!due) return;
 
+  const claimed = db.prepare(
+    `UPDATE list_imports
+     SET status = 'running', started_at = datetime('now')
+     WHERE id = ? AND status = 'scheduled' AND cancel_requested = 0`
+  ).run(due.id);
+  if (claimed.changes !== 1) return;
+
   importRunning = true;
-  db.prepare("UPDATE list_imports SET status = 'running', started_at = datetime('now') WHERE id = ?").run(due.id);
   runBatch(due.id)
     .catch((e) => console.error("[import] batch crashed:", e))
     .finally(() => { importRunning = false; });

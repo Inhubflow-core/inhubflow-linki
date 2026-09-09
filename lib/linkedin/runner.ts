@@ -25,6 +25,11 @@ import { enrichProfile } from "@/lib/linkedin/enrich";
 import { matchPerson } from "@/lib/apollo";
 import { premium } from "@/lib/premium";
 import { decryptSecret } from "@/lib/crypto";
+import {
+  releaseRuntimeLease,
+  renewRuntimeLease,
+  tryAcquireRuntimeLease,
+} from "@/lib/runtime-lease";
 
 // Minimum gap between Sales Nav profile enrichment calls per account (ms)
 const SALES_NAV_ENRICH_MIN_GAP_MS = 5 * 60 * 1000;
@@ -81,9 +86,9 @@ const PROFILE_DELAY_MIN = 8;
 const PROFILE_DELAY_MAX = 20;
 // Poll interval (ms)
 const POLL_INTERVAL_MS = 30_000;
-// One-shot schedule overrides requested through "Run now". They are consumed
-// by the selected track and never mutate the account's persisted work hours.
-const forcedTrackRuns = new Set<string>();
+const RUNNER_LEASE_KEY = "linkedin:global-runner";
+const RUNNER_LEASE_TTL_MS = 5 * 60 * 1000;
+const RUNNER_LEASE_HEARTBEAT_MS = 30_000;
 
 interface ScheduleConfig {
   active_hours_start: number;
@@ -201,6 +206,7 @@ interface TrackRun {
   last_email_body: string | null;
   last_linkedin_message: string | null;
   pending_reply_context: string | null;
+  force_run_once: number;
   // joined from run_profiles / runs
   run_id: string;
   target_id: string;
@@ -550,9 +556,13 @@ async function executeStep(
   accountLimits: AccountLimits,
   emailAccountId?: string | null,
   emailAccountLimits?: EmailAccountLimits | null,
-  campaignPrompt?: string | null
+  campaignPrompt?: string | null,
+  leaseActive: () => boolean = () => true
 ): Promise<void> {
-  const bypassSchedule = forcedTrackRuns.delete(tr.id);
+  if (!leaseActive()) return;
+  const bypassSchedule = db.prepare(
+    "UPDATE run_profile_tracks SET force_run_once = 0 WHERE id = ? AND force_run_once = 1"
+  ).run(tr.id).changes === 1;
   const stepIndex = tr.current_step;
   if (stepIndex >= steps.length) {
     db.prepare("UPDATE run_profile_tracks SET state = 'completed', last_step_at = datetime('now') WHERE id = ?").run(tr.id);
@@ -1164,8 +1174,33 @@ async function executeStep(
 const g = global as typeof global & { __inhubflowGlobalRunnerStarted?: boolean; __linkiGlobalRunnerStarted?: boolean };
 let tickQueueTail: Promise<void> = Promise.resolve();
 
+async function tickWithLease(db: ReturnType<typeof getDb>): Promise<void> {
+  const ownerId = tryAcquireRuntimeLease(db, RUNNER_LEASE_KEY, RUNNER_LEASE_TTL_MS);
+  if (!ownerId) return;
+
+  let leaseLost = false;
+  const heartbeat = setInterval(() => {
+    try {
+      if (!renewRuntimeLease(db, RUNNER_LEASE_KEY, ownerId, RUNNER_LEASE_TTL_MS)) {
+        leaseLost = true;
+        console.warn("[runner] Global lease ownership was lost during a tick");
+      }
+    } catch (error) {
+      console.warn("[runner] Could not renew global lease:", error instanceof Error ? error.message : error);
+    }
+  }, RUNNER_LEASE_HEARTBEAT_MS);
+  heartbeat.unref();
+
+  try {
+    await tick(db, () => !leaseLost);
+  } finally {
+    clearInterval(heartbeat);
+    try { releaseRuntimeLease(db, RUNNER_LEASE_KEY, ownerId); } catch { /* lease expires safely */ }
+  }
+}
+
 export function enqueueTick(db: ReturnType<typeof getDb>): Promise<void> {
-  const next = tickQueueTail.then(() => tick(db), () => tick(db));
+  const next = tickQueueTail.then(() => tickWithLease(db), () => tickWithLease(db));
   tickQueueTail = next.catch(() => { /* caller records the failure */ });
   return next;
 }
@@ -1213,9 +1248,14 @@ async function syncCampaignInboxAccounts(db: ReturnType<typeof getDb>, accountId
   }
 }
 
-async function tick(db: ReturnType<typeof getDb>): Promise<void> {
+async function tick(
+  db: ReturnType<typeof getDb>,
+  leaseActive: () => boolean = () => true
+): Promise<void> {
+  if (!leaseActive()) return;
   const campaignAccountIds = campaignInboxSchedulerEnabled() ? listCampaignInboxAccountIds(db) : [];
   await syncCampaignInboxAccounts(db, campaignAccountIds);
+  if (!leaseActive()) return;
 
   const activeRuns = db.prepare(`
     SELECT r.id as run_id, r.workflow_id, r.account_id, r.email_account_id,
@@ -1436,7 +1476,7 @@ async function tick(db: ReturnType<typeof getDb>): Promise<void> {
   const dueTrackRuns = db.prepare(
     `SELECT rt.id, rt.run_profile_id, rt.track, rt.state, rt.current_step, rt.next_step_at,
             rt.error_message, rt.last_email_subject, rt.last_email_body, rt.last_linkedin_message,
-            rt.pending_reply_context,
+            rt.pending_reply_context, rt.force_run_once,
             rp.run_id, rp.target_id, rp.email_account_id,
             r.account_id, r.workflow_id,
             t.connection_requested_at
@@ -1446,8 +1486,8 @@ async function tick(db: ReturnType<typeof getDb>): Promise<void> {
      JOIN targets t ON t.id = rp.target_id
      WHERE rp.run_id IN (${placeholders})
        AND rt.state = 'in_progress'
-       AND (rt.next_step_at IS NULL OR datetime(rt.next_step_at) <= datetime('now'))
-     ORDER BY rt.next_step_at ASC`
+       AND (rt.force_run_once = 1 OR rt.next_step_at IS NULL OR datetime(rt.next_step_at) <= datetime('now'))
+     ORDER BY rt.force_run_once DESC, rt.next_step_at ASC`
   ).all(...runIds) as TrackRun[];
 
   // Enroll new pending track-runs — track remaining slots per account across runs.
@@ -1621,15 +1661,18 @@ async function tick(db: ReturnType<typeof getDb>): Promise<void> {
 
   // Reschedule overflow to tomorrow (use LinkedIn account schedule for reschedule)
   for (const tr of toReschedule) {
-    forcedTrackRuns.delete(tr.id);
     const limits = accountLimitsMap.get(tr.account_id)!;
     const slot = rescheduleToTomorrow(limits);
-    db.prepare("UPDATE run_profile_tracks SET next_step_at = ? WHERE id = ?").run(slot, tr.id);
+    db.prepare("UPDATE run_profile_tracks SET next_step_at = ?, force_run_once = 0 WHERE id = ?").run(slot, tr.id);
     log(db, tr.run_id, tr.target_id, "info", `Daily limit reached — rescheduled to ${slot}`);
   }
 
   // Execute what's left
   for (const tr of toExecute) {
+    if (!leaseActive()) {
+      console.warn("[runner] Global lease lost; stopping step execution loop");
+      return;
+    }
     const steps = getSteps(tr.workflow_id, tr.track);
     const limits = accountLimitsMap.get(tr.account_id)!;
     const emailAccountId = tr.email_account_id ?? null;
@@ -1637,12 +1680,12 @@ async function tick(db: ReturnType<typeof getDb>): Promise<void> {
 
     const runStatus = db.prepare("SELECT status FROM runs WHERE id = ?").get(tr.run_id) as { status: string } | undefined;
     if (!runStatus || runStatus.status !== "running") {
-      forcedTrackRuns.delete(tr.id);
+      db.prepare("UPDATE run_profile_tracks SET force_run_once = 0 WHERE id = ?").run(tr.id);
       continue;
     }
 
     const target = db.prepare("SELECT * FROM targets WHERE id = ?").get(tr.target_id) as Target;
-    await executeStep(db, tr.run_id, tr, target, steps, tr.account_id, limits, emailAccountId, emailLimits, getWorkflowPrompt(tr.workflow_id));
+    await executeStep(db, tr.run_id, tr, target, steps, tr.account_id, limits, emailAccountId, emailLimits, getWorkflowPrompt(tr.workflow_id), leaseActive);
     await randomDelay(PROFILE_DELAY_MIN, PROFILE_DELAY_MAX);
   }
 }
@@ -1726,6 +1769,7 @@ export async function forceRunStep(
       UPDATE run_profile_tracks SET
         state = 'in_progress',
         next_step_at = datetime('now'),
+        force_run_once = 1,
         error_message = NULL
       WHERE run_profile_id IN (
         SELECT id FROM run_profiles WHERE run_id = ? AND target_id = ?
@@ -1736,6 +1780,7 @@ export async function forceRunStep(
       UPDATE run_profile_tracks SET
         state = 'in_progress',
         next_step_at = datetime('now'),
+        force_run_once = 1,
         error_message = NULL
       WHERE run_profile_id IN (
         SELECT id FROM run_profiles WHERE run_id = ?
@@ -1743,7 +1788,6 @@ export async function forceRunStep(
     `).run(runId);
   }
 
-  for (const track of trackRows) forcedTrackRuns.add(track.id);
   db.prepare("UPDATE runs SET status = 'running', started_at = COALESCE(started_at, datetime('now')) WHERE id = ?").run(runId);
 
   // Trigger a serialized tick immediately; repeated Run now requests wait their

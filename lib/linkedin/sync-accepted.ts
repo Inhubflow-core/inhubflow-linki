@@ -1,7 +1,12 @@
 import type { Page } from "playwright";
 import { getDb } from "@/lib/db";
 import { getSessionPage, saveSessionState, markNeedsReauth } from "@/lib/linkedin/session";
-import { isLinkedInAuthenticationWall, LinkedInAuthenticationError } from "./auth-wall";
+import {
+  isLinkedInAuthenticationWall,
+  LinkedInAuthenticationError,
+  probeLinkedInAuthenticationWall,
+} from "./auth-wall";
+import { releaseRuntimeLease, renewRuntimeLease, tryAcquireRuntimeLease } from "../runtime-lease";
 import { linkedinCsrfFromCookies } from "./cookie-state";
 import {
   calculateConnectionScanFloor,
@@ -24,6 +29,8 @@ import { autoAdvanceTargetByTrigger } from "@/lib/pipeline/pipeline-service";
  */
 
 const ACCEPTED_SYNC_INTERVAL_MS = 8 * 60 * 60 * 1000;
+const ACCEPTED_SYNC_LEASE_MS = 5 * 60 * 1000;
+const ACCEPTED_SYNC_HEARTBEAT_MS = 30_000;
 const PAGE_SIZE = 100;
 const MAX_PAGES = 60;
 const OVERLAP_MARGIN_MS = 24 * 60 * 60 * 1000;
@@ -50,12 +57,26 @@ export interface AcceptedSyncResult {
   pendingTargets: number;
   matchedTargets: number;
   declaredTotal: number | null;
-  reason?: "account_missing" | "auth_wall" | "api_error" | "page_limit" | "invalid_response";
+  reason?: "account_missing" | "auth_wall" | "api_error" | "page_limit" | "invalid_response" | "in_progress";
 }
 
 interface ApiPageResult {
   connections: ReturnType<typeof parseVoyagerConnections>["connections"];
   referencedElements: number;
+}
+
+class LinkedInConnectionsApiAuthorizationError extends Error {
+  constructor(readonly status: number) {
+    super(`LinkedIn connections API returned HTTP ${status}`);
+    this.name = "LinkedInConnectionsApiAuthorizationError";
+  }
+}
+
+class AcceptedSyncLeaseLostError extends Error {
+  constructor() {
+    super("Accepted-connections sync lease was lost");
+    this.name = "AcceptedSyncLeaseLostError";
+  }
 }
 
 interface AccountTarget extends PendingConnectionTarget {
@@ -135,6 +156,34 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
     requestMarginMs: REQUEST_MARGIN_MS,
   });
 
+  if (!account.is_authenticated) {
+    return { success: false, partial: false, stamped: 0, unmarked: 0, pages: 0, connectionsRead: 0, pendingTargets: pendingTargets.length, matchedTargets: 0, declaredTotal: null, reason: "auth_wall" };
+  }
+
+  const leaseKey = `linkedin:accepted-sync:${accountId}`;
+  let leaseOwner: string | null = null;
+  try {
+    leaseOwner = tryAcquireRuntimeLease(db, leaseKey, ACCEPTED_SYNC_LEASE_MS);
+  } catch (error) {
+    console.warn(`[sync-accepted] Could not acquire account lease: ${error instanceof Error ? error.message : String(error)}`);
+    return { success: false, partial: true, stamped: 0, unmarked: 0, pages: 0, connectionsRead: 0, pendingTargets: pendingTargets.length, matchedTargets: 0, declaredTotal: null, reason: "invalid_response" };
+  }
+  if (!leaseOwner) {
+    return { success: false, partial: true, stamped: 0, unmarked: 0, pages: 0, connectionsRead: 0, pendingTargets: pendingTargets.length, matchedTargets: 0, declaredTotal: null, reason: "in_progress" };
+  }
+
+  let leaseLost = false;
+  const leaseHeartbeat = setInterval(() => {
+    try {
+      if (!renewRuntimeLease(db, leaseKey, leaseOwner!, ACCEPTED_SYNC_LEASE_MS)) {
+        leaseLost = true;
+      }
+    } catch (error) {
+      console.warn(`[sync-accepted] Could not renew account lease: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, ACCEPTED_SYNC_HEARTBEAT_MS);
+  leaseHeartbeat.unref();
+
   let page: Page | null = null;
   let sessionWall = false;
   let completed = false;
@@ -151,10 +200,7 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
   const seenVanities = new Set<string>();
 
   try {
-    if (!account.is_authenticated) {
-      return { success: false, partial: false, stamped: 0, unmarked: 0, pages: 0, connectionsRead: 0, pendingTargets: pendingTargets.length, matchedTargets: 0, declaredTotal: null, reason: "auth_wall" };
-    }
-
+    if (leaseLost) throw new AcceptedSyncLeaseLostError();
     page = await getSessionPage(accountId);
     await page.goto("https://www.linkedin.com/mynetwork/invite-connect/connections/", {
       waitUntil: "domcontentloaded",
@@ -193,6 +239,7 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
     );
 
     for (let pageIndex = 0; pageIndex < MAX_PAGES; pageIndex++) {
+      if (leaseLost) throw new AcceptedSyncLeaseLostError();
       const result = await fetchConnectionsPage(page, pageIndex * PAGE_SIZE, PAGE_SIZE);
       pages++;
       if (!result) {
@@ -294,6 +341,7 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
       })();
     }
 
+    if (leaseLost) throw new AcceptedSyncLeaseLostError();
     const scanComplete = reachedFloor && !apiError;
     if (scanComplete) {
       // Advance all freshness metadata together. A partial scan must never move
@@ -325,6 +373,53 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
     console.log(`[sync-accepted] ${completed ? "Complete" : "Incomplete"}: ${stamped} accepted, ${matchedTargets} matches, ${connectionsRead} connections, ${pages} pages (floor=${scanFloor ?? "full"}, declared=${declaredTotal ?? "unknown"})`);
     return result;
   } catch (error) {
+    if (error instanceof AcceptedSyncLeaseLostError) {
+      console.warn("[sync-accepted] Account lease was lost; stopping this pass before further writes");
+      return {
+        success: false,
+        partial: true,
+        stamped,
+        unmarked,
+        pages,
+        connectionsRead,
+        pendingTargets: pendingTargets.length,
+        matchedTargets,
+        declaredTotal,
+        reason: "in_progress",
+      };
+    }
+    if (error instanceof LinkedInConnectionsApiAuthorizationError) {
+      const confirmedWall = page ? await probeLinkedInAuthenticationWall(page) : false;
+      if (confirmedWall) {
+        sessionWall = true;
+        console.warn(`[sync-accepted] Authentication wall confirmed after API HTTP ${error.status}`);
+        return {
+          success: false,
+          partial: false,
+          stamped,
+          unmarked,
+          pages,
+          connectionsRead,
+          pendingTargets: pendingTargets.length,
+          matchedTargets,
+          declaredTotal,
+          reason: "auth_wall",
+        };
+      }
+      console.warn(`[sync-accepted] Connections API returned HTTP ${error.status}, but the feed session remains authenticated`);
+      return {
+        success: false,
+        partial: true,
+        stamped,
+        unmarked,
+        pages,
+        connectionsRead,
+        pendingTargets: pendingTargets.length,
+        matchedTargets,
+        declaredTotal,
+        reason: "api_error",
+      };
+    }
     if (error instanceof LinkedInAuthenticationError) {
       sessionWall = true;
       console.warn(`[sync-accepted] Authentication wall: ${error.message}`);
@@ -355,6 +450,7 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
       reason: "invalid_response",
     };
   } finally {
+    clearInterval(leaseHeartbeat);
     if (page) {
       let url = "";
       try { url = page.url(); } catch { /* page gone */ }
@@ -364,6 +460,9 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
       } else if (completed) {
         try { await saveSessionState(accountId); } catch { /* ignore */ }
       }
+    }
+    if (leaseOwner) {
+      try { releaseRuntimeLease(db, leaseKey, leaseOwner); } catch { /* lease expires safely */ }
     }
   }
 }
@@ -420,7 +519,7 @@ async function fetchConnectionsPage(page: Page, start: number, count: number): P
   ) as { status: number; payload: import("./connection-reconciliation").VoyagerConnectionsPayload | null };
 
   if (payloadResult.status === 401 || payloadResult.status === 403) {
-    throw new LinkedInAuthenticationError(`LinkedIn connections API returned HTTP ${payloadResult.status}`);
+    throw new LinkedInConnectionsApiAuthorizationError(payloadResult.status);
   }
   if (!payloadResult.payload || typeof payloadResult.payload !== "object") return null;
   const payload = payloadResult.payload as import("./connection-reconciliation").VoyagerConnectionsPayload;

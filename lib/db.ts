@@ -697,6 +697,17 @@ function runMigrations(db: Database.Database) {
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
     "CREATE INDEX IF NOT EXISTS idx_linkedin_connection_attempts_account_time ON linkedin_connection_attempts(account_id, attempted_at)",
+    // Durable one-shot flag used by "Run now" across Next.js workers without
+    // mutating the account's configured working hours.
+    "ALTER TABLE run_profile_tracks ADD COLUMN force_run_once INTEGER NOT NULL DEFAULT 0",
+    // Cross-process leases prevent Next.js workers or API-triggered ticks from
+    // running the same browser/session work concurrently.
+    `CREATE TABLE IF NOT EXISTS runtime_leases (
+      lease_key TEXT PRIMARY KEY,
+      owner_id TEXT NOT NULL,
+      expires_at_ms INTEGER NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }

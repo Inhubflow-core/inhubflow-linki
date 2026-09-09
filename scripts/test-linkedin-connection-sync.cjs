@@ -37,6 +37,7 @@ const {
 } = require("../lib/linkedin/cookie-state.ts");
 const {
   isLinkedInAuthenticationWall,
+  probeLinkedInAuthenticationWall,
   LinkedInAuthenticationError,
 } = require("../lib/linkedin/auth-wall.ts");
 const {
@@ -45,6 +46,11 @@ const {
   createLinkedInConnectionAttempt,
   updateLinkedInConnectionAttempt,
 } = require("../lib/linkedin/connection-attempts.ts");
+const {
+  releaseRuntimeLease,
+  renewRuntimeLease,
+  tryAcquireRuntimeLease,
+} = require("../lib/runtime-lease.ts");
 
 function target(id, url, urn = null, memberUrn = null) {
   return {
@@ -165,6 +171,12 @@ attemptDb.exec(`
     attempted_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
+  CREATE TABLE runtime_leases (
+    lease_key TEXT PRIMARY KEY,
+    owner_id TEXT NOT NULL,
+    expires_at_ms INTEGER NOT NULL,
+    updated_at TEXT NOT NULL
+  );
   CREATE TABLE run_profiles (id TEXT PRIMARY KEY, run_id TEXT, target_id TEXT);
   CREATE TABLE runs (id TEXT PRIMARY KEY, account_id TEXT);
   CREATE TABLE logs (
@@ -223,13 +235,75 @@ assert.equal(
   attemptDb.prepare("SELECT outcome FROM linkedin_connection_attempts WHERE id = ?").get(attemptA).outcome,
   "confirmed"
 );
+
+const leaseOwner = tryAcquireRuntimeLease(attemptDb, "runner", 100, 1_000);
+assert.ok(leaseOwner);
+assert.equal(tryAcquireRuntimeLease(attemptDb, "runner", 100, 1_050), null);
+assert.equal(renewRuntimeLease(attemptDb, "runner", leaseOwner, 100, 1_075), true);
+assert.equal(tryAcquireRuntimeLease(attemptDb, "runner", 100, 1_150), null);
+releaseRuntimeLease(attemptDb, "runner", "not-the-owner");
+assert.equal(tryAcquireRuntimeLease(attemptDb, "runner", 100, 1_160), null);
+releaseRuntimeLease(attemptDb, "runner", leaseOwner);
+assert.ok(tryAcquireRuntimeLease(attemptDb, "runner", 100, 1_160));
+const expiringOwner = tryAcquireRuntimeLease(attemptDb, "expiring", 100, 2_000);
+assert.ok(expiringOwner);
+assert.ok(tryAcquireRuntimeLease(attemptDb, "expiring", 100, 2_101));
+assert.equal(renewRuntimeLease(attemptDb, "expiring", expiringOwner, 100, 2_105), false);
+
+// Test force_run_once idempotency on duplicate "Run now" clicks
+attemptDb.exec(`
+  CREATE TABLE run_profile_tracks (
+    id TEXT PRIMARY KEY,
+    run_profile_id TEXT,
+    state TEXT,
+    next_step_at TEXT,
+    force_run_once INTEGER NOT NULL DEFAULT 0
+  );
+  INSERT INTO run_profile_tracks VALUES ('track-1', 'profile-a', 'in_progress', '2026-09-10T00:00:00Z', 0);
+`);
+// First "Run now" click sets force_run_once = 1
+attemptDb.prepare("UPDATE run_profile_tracks SET force_run_once = 1 WHERE id = 'track-1'").run();
+// Second "Run now" click arrives before tick
+attemptDb.prepare("UPDATE run_profile_tracks SET force_run_once = 1 WHERE id = 'track-1'").run();
+// Execution consumes it once atomically:
+const firstExecution = attemptDb.prepare(
+  "UPDATE run_profile_tracks SET force_run_once = 0 WHERE id = 'track-1' AND force_run_once = 1"
+).run().changes === 1;
+assert.equal(firstExecution, true);
+const secondExecution = attemptDb.prepare(
+  "UPDATE run_profile_tracks SET force_run_once = 0 WHERE id = 'track-1' AND force_run_once = 1"
+).run().changes === 1;
+assert.equal(secondExecution, false);
+
 attemptDb.close();
+
+// Test probeLinkedInAuthenticationWall
+(async () => {
+  const fakeValidFeedPage = {
+    url: () => "https://www.linkedin.com/feed/",
+    goto: async () => {},
+    waitForTimeout: async () => {},
+    locator: () => ({ count: async () => 0 }),
+  };
+  const isWallFalse = await probeLinkedInAuthenticationWall(fakeValidFeedPage);
+  assert.equal(isWallFalse, false);
+
+  const fakeAuthWallPage = {
+    url: () => "https://www.linkedin.com/uas/login",
+    goto: async () => {},
+    waitForTimeout: async () => {},
+    locator: () => ({ count: async () => 1 }),
+  };
+  const isWallTrue = await probeLinkedInAuthenticationWall(fakeAuthWallPage);
+  assert.equal(isWallTrue, true);
+})();
 
 // Guard the irreversible connection-send boundary. The durable marker must be
 // created by the callback immediately before the click, never before profile or
 // modal navigation, and all post-submit auth-wall errors must retain that fact.
 const connectSource = fs.readFileSync(require.resolve("../lib/linkedin/connect.ts"), "utf8");
 const runnerSource = fs.readFileSync(require.resolve("../lib/linkedin/runner.ts"), "utf8");
+const syncSource = fs.readFileSync(require.resolve("../lib/linkedin/sync-accepted.ts"), "utf8");
 const dbSource = fs.readFileSync(require.resolve("../lib/db.ts"), "utf8");
 const beforeSubmitCall = connectSource.indexOf("await lifecycle.beforeSubmit?.();");
 const sendClick = connectSource.indexOf("await sendButton.click", beforeSubmitCall);
@@ -255,10 +329,21 @@ assert.match(runnerSource, /createLinkedInConnectionAttempt\(db, \{[\s\S]*?accou
 assert.match(runnerSource, /countLinkedInConnectionAttemptsToday\(db, accountId\)/);
 assert.match(runnerSource, /Connection request sent and confirmed for/);
 assert.match(dbSource, /CREATE TABLE IF NOT EXISTS linkedin_connection_attempts/);
+assert.match(dbSource, /CREATE TABLE IF NOT EXISTS runtime_leases/);
 assert.match(dbSource, /backfillLinkedInConnectionAttempts\(db\)/);
+assert.match(runnerSource, /async function tickWithLease/);
+assert.match(runnerSource, /renewRuntimeLease\(db, RUNNER_LEASE_KEY/);
+assert.match(syncSource, /error instanceof LinkedInConnectionsApiAuthorizationError/);
+assert.match(syncSource, /await probeLinkedInAuthenticationWall\(page\)/);
+assert.match(syncSource, /reason: "api_error"/);
 assert.doesNotMatch(runnerSource, /UPDATE accounts SET active_hours_start = 0/);
-assert.match(runnerSource, /const bypassSchedule = forcedTrackRuns\.delete\(tr\.id\)/);
-assert.match(runnerSource, /for \(const track of trackRows\) forcedTrackRuns\.add\(track\.id\)/);
+assert.match(
+  runnerSource,
+  /const bypassSchedule = db\.prepare\(\s*"UPDATE run_profile_tracks SET force_run_once = 0 WHERE id = \? AND force_run_once = 1"\s*\)\.run\(tr\.id\)\.changes === 1;/
+);
+assert.match(runnerSource, /UPDATE run_profile_tracks SET[\s\S]*?force_run_once = 1/);
+assert.match(runnerSource, /async function tick\(\s*db:\s*ReturnType<typeof getDb>,\s*leaseActive:\s*\(\)\s*=>\s*boolean/);
+assert.match(dbSource, /ALTER TABLE run_profile_tracks ADD COLUMN force_run_once INTEGER/);
 
 console.log("LinkedIn accepted-connection reconciliation tests passed");
 
