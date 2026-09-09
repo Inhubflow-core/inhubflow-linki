@@ -296,27 +296,35 @@ async function activateConnectAction(
 }
 
 async function findConnectInOpenMenu(page: Page): Promise<Locator | null> {
-  const directConnect = page.locator(`
-    [role="menu"] [role="menuitem"]:has-text("Conectar"),
-    [role="menu"] .artdeco-dropdown__item:has-text("Conectar"),
-    [role="menu"] div:has-text("Conectar"),
-    [role="menu"] span:has-text("Conectar"),
-    .artdeco-dropdown__content [role="menuitem"]:has-text("Conectar"),
-    .artdeco-dropdown__content .artdeco-dropdown__item:has-text("Conectar"),
-    .artdeco-dropdown__content div:has-text("Conectar"),
-    .artdeco-dropdown__content span:has-text("Conectar"),
-    [role="menu"] [role="menuitem"]:has-text("Connect"),
-    [role="menu"] .artdeco-dropdown__item:has-text("Connect"),
-    .artdeco-dropdown__content [role="menuitem"]:has-text("Connect"),
-    .artdeco-dropdown__content .artdeco-dropdown__item:has-text("Connect"),
-    .artdeco-dropdown__content div:has-text("Connect"),
-    .artdeco-dropdown__content span:has-text("Connect"),
-    .artdeco-dropdown__item:has-text("Conectar"),
-    .artdeco-dropdown__item:has-text("Connect")
-  `).first();
+  const directCandidates = page.locator(`
+    .artdeco-dropdown__content--is-open [role="button"],
+    .artdeco-dropdown__content--is-open .artdeco-dropdown__item,
+    .artdeco-dropdown__content--is-open [role="menuitem"],
+    .artdeco-dropdown__content--is-open div,
+    .artdeco-dropdown__content--is-open span,
+    [role="menu"]:visible [role="menuitem"],
+    [role="menu"]:visible .artdeco-dropdown__item,
+    [role="menu"]:visible [role="button"],
+    [role="menu"]:visible span,
+    .artdeco-dropdown__content:visible [role="button"],
+    .artdeco-dropdown__content:visible .artdeco-dropdown__item,
+    .artdeco-dropdown__content:visible [role="menuitem"],
+    .artdeco-dropdown__content:visible span,
+    .artdeco-dropdown__item:visible
+  `);
 
-  if (await directConnect.isVisible().catch(() => false)) {
-    return directConnect;
+  const count = await directCandidates.count().catch(() => 0);
+  for (let i = 0; i < count; i++) {
+    const candidate = directCandidates.nth(i);
+    if (!(await candidate.isVisible().catch(() => false))) continue;
+    const [text, aria, title] = await Promise.all([
+      candidate.innerText().catch(() => ""),
+      candidate.getAttribute("aria-label").then((val) => val ?? "").catch(() => ""),
+      candidate.getAttribute("title").then((val) => val ?? "").catch(() => ""),
+    ]);
+    if (isConnectAction(text, aria, title)) {
+      return candidate;
+    }
   }
 
   const menus = page.locator(MENU_SELECTOR);
@@ -378,16 +386,26 @@ async function waitForOpenMenuAction(
 async function clickConnectFromMoreMenu(page: Page, scope: Locator): Promise<Locator | null> {
   // 1. Prioritize real 3-dots / More / Más buttons on the profile header
   const priorityMoreSelectors = [
-    'main button[aria-label*="más" i]',
-    'main button[aria-label*="mais" i]',
-    'main button[aria-label*="more" i]',
-    'main button[aria-label*="acciones" i]',
-    'main button[aria-label*="actions" i]',
-    'main button[aria-label*="opções" i]',
-    'main button[aria-label*="opciones" i]',
+    'main section:has(h1) button[aria-label*="más" i]',
+    'main section:has(h1) button[aria-label*="mais" i]',
+    'main section:has(h1) button[aria-label*="more" i]',
+    'main section:has(h1) button[aria-label*="acciones" i]',
+    'main section:has(h1) button[aria-label*="actions" i]',
+    'main section:has(h1) button[aria-label*="opções" i]',
+    'main section:has(h1) button[aria-label*="opciones" i]',
+    'main section:has(h1) button:has(svg[data-test-icon*="overflow"])',
+    'main section:has(h1) button:has(li-icon[type*="overflow"])',
+    'main section:has(h1) button.artdeco-dropdown__trigger',
+    '.pvs-profile-actions button.artdeco-dropdown__trigger',
+    '.pvs-profile-actions button[aria-label*="más" i]',
+    '.pvs-profile-actions button[aria-label*="more" i]',
+    '.pvs-profile-actions button:has(svg[data-test-icon*="overflow"])',
+    'main button[aria-label*="más acciones" i]',
+    'main button[aria-label*="más opciones" i]',
+    'main button[aria-label*="more actions" i]',
+    'main button[aria-label*="mais ações" i]',
     'main button:has(svg[data-test-icon*="overflow"])',
     'main button:has(li-icon[type*="overflow"])',
-    'main button:has(svg-icon[type*="overflow"])',
     'main button.artdeco-dropdown__trigger:has-text("Más")',
     'main button.artdeco-dropdown__trigger:has-text("Mais")',
     'main button.artdeco-dropdown__trigger:has-text("More")',
@@ -399,7 +417,8 @@ async function clickConnectFromMoreMenu(page: Page, scope: Locator): Promise<Loc
     for (let i = 0; i < count; i++) {
       const btn = buttons.nth(i);
       if (!(await btn.isVisible().catch(() => false))) continue;
-      await btn.click().catch(() => {});
+      await btn.scrollIntoViewIfNeeded().catch(() => {});
+      await btn.click({ force: true }).catch(() => {});
       await page.waitForTimeout(600);
       const menuAction = await waitForOpenMenuAction(page, 3500);
       if (menuAction.pending) {
@@ -435,6 +454,7 @@ async function clickConnectFromMoreMenu(page: Page, scope: Locator): Promise<Loc
     ]);
     if (!isMoreTrigger(text, aria ?? "", title ?? "", className ?? "")) continue;
 
+    await trigger.scrollIntoViewIfNeeded().catch(() => {});
     await trigger.click({ force: true }).catch(() => {});
     await page.waitForTimeout(500);
     const menuAction = await waitForOpenMenuAction(page, 3000);
@@ -546,8 +566,34 @@ async function confirmConnectionRequest(page: Page, linkedinUrl: string): Promis
  * direct Connect actions and Creator-mode More/Mais dropdown menus.
  */
 export async function sendConnectionRequest(page: Page, linkedinUrl: string): Promise<void> {
-  await page.goto(linkedinUrl, { waitUntil: "domcontentloaded", timeout: 35000 });
+  try {
+    await page.goto(linkedinUrl, { waitUntil: "domcontentloaded", timeout: 35000 });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("ERR_TOO_MANY_REDIRECTS") || msg.includes("ERR_HTTP_RESPONSE_CODE_FAILURE")) {
+      try {
+        await page.goto("https://www.linkedin.com/feed/", { waitUntil: "domcontentloaded", timeout: 25000 });
+        await page.waitForTimeout(2000);
+        await page.goto(linkedinUrl, { waitUntil: "domcontentloaded", timeout: 35000 });
+      } catch (retryErr) {
+        throw new Error("Sesión de LinkedIn caducada o bloqueada por verificación de seguridad. Por favor actualiza tu Código de Conexión en Configuración.");
+      }
+    } else {
+      throw err;
+    }
+  }
+
   await page.waitForTimeout(3000 + Math.random() * 1500);
+
+  const currentUrl = page.url();
+  if (currentUrl.includes("/login") || currentUrl.includes("/authwall") || currentUrl.includes("/checkpoint") || currentUrl.includes("/uas/")) {
+    throw new Error("Sesión de LinkedIn caducada o cerrada. Por favor actualiza tu Código de Conexión en Configuración.");
+  }
+
+  const isPublicPrompt = await page.locator('#public_profile_contextual-sign-in, [data-tracking-control-name="public_profile_contextual-sign-in"], .contextual-sign-in-modal').count().catch(() => 0);
+  if (isPublicPrompt > 0) {
+    throw new Error("Sesión de LinkedIn caducada (perfil cargó en modo público sin autenticación). Por favor actualiza tu Código de Conexión en Configuración.");
+  }
 
   const topCard = await profileActionScope(page);
   const pageText = await topCard.innerText().catch(() => "");
