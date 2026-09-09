@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const Module = require("node:module");
 const ts = require("typescript");
+const Database = require("better-sqlite3");
 
 const originalTsLoader = Module._extensions[".ts"];
 Module._extensions[".ts"] = (module, filename) => {
@@ -38,6 +39,12 @@ const {
   isLinkedInAuthenticationWall,
   LinkedInAuthenticationError,
 } = require("../lib/linkedin/auth-wall.ts");
+const {
+  backfillLinkedInConnectionAttempts,
+  countLinkedInConnectionAttemptsToday,
+  createLinkedInConnectionAttempt,
+  updateLinkedInConnectionAttempt,
+} = require("../lib/linkedin/connection-attempts.ts");
 
 function target(id, url, urn = null, memberUrn = null) {
   return {
@@ -145,6 +152,110 @@ assert.equal(isLinkedInAuthenticationWall("https://www.linkedin.com/checkpoint/c
 assert.equal(isLinkedInAuthenticationWall("https://www.linkedin.com/in/example/"), false);
 assert.equal(new LinkedInAuthenticationError("post-submit", true).submissionAttempted, true);
 assert.equal(new LinkedInAuthenticationError("pre-submit").submissionAttempted, false);
+
+const attemptDb = new Database(":memory:");
+attemptDb.exec(`
+  CREATE TABLE linkedin_connection_attempts (
+    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    run_id TEXT,
+    target_id TEXT,
+    outcome TEXT NOT NULL,
+    error_message TEXT,
+    attempted_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE TABLE run_profiles (id TEXT PRIMARY KEY, run_id TEXT, target_id TEXT);
+  CREATE TABLE runs (id TEXT PRIMARY KEY, account_id TEXT);
+  CREATE TABLE logs (
+    id TEXT PRIMARY KEY,
+    run_id TEXT,
+    target_id TEXT,
+    message TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  INSERT INTO run_profiles VALUES ('profile-a', 'run-a', 'shared-target');
+  INSERT INTO runs VALUES
+    ('run-a', 'account-a'),
+    ('run-b', 'account-b'),
+    ('legacy-run', 'account-c');
+`);
+const attemptedAt = new Date().toISOString();
+const attemptA = createLinkedInConnectionAttempt(attemptDb, {
+  accountId: "account-a",
+  runId: "run-a",
+  targetId: "shared-target",
+  attemptedAt,
+});
+createLinkedInConnectionAttempt(attemptDb, {
+  accountId: "account-b",
+  runId: "run-b",
+  targetId: "shared-target",
+  attemptedAt,
+});
+attemptDb.prepare("INSERT INTO logs VALUES (?, ?, ?, ?, ?)").run(
+  "current-success-log",
+  "run-a",
+  "shared-target",
+  "Connection request sent and confirmed for Test",
+  attemptedAt
+);
+attemptDb.prepare("INSERT INTO logs VALUES (?, ?, ?, ?, ?)").run(
+  "legacy-success-log",
+  "legacy-run",
+  "legacy-target",
+  "Connection request confirmed for Legacy Test",
+  attemptedAt
+);
+backfillLinkedInConnectionAttempts(attemptDb);
+backfillLinkedInConnectionAttempts(attemptDb);
+assert.equal(countLinkedInConnectionAttemptsToday(attemptDb, "account-a"), 1);
+assert.equal(countLinkedInConnectionAttemptsToday(attemptDb, "account-b"), 1);
+assert.equal(countLinkedInConnectionAttemptsToday(attemptDb, "account-c"), 1);
+assert.match(
+  attemptDb.prepare("SELECT message FROM logs WHERE id = 'legacy-success-log'").get().message,
+  /^Connection request sent and confirmed/
+);
+attemptDb.prepare("DELETE FROM run_profiles WHERE id = 'profile-a'").run();
+assert.equal(countLinkedInConnectionAttemptsToday(attemptDb, "account-a"), 1);
+updateLinkedInConnectionAttempt(attemptDb, attemptA, "confirmed");
+assert.equal(
+  attemptDb.prepare("SELECT outcome FROM linkedin_connection_attempts WHERE id = ?").get(attemptA).outcome,
+  "confirmed"
+);
+attemptDb.close();
+
+// Guard the irreversible connection-send boundary. The durable marker must be
+// created by the callback immediately before the click, never before profile or
+// modal navigation, and all post-submit auth-wall errors must retain that fact.
+const connectSource = fs.readFileSync(require.resolve("../lib/linkedin/connect.ts"), "utf8");
+const runnerSource = fs.readFileSync(require.resolve("../lib/linkedin/runner.ts"), "utf8");
+const dbSource = fs.readFileSync(require.resolve("../lib/db.ts"), "utf8");
+const beforeSubmitCall = connectSource.indexOf("await lifecycle.beforeSubmit?.();");
+const sendClick = connectSource.indexOf("await sendButton.click", beforeSubmitCall);
+const afterSubmitCall = connectSource.indexOf("await lifecycle.afterSubmit?.();", sendClick);
+const confirmationCall = connectSource.indexOf("await confirmConnectionRequest", afterSubmitCall);
+assert.ok(
+  beforeSubmitCall > 0 &&
+  sendClick > beforeSubmitCall &&
+  afterSubmitCall > sendClick &&
+  confirmationCall > afterSubmitCall
+);
+assert.equal(
+  connectSource.split("\n").filter((line) =>
+    line.includes("authentication wall after connection submission") && line.includes(", true)")
+  ).length,
+  2
+);
+assert.match(
+  runnerSource,
+  /sendConnectionRequest\(page, linkedinUrl, \{[\s\S]*?beforeSubmit:[\s\S]*?UPDATE targets SET connection_requested_at/
+);
+assert.match(runnerSource, /createLinkedInConnectionAttempt\(db, \{[\s\S]*?accountId,[\s\S]*?runId,[\s\S]*?targetId/);
+assert.match(runnerSource, /countLinkedInConnectionAttemptsToday\(db, accountId\)/);
+assert.match(runnerSource, /Connection request sent and confirmed for/);
+assert.match(dbSource, /CREATE TABLE IF NOT EXISTS linkedin_connection_attempts/);
+assert.match(dbSource, /backfillLinkedInConnectionAttempts\(db\)/);
 
 console.log("LinkedIn accepted-connection reconciliation tests passed");
 

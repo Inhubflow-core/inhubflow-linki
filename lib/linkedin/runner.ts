@@ -11,6 +11,11 @@ import {
   UncertainConnectionOutcomeError,
 } from "@/lib/linkedin/connect";
 import { LinkedInAuthenticationError } from "@/lib/linkedin/auth-wall";
+import {
+  countLinkedInConnectionAttemptsToday,
+  createLinkedInConnectionAttempt,
+  updateLinkedInConnectionAttempt,
+} from "@/lib/linkedin/connection-attempts";
 import { sendMessage, NotConnectedError } from "@/lib/linkedin/message";
 import { shouldSyncAccepted, syncAcceptedConnectionsDetailed, type AcceptedSyncResult } from "@/lib/linkedin/sync-accepted";
 import { campaignInboxSchedulerEnabled, listCampaignInboxAccountIds, shouldSyncLinkedInCampaignInbox, syncLinkedInCampaignInbox } from "@/lib/linkedin/campaign-inbox";
@@ -564,6 +569,19 @@ async function executeStep(
   const name = target.full_name ?? target.linkedin_url;
   let connectionMarkerCreated = false;
   let connectionSendInvoked = false;
+  let connectionConfirmed = false;
+  let connectionAttemptId: string | null = null;
+  const recordConnectionOutcome = (
+    outcome: "submitted" | "confirmed" | "uncertain" | "rejected",
+    errorMessage?: string
+  ) => {
+    if (!connectionAttemptId) return;
+    try {
+      updateLinkedInConnectionAttempt(db, connectionAttemptId, outcome, errorMessage);
+    } catch (error) {
+      console.error(`[runner] Could not update LinkedIn connection attempt ${connectionAttemptId}:`, error instanceof Error ? error.message : error);
+    }
+  };
 
   try {
     if (step.step_type === "delay") {
@@ -630,21 +648,50 @@ async function executeStep(
       }
 
       db.prepare("UPDATE run_profile_tracks SET last_step_at = datetime('now') WHERE id = ?").run(tr.id);
-      log(db, runId, target.id, "info", `Sending connection request to ${name}`);
+      log(db, runId, target.id, "info", `Preparing connection request for ${name}`);
       const linkedinUrl = await getLinkedinUrl(db, target, accountId);
       const page = await getSessionPage(accountId);
-      // Claim the request before clicking Send. If LinkedIn accepts the request
-      // but confirmation fails, a retry must reconcile the pending request
-      // instead of issuing a duplicate invitation.
-      const marker = db.prepare(
-        "UPDATE targets SET connection_requested_at = ? WHERE id = ? AND connection_requested_at IS NULL"
-      ).run(nowIso(), target.id);
-      connectionMarkerCreated = marker.changes > 0;
-      connectionSendInvoked = true;
-      try { await sendConnectionRequest(page, linkedinUrl); } finally { await page.close(); }
-      await saveSessionState(accountId);
+      try {
+        await sendConnectionRequest(page, linkedinUrl, {
+          beforeSubmit: () => {
+            // This callback runs after the modal and send button are ready, at
+            // the last reversible boundary before LinkedIn receives the click.
+            const attemptedAt = nowIso();
+            let markerCreated = false;
+            let attemptId = "";
+            db.transaction(() => {
+              log(db, runId, target.id, "info", `Sending connection request to ${name}`);
+              const marker = db.prepare(
+                "UPDATE targets SET connection_requested_at = ? WHERE id = ? AND connection_requested_at IS NULL"
+              ).run(attemptedAt, target.id);
+              markerCreated = marker.changes > 0;
+              attemptId = createLinkedInConnectionAttempt(db, {
+                accountId,
+                runId,
+                targetId: target.id,
+                attemptedAt,
+              });
+            })();
+            connectionMarkerCreated = markerCreated;
+            connectionAttemptId = attemptId;
+            connectionSendInvoked = true;
+          },
+          afterSubmit: () => {
+            recordConnectionOutcome("submitted");
+          },
+        });
+      } finally {
+        await page.close();
+      }
+      connectionConfirmed = true;
+      recordConnectionOutcome("confirmed");
+      try {
+        await saveSessionState(accountId);
+      } catch (error) {
+        console.warn(`[runner] Connection confirmed but session persistence failed for ${name}:`, error instanceof Error ? error.message : error);
+      }
       trWait(db, tr, CONNECTION_RECHECK_HOURS);
-      log(db, runId, target.id, "info", `Connection request confirmed for ${name} — will recheck in ${CONNECTION_RECHECK_HOURS}h`);
+      log(db, runId, target.id, "info", `Connection request sent and confirmed for ${name} — will recheck in ${CONNECTION_RECHECK_HOURS}h`);
 
     } else if (step.step_type === "message") {
       await ensureSalesNavEnriched(db, target, accountId);
@@ -1039,15 +1086,18 @@ async function executeStep(
         db.prepare("UPDATE targets SET connection_requested_at = NULL WHERE id = ?").run(target.id);
       }
       if (err.submissionAttempted) {
+        recordConnectionOutcome("uncertain", msg);
         trWait(db, tr, CONNECTION_RECHECK_HOURS);
         log(db, runId, target.id, "warn", `${name} connection outcome is pending after session expiry — account requires reauthentication`);
       } else {
+        recordConnectionOutcome("rejected", msg);
         trFail(db, tr, msg);
         log(db, runId, target.id, "error", `LinkedIn session expired for ${name} — account paused for reauthentication`);
       }
       return;
     }
     if (err instanceof WeeklyLimitError) {
+      recordConnectionOutcome("rejected", msg);
       if (connectionMarkerCreated) {
         db.prepare("UPDATE targets SET connection_requested_at = NULL WHERE id = ?").run(target.id);
       }
@@ -1056,6 +1106,7 @@ async function executeStep(
       return;
     }
     if (err instanceof ConnectionPreSubmitError) {
+      recordConnectionOutcome("rejected", msg);
       if (connectionMarkerCreated) {
         db.prepare("UPDATE targets SET connection_requested_at = NULL WHERE id = ?").run(target.id);
       }
@@ -1075,11 +1126,20 @@ async function executeStep(
       return;
     }
     if (err instanceof UncertainConnectionOutcomeError || connectionMarkerCreated || connectionSendInvoked) {
+      if (!connectionConfirmed) recordConnectionOutcome("uncertain", msg);
       // Once the send routine has been entered, the request may have reached
       // LinkedIn even if the browser did not observe confirmation. Keep the
       // marker and use the normal reconciliation path to avoid duplicates.
       trWait(db, tr, CONNECTION_RECHECK_HOURS);
-      log(db, runId, target.id, "warn", `${name} connection outcome uncertain — will reconcile in ${CONNECTION_RECHECK_HOURS}h`);
+      log(
+        db,
+        runId,
+        target.id,
+        "warn",
+        connectionConfirmed
+          ? `${name} connection was confirmed, but post-send bookkeeping failed — will reconcile in ${CONNECTION_RECHECK_HOURS}h`
+          : `${name} connection outcome uncertain — will reconcile in ${CONNECTION_RECHECK_HOURS}h`
+      );
       return;
     }
     if (msg.includes("No InMail credits left")) {
@@ -1305,16 +1365,14 @@ async function tick(db: ReturnType<typeof getDb>): Promise<void> {
     if (ea) emailAccountLimitsMap.set(emailAccountId, ea);
   }
 
-  // Count actions already done today per LinkedIn account — messages and InMail are
-  // counted separately so a busy message quota never starves InMail sends (and vice versa).
+  // Count actions already done today per LinkedIn account. Connection attempts
+  // come from an immutable account-scoped ledger, so deleting a campaign profile,
+  // renaming a log message, or sharing a target cannot weaken the safety limit.
   const connectsSentToday = new Map<string, number>();
   const messagesSentToday = new Map<string, number>();
   const inmailsSentToday = new Map<string, number>();
   for (const [accountId] of accountLimitsMap) {
-    const c = (db.prepare(
-      `SELECT COUNT(*) as c FROM logs WHERE run_id IN (SELECT id FROM runs WHERE account_id = ?)
-       AND message LIKE 'Connection request sent%' AND date(created_at) = date('now')`
-    ).get(accountId) as { c: number }).c;
+    const c = countLinkedInConnectionAttemptsToday(db, accountId);
     const m = (db.prepare(
       `SELECT COUNT(*) as c FROM logs WHERE run_id IN (SELECT id FROM runs WHERE account_id = ?)
        AND message LIKE 'Message sent%' AND date(created_at) = date('now')`

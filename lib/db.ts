@@ -8,6 +8,7 @@ import { autoSeedInstance } from "@/lib/auto-seed";
 import { applySdrSchema } from "@/lib/sdr-agent/schema";
 import { applyPipelineSchema } from "@/lib/pipeline/schema";
 import { applyCalendarSchema } from "@/lib/calendar/schema";
+import { backfillLinkedInConnectionAttempts } from "@/lib/linkedin/connection-attempts";
 
 function resolveDbPath(): string {
   if (process.env.INHUBFLOW_DB_PATH) return process.env.INHUBFLOW_DB_PATH;
@@ -682,10 +683,28 @@ function runMigrations(db: Database.Database) {
       updated_at TEXT DEFAULT (datetime('now'))
     )`,
     "CREATE INDEX IF NOT EXISTS idx_live_chat_push_active ON live_chat_push_subscriptions(active)",
+    // Immutable, account-scoped ledger for LinkedIn connection submissions.
+    // Unlike target state or campaign logs, these rows survive profile removal
+    // and cannot be attributed to a different LinkedIn account later.
+    `CREATE TABLE IF NOT EXISTS linkedin_connection_attempts (
+      id TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      run_id TEXT,
+      target_id TEXT,
+      outcome TEXT NOT NULL DEFAULT 'prepared' CHECK(outcome IN ('prepared', 'submitted', 'confirmed', 'uncertain', 'rejected')),
+      error_message TEXT,
+      attempted_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    "CREATE INDEX IF NOT EXISTS idx_linkedin_connection_attempts_account_time ON linkedin_connection_attempts(account_id, attempted_at)",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
   }
+
+  // Preserve quota history across the ledger migration. This helper also avoids
+  // duplicating rows for sends already recorded by the current runtime.
+  try { backfillLinkedInConnectionAttempts(db); } catch { /* table/logs unavailable */ }
 
   // Migrate linkedin_inbox_messages CHECK constraint to allow 'outbound' direction
   try {

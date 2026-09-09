@@ -540,7 +540,7 @@ async function confirmOnProfile(page: Page, linkedinUrl: string): Promise<boolea
   await page.waitForTimeout(2000);
   const url = page.url();
   if (isLinkedInAuthenticationWall(url)) {
-    throw new LinkedInAuthenticationError(`LinkedIn authentication wall after connection submission (${url})`);
+    throw new LinkedInAuthenticationError(`LinkedIn authentication wall after connection submission (${url})`, true);
   }
   return profileShowsPending(page);
 }
@@ -602,7 +602,18 @@ async function confirmConnectionRequest(page: Page, linkedinUrl: string): Promis
  * Handles all UI languages (Portuguese, Spanish, English, etc.) and both
  * direct Connect actions and Creator-mode More/Mais dropdown menus.
  */
-export async function sendConnectionRequest(page: Page, linkedinUrl: string): Promise<void> {
+export interface ConnectionRequestLifecycle {
+  /** Persist the attempt immediately before the irreversible Send click. */
+  beforeSubmit?: () => void | Promise<void>;
+  /** Record that Playwright dispatched the Send click. */
+  afterSubmit?: () => void | Promise<void>;
+}
+
+export async function sendConnectionRequest(
+  page: Page,
+  linkedinUrl: string,
+  lifecycle: ConnectionRequestLifecycle = {}
+): Promise<void> {
   // 1. Preventive warm up on /feed/ — direct navigations to /in/ profiles trigger LinkedIn's profile authwall
   try {
     await page.goto("https://www.linkedin.com/feed/", { waitUntil: "domcontentloaded", timeout: 25000 });
@@ -715,11 +726,16 @@ export async function sendConnectionRequest(page: Page, linkedinUrl: string): Pr
     throw new ConnectionPreSubmitError("LinkedIn connection send button remained disabled");
   }
 
+  // This is the last reversible boundary. Persisting earlier would turn feed,
+  // profile, selector or modal failures into invitations that never existed.
+  await lifecycle.beforeSubmit?.();
+
   try {
     await sendButton.click({ force: true, timeout: 10000 });
   } catch (error) {
     throw new UncertainConnectionOutcomeError(`Could not confirm LinkedIn's send-without-note click: ${error instanceof Error ? error.message : String(error)}`);
   }
+  await lifecycle.afterSubmit?.();
 
   await confirmConnectionRequest(page, linkedinUrl);
 }
