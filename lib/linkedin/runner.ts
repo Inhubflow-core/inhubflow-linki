@@ -1044,7 +1044,7 @@ async function executeStep(
 const g = global as typeof global & { __inhubflowGlobalRunnerStarted?: boolean; __linkiGlobalRunnerStarted?: boolean };
 let tickQueueTail: Promise<void> = Promise.resolve();
 
-function enqueueTick(db: ReturnType<typeof getDb>): Promise<void> {
+export function enqueueTick(db: ReturnType<typeof getDb>): Promise<void> {
   const next = tickQueueTail.then(() => tick(db), () => tick(db));
   tickQueueTail = next.catch(() => { /* caller records the failure */ });
   return next;
