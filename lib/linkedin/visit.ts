@@ -236,7 +236,9 @@ export async function extractProfileUrnFromPage(page: Page, vanity: string): Pro
       const rawUrnMatch = html.match(/profileUrn=(urn:li:fsd_profile:[A-Za-z0-9_-]+)/i);
       if (rawUrnMatch) return rawUrnMatch[1];
 
-      const normalizedTarget = (targetVanity || "").toLowerCase().replace(/[^a-z0-9_-]/g, "");
+      const cleanTarget = (targetVanity || "").toLowerCase();
+      const unaccentedTarget = cleanTarget.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9_-]/g, "");
+      const strippedTarget = cleanTarget.replace(/[^a-z0-9_-]/g, "");
 
       // 2. Scan all <code ...> and <script ...> elements for Voyager JSON
       const codeElements = Array.from(document.querySelectorAll("code, script"));
@@ -248,14 +250,24 @@ export async function extractProfileUrnFromPage(page: Page, vanity: string): Pro
             const list = Array.isArray(data.included) ? data.included : Array.isArray(data.data) ? data.data : [data];
             for (const item of list) {
               if (item && item.entityUrn && typeof item.entityUrn === "string" && item.entityUrn.startsWith("urn:li:fsd_profile:")) {
-                const pubId = ((item.publicIdentifier as string) || "").toLowerCase().replace(/[^a-z0-9_-]/g, "");
-                if (pubId && normalizedTarget && (pubId === normalizedTarget || normalizedTarget.includes(pubId) || pubId.includes(normalizedTarget))) {
+                const rawPubId = ((item.publicIdentifier as string) || "").toLowerCase();
+                const normPubId = rawPubId.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9_-]/g, "");
+                if (
+                  normPubId &&
+                  (normPubId === unaccentedTarget ||
+                    normPubId === strippedTarget ||
+                    unaccentedTarget.includes(normPubId) ||
+                    normPubId.includes(unaccentedTarget))
+                ) {
                   return item.entityUrn;
                 }
               }
             }
           } catch {
-            if (normalizedTarget && text.toLowerCase().includes(normalizedTarget)) {
+            if (
+              (unaccentedTarget && text.toLowerCase().includes(unaccentedTarget)) ||
+              (strippedTarget && text.toLowerCase().includes(strippedTarget))
+            ) {
               const m = text.match(/"entityUrn":"(urn:li:fsd_profile:[A-Za-z0-9_-]+)"/);
               if (m) return m[1];
               const m2 = text.match(/(urn:li:fsd_profile:[A-Za-z0-9_-]+)/);
@@ -274,7 +286,16 @@ export async function extractProfileUrnFromPage(page: Page, vanity: string): Pro
         }
       }
 
-      // 4. Any fsd_profile URN in the page HTML
+      // 4. Any Profile object in included array
+      for (const code of codeElements) {
+        const text = code.textContent || "";
+        if (text.includes("identity.profile.Profile") && text.includes("urn:li:fsd_profile:")) {
+          const m = text.match(/"entityUrn":"(urn:li:fsd_profile:[A-Za-z0-9_-]+)"/);
+          if (m) return m[1];
+        }
+      }
+
+      // 5. Any fsd_profile URN in the page HTML
       const allMatches = Array.from(html.matchAll(/urn:li:fsd_profile:[A-Za-z0-9_-]+/g)).map((m) => m[0]);
       if (allMatches.length > 0) {
         return allMatches[0];

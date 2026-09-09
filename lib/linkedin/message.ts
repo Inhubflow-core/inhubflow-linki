@@ -72,61 +72,43 @@ export async function sendMessage(
 
 async function openComposeFromProfilePage(page: Page): Promise<boolean> {
   try {
-    const actionResult = await page.evaluate(() => {
-      const elements = Array.from(document.querySelectorAll("main button, main a"));
-      for (const el of elements) {
-        const text = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-        const aria = (el.getAttribute("aria-label") || "").toLowerCase();
-        const href = el.getAttribute("href") || "";
+    console.log("[message] openComposeFromProfilePage: locating message button on profile");
 
-        const isMessage =
-          text === "mensaje" ||
-          text === "message" ||
-          text === "mensagem" ||
-          text === "enviar mensaje" ||
-          text === "send message" ||
-          text === "enviar mensagem" ||
-          text === "envoyer" ||
-          aria.includes("mensaje") ||
-          aria.includes("message") ||
-          aria.includes("mensagem") ||
-          aria.includes("envoyer") ||
-          href.includes("/messaging/compose") ||
-          href.includes("/messaging/thread/");
+    const msgBtn = page.locator(`
+      main button:has-text("Enviar mensagem"),
+      main button:has-text("Mensagem"),
+      main button:has-text("Mensaje"),
+      main button:has-text("Message"),
+      main button:has-text("Enviar mensaje"),
+      main button:has-text("Send message"),
+      main a:has-text("Enviar mensagem"),
+      main a:has-text("Mensagem"),
+      main a:has-text("Mensaje"),
+      main a:has-text("Message"),
+      main button[aria-label*="mensagem" i],
+      main button[aria-label*="mensaje" i],
+      main button[aria-label*="message" i],
+      main a[href*="/messaging/compose"],
+      main a[href*="/messaging/thread/"]
+    `).first();
 
-        const isExcluded =
-          aria.includes("más") ||
-          aria.includes("more") ||
-          aria.includes("mais") ||
-          aria.includes("cerrar") ||
-          aria.includes("close") ||
-          aria.includes("dismiss");
-
-        if (isMessage && !isExcluded) {
-          if (href && href.includes("/messaging/")) {
-            return { type: "link", href };
-          }
-          (el as HTMLElement).click();
-          return { type: "button_clicked", text, aria };
-        }
-      }
-      return null;
-    });
-
-    if (!actionResult) {
-      console.warn("[message] openComposeFromProfilePage: no message button found in main");
+    const btnCount = await msgBtn.count().catch(() => 0);
+    if (btnCount === 0 || !(await msgBtn.isVisible().catch(() => false))) {
+      console.warn("[message] openComposeFromProfilePage: message button not found in main");
       return false;
     }
 
-    console.log("[message] openComposeFromProfilePage action taken:", actionResult);
-
-    if (actionResult.type === "link" && actionResult.href) {
-      const targetUrl = actionResult.href.startsWith("http")
-        ? actionResult.href
-        : `https://www.linkedin.com${actionResult.href}`;
+    const href = await msgBtn.getAttribute("href").catch(() => null);
+    if (href && href.includes("/messaging/")) {
+      const targetUrl = href.startsWith("http") ? href : `https://www.linkedin.com${href}`;
+      console.log(`[message] Following direct messaging link: ${targetUrl}`);
       await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
     } else {
+      console.log("[message] Clicking message button on profile with Playwright native click");
+      await msgBtn.scrollIntoViewIfNeeded().catch(() => {});
+      await msgBtn.click({ force: true });
       await page.waitForTimeout(2000);
+
       // Maximize any minimized conversation bubble via DOM
       await page.evaluate(() => {
         const headers = document.querySelectorAll(
@@ -163,8 +145,10 @@ async function openComposeFromProfilePage(page: Page): Promise<boolean> {
     if (count > 0) {
       await msgInput.focus().catch(() => {});
       await msgInput.waitFor({ state: "visible", timeout: 8000 });
+      console.log("[message] openComposeFromProfilePage: compose box successfully focused");
       return true;
     }
+    console.warn("[message] openComposeFromProfilePage: compose box not found after button click");
     return false;
   } catch (err) {
     console.warn("[message] openComposeFromProfilePage error:", err instanceof Error ? err.message : String(err));
@@ -203,27 +187,14 @@ async function openComposeByUrn(page: Page, messagingUrn: string): Promise<boole
 }
 
 async function sendMessageViaTypeahead(page: Page, fullName: string, text: string, attachmentPath?: string | null): Promise<void> {
-  console.log(`[message] Navigating to /messaging/ for recipient search: "${fullName}"`);
-  await page.goto("https://www.linkedin.com/messaging/", {
+  console.log(`[message] Navigating directly to /messaging/thread/new/ for: "${fullName}"`);
+  await page.goto("https://www.linkedin.com/messaging/thread/new/", {
     waitUntil: "domcontentloaded",
     timeout: 30000,
   });
   await page.waitForTimeout(2500);
 
-  // Strategy A: Check if an existing conversation with fullName exists in the messaging inbox
-  const existingFound = await searchExistingConversation(page, fullName);
-  if (existingFound) {
-    console.log(`[message] Found and opened existing conversation with "${fullName}"`);
-    await sendFromComposeBox(page, text, attachmentPath);
-    return;
-  }
-
-  // Strategy B: Click "New message" compose trigger
-  console.log(`[message] Triggering new message compose button`);
-  await triggerNewMessageButton(page);
-  await page.waitForTimeout(1500);
-
-  const searchField = page.locator(`
+  const searchFieldSelector = `
     input.msg-connections-typeahead__search-field,
     input[name="search"],
     input[role="combobox"],
@@ -238,7 +209,32 @@ async function sendMessageViaTypeahead(page: Page, fullName: string, text: strin
     .msg-connections-typeahead input,
     form.msg-connections-typeahead input,
     .msg-compose input
-  `).first();
+  `;
+
+  let searchField = page.locator(searchFieldSelector).first();
+  const searchVisible = await searchField.isVisible().catch(() => false);
+
+  if (!searchVisible) {
+    console.log("[message] Compose field not visible yet, clicking new message trigger in UI");
+    const composeBtn = page.locator(`
+      a[href*="/messaging/thread/new/"]:visible,
+      button.msg-conversations-container__compose-btn:visible,
+      button:has(svg[data-test-icon*="compose"]):visible,
+      button[aria-label*="mensagem" i]:visible,
+      button[aria-label*="message" i]:visible,
+      button[aria-label*="mensaje" i]:visible,
+      button[aria-label*="compose" i]:visible
+    `).first();
+
+    if ((await composeBtn.count().catch(() => 0)) > 0) {
+      await composeBtn.click({ force: true }).catch(() => {});
+      await page.waitForTimeout(1500);
+    } else {
+      await triggerNewMessageButton(page);
+      await page.waitForTimeout(1500);
+    }
+    searchField = page.locator(searchFieldSelector).first();
+  }
 
   await searchField.waitFor({ state: "visible", timeout: 15000 });
   await searchField.click();
