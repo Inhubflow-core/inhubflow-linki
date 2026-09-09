@@ -81,6 +81,9 @@ const PROFILE_DELAY_MIN = 8;
 const PROFILE_DELAY_MAX = 20;
 // Poll interval (ms)
 const POLL_INTERVAL_MS = 30_000;
+// One-shot schedule overrides requested through "Run now". They are consumed
+// by the selected track and never mutate the account's persisted work hours.
+const forcedTrackRuns = new Set<string>();
 
 interface ScheduleConfig {
   active_hours_start: number;
@@ -342,9 +345,10 @@ function enforceSchedule(
   runId: string,
   targetId: string,
   name: string,
-  schedule: ScheduleConfig
+  schedule: ScheduleConfig,
+  bypassSchedule = false
 ): boolean {
-  if (isWithinSchedule(schedule)) return true;
+  if (bypassSchedule || isWithinSchedule(schedule)) return true;
   const nextSlot = nextScheduledSlot(schedule);
   log(db, runId, targetId, "info", `Outside working schedule — rescheduling ${name} to ${nextSlot}`);
   trReschedule(db, tr, nextSlot);
@@ -548,6 +552,7 @@ async function executeStep(
   emailAccountLimits?: EmailAccountLimits | null,
   campaignPrompt?: string | null
 ): Promise<void> {
+  const bypassSchedule = forcedTrackRuns.delete(tr.id);
   const stepIndex = tr.current_step;
   if (stepIndex >= steps.length) {
     db.prepare("UPDATE run_profile_tracks SET state = 'completed', last_step_at = datetime('now') WHERE id = ?").run(tr.id);
@@ -609,7 +614,7 @@ async function executeStep(
       log(db, runId, target.id, "info", `Visited ${name}`);
 
     } else if (step.step_type === "connect") {
-      if (!enforceSchedule(db, tr, runId, target.id, name, accountLimits)) return;
+      if (!enforceSchedule(db, tr, runId, target.id, name, accountLimits, bypassSchedule)) return;
 
       let freshTarget = db.prepare("SELECT * FROM targets WHERE id = ?").get(target.id) as Target;
       if (freshTarget.degree === 1) {
@@ -695,7 +700,7 @@ async function executeStep(
 
     } else if (step.step_type === "message") {
       await ensureSalesNavEnriched(db, target, accountId);
-      if (!enforceSchedule(db, tr, runId, target.id, name, accountLimits)) return;
+      if (!enforceSchedule(db, tr, runId, target.id, name, accountLimits, bypassSchedule)) return;
 
       let freshTarget = db.prepare("SELECT * FROM targets WHERE id = ?").get(target.id) as Target;
       if (freshTarget.degree !== 1) {
@@ -843,7 +848,7 @@ async function executeStep(
         return;
       }
       await ensureSalesNavEnriched(db, target, accountId);
-      if (!enforceSchedule(db, tr, runId, target.id, name, accountLimits)) return;
+      if (!enforceSchedule(db, tr, runId, target.id, name, accountLimits, bypassSchedule)) return;
 
       const freshTarget = db.prepare("SELECT * FROM targets WHERE id = ?").get(target.id) as Target;
       if (!freshTarget.sales_nav_url) {
@@ -945,7 +950,7 @@ async function executeStep(
         return;
       }
 
-      if (!enforceSchedule(db, tr, runId, target.id, name, emailAccountLimits)) return;
+      if (!enforceSchedule(db, tr, runId, target.id, name, emailAccountLimits, bypassSchedule)) return;
 
       const freshTarget = db.prepare("SELECT * FROM targets WHERE id = ?").get(target.id) as Target;
       if (!freshTarget.email) {
@@ -1616,6 +1621,7 @@ async function tick(db: ReturnType<typeof getDb>): Promise<void> {
 
   // Reschedule overflow to tomorrow (use LinkedIn account schedule for reschedule)
   for (const tr of toReschedule) {
+    forcedTrackRuns.delete(tr.id);
     const limits = accountLimitsMap.get(tr.account_id)!;
     const slot = rescheduleToTomorrow(limits);
     db.prepare("UPDATE run_profile_tracks SET next_step_at = ? WHERE id = ?").run(slot, tr.id);
@@ -1630,7 +1636,10 @@ async function tick(db: ReturnType<typeof getDb>): Promise<void> {
     const emailLimits = emailAccountId ? (emailAccountLimitsMap.get(emailAccountId) ?? null) : null;
 
     const runStatus = db.prepare("SELECT status FROM runs WHERE id = ?").get(tr.run_id) as { status: string } | undefined;
-    if (!runStatus || runStatus.status !== "running") continue;
+    if (!runStatus || runStatus.status !== "running") {
+      forcedTrackRuns.delete(tr.id);
+      continue;
+    }
 
     const target = db.prepare("SELECT * FROM targets WHERE id = ?").get(tr.target_id) as Target;
     await executeStep(db, tr.run_id, tr, target, steps, tr.account_id, limits, emailAccountId, emailLimits, getWorkflowPrompt(tr.workflow_id));
@@ -1686,21 +1695,31 @@ export async function forceRunStep(
   targetId?: string
 ): Promise<{ success: boolean; message: string }> {
   const db = getDb();
-
-  // Widen active hours for this run's account to 24/7 so it executes immediately
-  const run = db.prepare("SELECT account_id, email_account_id FROM runs WHERE id = ?").get(runId) as
-    | { account_id: string; email_account_id: string | null }
-    | undefined;
-  if (run) {
-    db.prepare(
-      "UPDATE accounts SET active_hours_start = 0, active_hours_end = 24, working_days = '1,2,3,4,5,6,7' WHERE id = ?"
-    ).run(run.account_id);
-    if (run.email_account_id) {
-      db.prepare(
-        "UPDATE email_accounts SET active_hours_start = 0, active_hours_end = 24, working_days = '1,2,3,4,5,6,7' WHERE id = ?"
-      ).run(run.email_account_id);
-    }
+  const run = db.prepare(`
+    SELECT r.account_id, a.is_authenticated
+    FROM runs r
+    JOIN accounts a ON a.id = r.account_id
+    WHERE r.id = ?
+  `).get(runId) as { account_id: string; is_authenticated: number } | undefined;
+  if (!run) throw new Error("Run or LinkedIn account not found");
+  if (run.is_authenticated !== 1) {
+    throw new Error("La cuenta de LinkedIn necesita autenticarse antes de ejecutar una acción");
   }
+
+  const trackRows = targetId
+    ? db.prepare(`
+        SELECT rt.id
+        FROM run_profile_tracks rt
+        JOIN run_profiles rp ON rp.id = rt.run_profile_id
+        WHERE rp.run_id = ? AND rp.target_id = ? AND rt.state != 'completed'
+      `).all(runId, targetId) as Array<{ id: string }>
+    : db.prepare(`
+        SELECT rt.id
+        FROM run_profile_tracks rt
+        JOIN run_profiles rp ON rp.id = rt.run_profile_id
+        WHERE rp.run_id = ? AND rt.state != 'completed'
+      `).all(runId) as Array<{ id: string }>;
+  if (trackRows.length === 0) throw new Error("No hay pasos pendientes para ejecutar");
 
   if (targetId) {
     db.prepare(`
@@ -1724,6 +1743,7 @@ export async function forceRunStep(
     `).run(runId);
   }
 
+  for (const track of trackRows) forcedTrackRuns.add(track.id);
   db.prepare("UPDATE runs SET status = 'running', started_at = COALESCE(started_at, datetime('now')) WHERE id = ?").run(runId);
 
   // Trigger a serialized tick immediately; repeated Run now requests wait their

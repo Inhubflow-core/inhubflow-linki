@@ -256,6 +256,9 @@ assert.match(runnerSource, /countLinkedInConnectionAttemptsToday\(db, accountId\
 assert.match(runnerSource, /Connection request sent and confirmed for/);
 assert.match(dbSource, /CREATE TABLE IF NOT EXISTS linkedin_connection_attempts/);
 assert.match(dbSource, /backfillLinkedInConnectionAttempts\(db\)/);
+assert.doesNotMatch(runnerSource, /UPDATE accounts SET active_hours_start = 0/);
+assert.match(runnerSource, /const bypassSchedule = forcedTrackRuns\.delete\(tr\.id\)/);
+assert.match(runnerSource, /for \(const track of trackRows\) forcedTrackRuns\.add\(track\.id\)/);
 
 console.log("LinkedIn accepted-connection reconciliation tests passed");
 
