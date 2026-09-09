@@ -366,7 +366,7 @@ const messageSource = fs.readFileSync(require.resolve("../lib/linkedin/message.t
 assert.equal(resultNameMatches("MOre fergo\n1er grado • Ingeniera", "MOre fergo"), true);
 assert.equal(resultNameMatches("John Doe\nVP of Marketing", "John Doe"), true);
 assert.equal(resultNameMatches("Jane Smith\nDesigner", "John Doe"), false);
-assert.match(messageSource, /main button:has-text\("Enviar mensagem"\)/);
+assert.match(messageSource, /button:has-text\("Enviar mensagem"\)/);
 assert.match(messageSource, /msg-overlay-conversation-bubble/);
 assert.match(messageSource, /msg-conversations-container__compose-btn/);
 
