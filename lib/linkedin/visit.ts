@@ -227,41 +227,57 @@ export async function visitProfile(page: Page, linkedinUrl: string): Promise<Pro
 export async function extractProfileUrnFromPage(page: Page, vanity: string): Promise<string | null> {
   return page.evaluate((targetVanity) => {
     try {
-      const normalizedTarget = targetVanity.toLowerCase();
-      // 1. Scan <code id="bpr-guid-..."> elements which contain Voyager JSON
-      const codeElements = Array.from(document.querySelectorAll("code[id*='bpr-guid']"));
+      const html = typeof document !== "undefined" && document.documentElement ? document.documentElement.innerHTML || "" : "";
+
+      // 1. Look for profileUrn query param in any link or text
+      const hrefMatch = html.match(/profileUrn=(urn%3Ali%3Afsd_profile%3A[A-Za-z0-9_-]+)/i);
+      if (hrefMatch) return decodeURIComponent(hrefMatch[1]);
+
+      const rawUrnMatch = html.match(/profileUrn=(urn:li:fsd_profile:[A-Za-z0-9_-]+)/i);
+      if (rawUrnMatch) return rawUrnMatch[1];
+
+      const normalizedTarget = (targetVanity || "").toLowerCase().replace(/[^a-z0-9_-]/g, "");
+
+      // 2. Scan all <code ...> and <script ...> elements for Voyager JSON
+      const codeElements = Array.from(document.querySelectorAll("code, script"));
       for (const code of codeElements) {
         const text = code.textContent || "";
-        if (text.includes("urn:li:fsd_profile:") && text.toLowerCase().includes(normalizedTarget)) {
+        if (text.includes("urn:li:fsd_profile:")) {
           try {
             const data = JSON.parse(text);
             const list = Array.isArray(data.included) ? data.included : Array.isArray(data.data) ? data.data : [data];
             for (const item of list) {
               if (item && item.entityUrn && typeof item.entityUrn === "string" && item.entityUrn.startsWith("urn:li:fsd_profile:")) {
-                const pubId = (item.publicIdentifier || "").toLowerCase();
-                if (pubId === normalizedTarget) {
+                const pubId = ((item.publicIdentifier as string) || "").toLowerCase().replace(/[^a-z0-9_-]/g, "");
+                if (pubId && normalizedTarget && (pubId === normalizedTarget || normalizedTarget.includes(pubId) || pubId.includes(normalizedTarget))) {
                   return item.entityUrn;
                 }
               }
             }
           } catch {
-            const regex = new RegExp(`"entityUrn":"(urn:li:fsd_profile:[^"]+)".*?"publicIdentifier":"${normalizedTarget}"`, "i");
-            const m = text.match(regex);
-            if (m) return m[1];
-            const revRegex = new RegExp(`"publicIdentifier":"${normalizedTarget}".*?"entityUrn":"(urn:li:fsd_profile:[^"]+)"`, "i");
-            const rm = text.match(revRegex);
-            if (rm) return rm[1];
+            if (normalizedTarget && text.toLowerCase().includes(normalizedTarget)) {
+              const m = text.match(/"entityUrn":"(urn:li:fsd_profile:[A-Za-z0-9_-]+)"/);
+              if (m) return m[1];
+              const m2 = text.match(/(urn:li:fsd_profile:[A-Za-z0-9_-]+)/);
+              if (m2) return m2[1];
+            }
           }
         }
       }
 
-      // 2. Scan DOM attributes for fsd_profile URNs
+      // 3. Scan DOM attributes for fsd_profile URNs
       const elementsWithUrn = document.querySelectorAll("[data-entity-urn*='fsd_profile'], [data-member-id*='fsd_profile']");
       for (const el of Array.from(elementsWithUrn)) {
         const urn = el.getAttribute("data-entity-urn") || el.getAttribute("data-member-id");
         if (urn && urn.startsWith("urn:li:fsd_profile:")) {
           return urn;
         }
+      }
+
+      // 4. Any fsd_profile URN in the page HTML
+      const allMatches = Array.from(html.matchAll(/urn:li:fsd_profile:[A-Za-z0-9_-]+/g)).map((m) => m[0]);
+      if (allMatches.length > 0) {
+        return allMatches[0];
       }
     } catch {
       /* ignore */

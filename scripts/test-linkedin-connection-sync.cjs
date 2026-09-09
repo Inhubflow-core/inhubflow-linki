@@ -357,7 +357,7 @@ const messageSource = fs.readFileSync(require.resolve("../lib/linkedin/message.t
 assert.equal(resultNameMatches("MOre fergo\n1er grado • Ingeniera", "MOre fergo"), true);
 assert.equal(resultNameMatches("John Doe\nVP of Marketing", "John Doe"), true);
 assert.equal(resultNameMatches("Jane Smith\nDesigner", "John Doe"), false);
-assert.match(messageSource, /headerCard\.locator/);
+assert.match(messageSource, /main button, main a/);
 assert.match(messageSource, /msg-overlay-conversation-bubble/);
 assert.match(messageSource, /msg-conversations-container__compose-btn/);
 
@@ -365,6 +365,7 @@ assert.match(messageSource, /msg-conversations-container__compose-btn/);
   const mockPage = {
     evaluate: async (fn, arg) => {
       const mockDocument = {
+        documentElement: { innerHTML: "" },
         querySelectorAll: (selector) => {
           if (selector.includes("code")) {
             return [
@@ -395,10 +396,10 @@ assert.match(messageSource, /msg-conversations-container__compose-btn/);
   };
   const extractedUrn = await extractProfileUrnFromPage(mockPage, "more-fergo");
   assert.equal(extractedUrn, "urn:li:fsd_profile:ACoAATEST123");
+
+  console.log("LinkedIn accepted-connection reconciliation tests passed");
+
+  if (originalTsLoader) Module._extensions[".ts"] = originalTsLoader;
+  else delete Module._extensions[".ts"];
 })();
-
-console.log("LinkedIn accepted-connection reconciliation tests passed");
-
-if (originalTsLoader) Module._extensions[".ts"] = originalTsLoader;
-else delete Module._extensions[".ts"];
 
