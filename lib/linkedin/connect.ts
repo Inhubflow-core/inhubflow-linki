@@ -74,10 +74,15 @@ async function visibleCustomInvite(scope: Locator): Promise<Locator | null> {
 }
 
 function isConnectAction(text: string, aria: string, title: string): boolean {
-  if (matchesLabel(text, CONNECT_LABEL_RE)) return true;
-  return [aria, title].some((value) => {
+  return [text, aria, title].some((value) => {
     const label = normalizeLabel(value);
-    return CONNECT_LABEL_RE.test(label) || /(?:^|\s)(?:conectar|connect|convidar|invitar|invite)(?:\s|$)/i.test(label);
+    return (
+      CONNECT_LABEL_RE.test(label) ||
+      /(?:^|\s)(?:conectar|connect|convidar|invitar|invite|se connecter|conectar-se)(?:\s|$)/i.test(label) ||
+      label.includes("conectar") ||
+      label.includes("connect") ||
+      label.includes("convidar")
+    );
   });
 }
 
@@ -291,6 +296,29 @@ async function activateConnectAction(
 }
 
 async function findConnectInOpenMenu(page: Page): Promise<Locator | null> {
+  const directConnect = page.locator(`
+    [role="menu"] [role="menuitem"]:has-text("Conectar"),
+    [role="menu"] .artdeco-dropdown__item:has-text("Conectar"),
+    [role="menu"] div:has-text("Conectar"),
+    [role="menu"] span:has-text("Conectar"),
+    .artdeco-dropdown__content [role="menuitem"]:has-text("Conectar"),
+    .artdeco-dropdown__content .artdeco-dropdown__item:has-text("Conectar"),
+    .artdeco-dropdown__content div:has-text("Conectar"),
+    .artdeco-dropdown__content span:has-text("Conectar"),
+    [role="menu"] [role="menuitem"]:has-text("Connect"),
+    [role="menu"] .artdeco-dropdown__item:has-text("Connect"),
+    .artdeco-dropdown__content [role="menuitem"]:has-text("Connect"),
+    .artdeco-dropdown__content .artdeco-dropdown__item:has-text("Connect"),
+    .artdeco-dropdown__content div:has-text("Connect"),
+    .artdeco-dropdown__content span:has-text("Connect"),
+    .artdeco-dropdown__item:has-text("Conectar"),
+    .artdeco-dropdown__item:has-text("Connect")
+  `).first();
+
+  if (await directConnect.isVisible().catch(() => false)) {
+    return directConnect;
+  }
+
   const menus = page.locator(MENU_SELECTOR);
   const menuCount = await menus.count().catch(() => 0);
   for (let index = 0; index < menuCount; index++) {
@@ -301,18 +329,15 @@ async function findConnectInOpenMenu(page: Page): Promise<Locator | null> {
     const option = await visibleAction(
       menu,
       (text, aria, title) => isConnectAction(text, aria, title),
-      'a, button, [role="menuitem"], [role="button"], .artdeco-dropdown__item'
+      'a, button, [role="menuitem"], [role="button"], .artdeco-dropdown__item, span, div'
     );
     if (option) return option;
   }
 
-  // Some LinkedIn builds omit a menu wrapper but keep visible menuitem or
-  // Artdeco-item semantics. Never search arbitrary links in the full body: a
-  // recommendation card can contain another person's custom-invite URL.
   return visibleAction(
     page.locator("body"),
     (text, aria, title) => isConnectAction(text, aria, title),
-    '[role="menuitem"]:visible, .artdeco-dropdown__item:visible'
+    '[role="menuitem"]:visible, .artdeco-dropdown__item:visible, .artdeco-dropdown__content *:visible'
   );
 }
 
@@ -337,7 +362,7 @@ async function findPendingInOpenMenu(page: Page): Promise<Locator | null> {
 
 async function waitForOpenMenuAction(
   page: Page,
-  timeoutMs = 2500
+  timeoutMs = 3000
 ): Promise<{ connect: Locator | null; pending: Locator | null }> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -351,6 +376,42 @@ async function waitForOpenMenuAction(
 }
 
 async function clickConnectFromMoreMenu(page: Page, scope: Locator): Promise<Locator | null> {
+  // 1. Prioritize real 3-dots / More / Más buttons on the profile header
+  const priorityMoreSelectors = [
+    'main button[aria-label*="más" i]',
+    'main button[aria-label*="mais" i]',
+    'main button[aria-label*="more" i]',
+    'main button[aria-label*="acciones" i]',
+    'main button[aria-label*="actions" i]',
+    'main button[aria-label*="opções" i]',
+    'main button[aria-label*="opciones" i]',
+    'main button:has(svg[data-test-icon*="overflow"])',
+    'main button:has(li-icon[type*="overflow"])',
+    'main button:has(svg-icon[type*="overflow"])',
+    'main button.artdeco-dropdown__trigger:has-text("Más")',
+    'main button.artdeco-dropdown__trigger:has-text("Mais")',
+    'main button.artdeco-dropdown__trigger:has-text("More")',
+  ];
+
+  for (const selector of priorityMoreSelectors) {
+    const buttons = page.locator(selector);
+    const count = await buttons.count().catch(() => 0);
+    for (let i = 0; i < count; i++) {
+      const btn = buttons.nth(i);
+      if (!(await btn.isVisible().catch(() => false))) continue;
+      await btn.click().catch(() => {});
+      await page.waitForTimeout(600);
+      const menuAction = await waitForOpenMenuAction(page, 3500);
+      if (menuAction.pending) {
+        throw new PendingInviteError("Invitation already pending (found in More/Mais menu)");
+      }
+      if (menuAction.connect) return menuAction.connect;
+      await page.keyboard.press("Escape").catch(() => {});
+      await page.waitForTimeout(150);
+    }
+  }
+
+  // 2. Fallback: search triggerCandidates inside scope
   const triggerCandidates = scope.locator(`
     button[aria-haspopup="menu"],
     [role="button"][aria-haspopup="menu"],
@@ -375,7 +436,8 @@ async function clickConnectFromMoreMenu(page: Page, scope: Locator): Promise<Loc
     if (!isMoreTrigger(text, aria ?? "", title ?? "", className ?? "")) continue;
 
     await trigger.click({ force: true }).catch(() => {});
-    const menuAction = await waitForOpenMenuAction(page);
+    await page.waitForTimeout(500);
+    const menuAction = await waitForOpenMenuAction(page, 3000);
     if (menuAction.pending) {
       throw new PendingInviteError("Invitation already pending (found in More/Mais menu)");
     }
