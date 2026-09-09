@@ -84,12 +84,15 @@ export async function visitProfile(page: Page, linkedinUrl: string): Promise<Pro
     };
   }
 
-  const topCard = page.locator("main section:has(h1):visible, main .pv-top-card:visible, .pvs-profile-actions:visible, main section:visible").first();
-  const topCardExists = (await topCard.count().catch(() => 0)) > 0;
-  const actionsScope = topCardExists ? topCard : main;
+  // 1. Locate the top profile card container containing h1
+  const topCard = page.locator("main section, main > div, .pv-top-card")
+    .filter({ has: page.locator("h1") })
+    .first();
+  const topCardFound = (await topCard.count().catch(() => 0)) > 0;
+  const headerCard = topCardFound ? topCard : page.locator("main").first();
 
-  const topCardText = (await actionsScope.innerText().catch(() => "")).replace(/\s+/g, " ").trim();
-  const badgeLocator = actionsScope.locator(".dist-value, span[class*='distance-badge'], span[class*='dist-value']").first();
+  const topCardText = (await headerCard.innerText().catch(() => "")).replace(/\s+/g, " ").trim();
+  const badgeLocator = headerCard.locator(".dist-value, span[class*='distance-badge'], span[class*='dist-value']").first();
   const badgeText = (await badgeLocator.innerText().catch(() => "")).trim();
 
   const visibleText = topCardText;
@@ -100,54 +103,76 @@ export async function visitProfile(page: Page, linkedinUrl: string): Promise<Pro
   const explicitSecondOrThird = explicitDegree === "second_or_third";
   const explicitFirst = explicitDegree === "first";
 
-  const messageAction = actionsScope.locator(`
-    button:visible:has-text("Mensaje"),
-    button:visible:has-text("Mensagem"),
-    button:visible:has-text("Message"),
-    button:visible:has-text("Enviar mensaje"),
-    button:visible:has-text("Enviar mensagem"),
-    button:visible:has-text("Send message"),
-    button:visible[aria-label*="Mensaje" i],
-    button:visible[aria-label*="Mensagem" i],
-    button:visible[aria-label*="Message" i],
-    div[role="button"]:visible:has-text("Mensaje"),
-    div[role="button"]:visible:has-text("Mensagem"),
-    div[role="button"]:visible:has-text("Message"),
-    a:visible[href*="/messaging/compose"],
-    a:visible[href*="/messaging/thread"],
-    a:visible[href*="/messaging/"]
-  `).first();
-  const connectAction = actionsScope.locator(`
-    button:visible:has-text("Conectar"),
-    button:visible:has-text("Connect"),
-    button:visible[aria-label*="Conectar" i],
-    button:visible[aria-label*="Connect" i],
-    div[role="button"]:visible:has-text("Conectar"),
-    div[role="button"]:visible:has-text("Connect")
-  `).first();
-  const pendingAction = actionsScope.locator(`
-    button:visible:has-text("Pendente"),
-    button:visible:has-text("Pending"),
-    button:visible:has-text("Pendiente"),
-    button:visible:has-text("Aguardando"),
-    button:visible[aria-label*="Pendente" i],
-    button:visible[aria-label*="Pending" i],
-    button:visible[aria-label*="Pendiente" i],
-    button:visible[aria-label*="Aguardando" i],
-    div[role="button"]:visible:has-text("Pendiente"),
-    div[role="button"]:visible:has-text("Pending"),
-    div[role="button"]:visible:has-text("Pendente")
-  `).first();
+  // 2. Accurately inspect and classify buttons strictly within the profile header
+  const candidateElements = headerCard.locator("button:visible, a:visible, div[role='button']:visible");
+  const elCount = await candidateElements.count().catch(() => 0);
 
-  const hasMessageAction = (await messageAction.count().catch(() => 0)) > 0;
-  const hasConnectAction = (await connectAction.count().catch(() => 0)) > 0;
-  const hasPendingAction = (await pendingAction.count().catch(() => 0)) > 0;
-  const messageLink = actionsScope.locator('a:visible[href*="/messaging/compose"], a:visible[href*="/messaging/thread"]').first();
-  const messageHref = (await messageLink.count().catch(() => 0)) > 0
-    ? await messageLink.getAttribute("href").catch(() => null)
-    : null;
-  const urnMatch = messageHref?.match(/profileUrn=([^&]+)/);
-  const messagingUrn = urnMatch ? decodeURIComponent(urnMatch[1]) : null;
+  let hasMessageAction = false;
+  let hasConnectAction = false;
+  let hasPendingAction = false;
+  let messagingUrn: string | null = null;
+  const actionsFound: string[] = [];
+
+  for (let i = 0; i < elCount; i++) {
+    const el = candidateElements.nth(i);
+    const [rawText, rawAria, rawHref] = await Promise.all([
+      el.innerText().catch(() => ""),
+      el.getAttribute("aria-label").then((v) => v ?? "").catch(() => ""),
+      el.getAttribute("href").then((v) => v ?? "").catch(() => ""),
+    ]);
+    const text = rawText.replace(/\s+/g, " ").trim();
+    const aria = rawAria.replace(/\s+/g, " ").trim();
+
+    if (!messagingUrn && rawHref) {
+      const match = rawHref.match(/profileUrn=([^&]+)/);
+      if (match) messagingUrn = decodeURIComponent(match[1]);
+    }
+
+    // Ignore More / 3-dots overflow button so it is never confused for Connect
+    const isMoreButton =
+      /^(?:más|more|mais)$/i.test(text) ||
+      /(?:más acciones|more actions|mais ações|más opciones|more options|mais opções)/i.test(aria);
+
+    if (isMoreButton) {
+      actionsFound.push(`more:${text || aria}`);
+      continue;
+    }
+
+    // Message action
+    const isMessage =
+      /^(?:mensaje|message|mensagem|enviar mensaje|send message|enviar mensagem)$/i.test(text) ||
+      /^(?:mensaje|message|mensagem|enviar mensaje|send message|enviar mensagem)\b/i.test(aria) ||
+      rawHref.includes("/messaging/compose") ||
+      rawHref.includes("/messaging/thread");
+
+    if (isMessage) {
+      hasMessageAction = true;
+      actionsFound.push(`msg:${text || aria}`);
+      continue;
+    }
+
+    // Pending action
+    const isPending =
+      /^(?:pendiente|pending|pendente|aguardando)$/i.test(text) ||
+      /(?:invitación pendiente|invitation pending|convite pendente|aguardando confirma[cç][ãa]o)/i.test(aria);
+
+    if (isPending) {
+      hasPendingAction = true;
+      actionsFound.push(`pending:${text || aria}`);
+      continue;
+    }
+
+    // Connect action (strictly text = Conectar/Connect/etc. or aria starting with Invitar/Invite/Conectar con)
+    const isConnect =
+      /^(?:conectar|connect|convidar|invitar|se connecter)$/i.test(text) ||
+      /(?:^|\s)(?:invitar a [^.]* a conectar|invite [^.]* to connect|conectar com |conectar con )\b/i.test(aria);
+
+    if (isConnect) {
+      hasConnectAction = true;
+      actionsFound.push(`connect:${text || aria}`);
+      continue;
+    }
+  }
 
   let isFirstDegree = false;
   let reason = "no_positive_connection_evidence";
@@ -158,10 +183,10 @@ export async function visitProfile(page: Page, linkedinUrl: string): Promise<Pro
     reason = "explicit_second_or_third_degree";
   } else if (hasConnectAction || hasPendingAction) {
     reason = hasPendingAction ? "explicit_pending_action" : "explicit_connect_action";
-  } else if (hasMessageAction || messageHref) {
+  } else if (hasMessageAction) {
     // If no degree badge was detected, verify if "Connect" or "Pending" is
     // hidden inside the More / 3-dots menu (common in Creator Mode & Open Profiles).
-    const moreMenu = await inspectMoreMenuForConnectionState(page, actionsScope);
+    const moreMenu = await inspectMoreMenuForConnectionState(page, headerCard);
     if (moreMenu.hasConnect) {
       reason = "more_menu_has_connect_action";
     } else if (moreMenu.hasPending) {
@@ -180,7 +205,7 @@ export async function visitProfile(page: Page, linkedinUrl: string): Promise<Pro
     messagingUrn: isFirstDegree ? messagingUrn : null,
     evidence: {
       pageUrl,
-      visibleTextSample: visibleText.slice(0, 500),
+      visibleTextSample: `${visibleText.slice(0, 300)} [actions: ${actionsFound.join(", ")}]`,
       explicitDegree: explicitSecondOrThird ? "second_or_third" : explicitFirst ? "first" : null,
       hasMessageAction,
       hasConnectAction,
