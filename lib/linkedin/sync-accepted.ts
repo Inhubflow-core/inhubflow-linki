@@ -407,6 +407,9 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
         };
       }
       console.warn(`[sync-accepted] Connections API returned HTTP ${error.status}, but the feed session remains authenticated`);
+      try {
+        db.prepare("UPDATE accounts SET accepted_sync_at = datetime('now') WHERE id = ?").run(accountId);
+      } catch { /* ignore */ }
       return {
         success: false,
         partial: true,

@@ -29,14 +29,30 @@ export function isLinkedInAuthenticationWall(url: string): boolean {
  */
 export async function probeLinkedInAuthenticationWall(page: Page): Promise<boolean> {
   try {
-    if (isLinkedInAuthenticationWall(page.url())) return true;
+    const startUrl = page.url();
+    if (isLinkedInAuthenticationWall(startUrl)) {
+      console.warn(`[auth-wall] Probe: start URL matches auth wall: ${startUrl}`);
+      return true;
+    }
     await page.goto("https://www.linkedin.com/feed/", {
       waitUntil: "domcontentloaded",
       timeout: 25_000,
-    }).catch(() => {});
+    }).catch((e) => {
+      console.warn(`[auth-wall] Probe navigation warning: ${e instanceof Error ? e.message : String(e)}`);
+    });
     await page.waitForTimeout(1500);
-    if (isLinkedInAuthenticationWall(page.url())) return true;
-    return (await page.locator(PUBLIC_SIGN_IN_SELECTOR).count().catch(() => 0)) > 0;
+    const feedUrl = page.url();
+    if (isLinkedInAuthenticationWall(feedUrl)) {
+      console.warn(`[auth-wall] Probe: feed redirected to auth wall: ${feedUrl}`);
+      return true;
+    }
+    const publicSignIn = (await page.locator(PUBLIC_SIGN_IN_SELECTOR).count().catch(() => 0)) > 0;
+    if (publicSignIn) {
+      console.warn(`[auth-wall] Probe: public sign-in prompt detected on ${feedUrl}`);
+      return true;
+    }
+    console.log(`[auth-wall] Probe: feed confirmed authenticated (${feedUrl})`);
+    return false;
   } catch {
     // A network/browser failure is not evidence that LinkedIn revoked the
     // session. The next real navigation can make that determination.
