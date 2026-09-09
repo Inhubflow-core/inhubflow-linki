@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/db";
 import { randomUUID } from "crypto";
+import type { Page } from "playwright";
 import { getSessionPage, saveSessionState, getSessionContext, markNeedsReauth } from "@/lib/linkedin/session";
 import { visitProfile } from "@/lib/linkedin/visit";
 import {
@@ -745,13 +746,14 @@ async function executeStep(
       }
 
       let lastLiveCheckReason: string | null = null;
+      let activePage: Page | null = null;
       if (freshTarget.degree !== 1) {
         // Perform a live verification check by visiting the profile. This is the
         // final read-only check immediately before send and writes no action.
         const messageLinkedinUrl = await getLinkedinUrl(db, target, accountId);
-        const page = await getSessionPage(accountId);
+        activePage = await getSessionPage(accountId);
         try {
-          const check = await visitProfile(page, messageLinkedinUrl);
+          const check = await visitProfile(activePage, messageLinkedinUrl);
           lastLiveCheckReason = check.evidence.reason;
           if (check.isFirstDegree) {
             db.prepare("UPDATE targets SET degree = 1, connected_at = COALESCE(connected_at, ?), messaging_urn = COALESCE(messaging_urn, ?) WHERE id = ?")
@@ -760,16 +762,24 @@ async function executeStep(
             log(db, runId, target.id, "info", `${name} verified as 1st-degree via live profile (${check.evidence.reason}) — proceeding with message`);
           } else {
             log(db, runId, target.id, "info", `${name} live connection check negative (${check.evidence.reason}; message=${check.evidence.hasMessageAction}, connect=${check.evidence.hasConnectAction}, pending=${check.evidence.hasPendingAction})`);
+            await activePage.close();
+            activePage = null;
           }
         } catch (err) {
           console.warn(`[runner] Live connection check failed for ${name}:`, err instanceof Error ? err.message : err);
           log(db, runId, target.id, "warn", `${name} live connection check failed — ${err instanceof Error ? err.message : String(err)}`);
-        } finally {
-          await page.close();
+          if (activePage) {
+            await activePage.close();
+            activePage = null;
+          }
         }
       }
 
       if (freshTarget.degree !== 1) {
+        if (activePage) {
+          await activePage.close();
+          activePage = null;
+        }
         const requested = freshTarget.connection_requested_at;
         if (requested && hoursSince(requested) / 24 > CONNECTION_MAX_WAIT_DAYS) {
           log(db, runId, target.id, "warn", `${name} never accepted — skipping message step`);
@@ -788,6 +798,7 @@ async function executeStep(
       let messageText = "";
       if (step.ai_enabled) {
         if (!premium?.ai) {
+          if (activePage) await activePage.close();
           log(db, runId, target.id, "warn", `AI writer is a premium feature — not available in this build. Skipping ${name}`);
           trAdvance(db, tr, steps);
           return;
@@ -796,12 +807,14 @@ async function executeStep(
         const agentCfgForMsg = premium.ai.getAgentConfig();
         const resolvedMsgModel = step.ai_model || agentCfgForMsg.default_model;
         if (!integration?.api_key || !resolvedMsgModel) {
+          if (activePage) await activePage.close();
           log(db, runId, target.id, "warn", `AI enabled on message step but OpenRouter key or model missing — skipping ${name}`);
           trAdvance(db, tr, steps);
           return;
         }
         const contactData = premium.ai.getContactWithCompany(target.id);
         if (!contactData) {
+          if (activePage) await activePage.close();
           log(db, runId, target.id, "warn", `Could not load contact data for AI message — skipping ${name}`);
           trAdvance(db, tr, steps);
           return;
@@ -842,6 +855,7 @@ async function executeStep(
         if (!messageText && step.message_body) messageText = renderTemplate(step.message_body, freshTarget);
       }
       if (!messageText) {
+        if (activePage) await activePage.close();
         log(db, runId, target.id, "warn", `No message body for message step — skipping ${name}`);
         trAdvance(db, tr, steps);
         return;
@@ -850,7 +864,7 @@ async function executeStep(
       db.prepare("UPDATE run_profile_tracks SET last_step_at = datetime('now') WHERE id = ?").run(tr.id);
       log(db, runId, target.id, "info", `Sending message to ${name}`);
       const messageLinkedinUrl = await getLinkedinUrl(db, target, accountId);
-      const page = await getSessionPage(accountId);
+      const page = activePage ?? (await getSessionPage(accountId));
       try {
         if (!target.full_name) throw new Error(`Target ${target.id} has no full_name — cannot search messaging`);
         const result = await sendMessage(page, target.full_name, messageText, messageLinkedinUrl, freshTarget.messaging_urn);
