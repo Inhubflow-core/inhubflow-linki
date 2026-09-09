@@ -510,26 +510,34 @@ async function sendFromComposeBox(page: Page, text: string, attachmentPath?: str
     await attachFileInCompose(page, attachmentPath);
   }
 
-  // 2. Paste or type text message into compose area if text provided
+  // 2. Focus and enter text message into compose area
   if (text?.trim()) {
+    console.log("[message] Focusing compose box for text entry");
     await findAndFocusComposeBox(page, 8000);
 
-    let pasted = false;
+    // Try clipboard paste first
     try {
       await page.evaluate((t) => navigator.clipboard.writeText(t), text);
       await page.waitForTimeout(200);
       await page.keyboard.press("Control+V");
       await page.waitForTimeout(300);
-      pasted = true;
     } catch {
-      pasted = false;
+      /* continue to verification */
     }
 
-    if (!pasted) {
-      await page.keyboard.type(text, { delay: 12 });
+    // Check if text was actually inserted into the active contenteditable
+    const hasText = await page.evaluate(() => {
+      const active = document.activeElement;
+      return active ? (active.textContent || "").trim().length > 0 : false;
+    }).catch(() => false);
+
+    if (!hasText) {
+      console.log("[message] Direct typing message text into compose box");
+      await page.keyboard.type(text, { delay: 10 });
+      await page.waitForTimeout(400);
     }
 
-    // Trigger input events so LinkedIn's Ember/React app enables the Send button
+    // Trigger input and change events so LinkedIn's React/Ember app enables the Send button
     await page.evaluate(() => {
       const active = document.activeElement;
       if (active) {
@@ -545,39 +553,88 @@ async function sendFromComposeBox(page: Page, text: string, attachmentPath?: str
     await page.waitForTimeout(600);
   }
 
-  // 3. Locate send button
-  const sendBtn = page.locator(`
-    button.msg-form__send-button,
-    button[type='submit'].msg-form__send-button,
-    button.msg-form__send-btn,
-    button[type='submit'].msg-form__send-btn,
-    button:has-text("Send"),
-    button:has-text("Enviar"),
-    button:has-text("Envoyer"),
-    button[aria-label*="Send" i],
-    button[aria-label*="Enviar" i],
-    button[aria-label*="Envoyer" i]
-  `);
+  // 3. Multi-strategy send dispatch
+  console.log("[message] Dispatching send action");
+  let sentViaDom = false;
 
-  let targetSendBtn = sendBtn.first();
-  const btnCount = await sendBtn.count().catch(() => 0);
-  for (let i = 0; i < btnCount; i++) {
-    const b = sendBtn.nth(i);
-    if (await b.isVisible().catch(() => false)) {
-      targetSendBtn = b;
-      break;
+  // Strategy A: DOM submit on form or send button
+  sentViaDom = await page.evaluate(() => {
+    // 1. Look for submit button inside active message form
+    const forms = Array.from(document.querySelectorAll<HTMLFormElement>("form.msg-form, .msg-overlay-conversation-bubble form, .msg-thread form, form"));
+    for (const form of forms) {
+      const btn = form.querySelector<HTMLButtonElement>(
+        'button[type="submit"], button.msg-form__send-button, button.msg-form__send-btn, footer button.artdeco-button--primary, button[data-control-name="send_message"]'
+      );
+      if (btn) {
+        btn.removeAttribute("disabled");
+        btn.disabled = false;
+        btn.click();
+        return true;
+      }
+    }
+
+    // 2. Scan all buttons on page for send intent
+    const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>("button"));
+    for (const b of buttons) {
+      const aria = (b.getAttribute("aria-label") || "").toLowerCase();
+      const text = (b.innerText || "").trim().toLowerCase();
+      const type = b.getAttribute("type");
+      const hasIcon = !!b.querySelector('svg[data-test-icon*="send"], li-icon[type*="send"]');
+      if (
+        (type === "submit" && (b.className.includes("msg") || b.closest("footer, form"))) ||
+        aria.includes("enviar") ||
+        aria.includes("send") ||
+        text === "enviar" ||
+        text === "send" ||
+        hasIcon
+      ) {
+        const rect = b.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          b.removeAttribute("disabled");
+          b.disabled = false;
+          b.click();
+          return true;
+        }
+      }
+    }
+    return false;
+  }).catch(() => false);
+
+  if (sentViaDom) {
+    console.log("[message] Send button clicked via DOM successfully");
+  } else {
+    // Strategy B: Playwright locator fallback
+    const sendLocator = page.locator(`
+      form.msg-form button[type='submit'],
+      button.msg-form__send-button,
+      button.msg-form__send-btn,
+      footer button.artdeco-button--primary,
+      button:has(svg[data-test-icon*='send']),
+      button:has-text("Enviar"),
+      button:has-text("Send")
+    `);
+
+    const count = await sendLocator.count().catch(() => 0);
+    for (let i = 0; i < count; i++) {
+      const b = sendLocator.nth(i);
+      if (await b.isVisible().catch(() => false)) {
+        if (await b.isDisabled().catch(() => false)) {
+          await page.keyboard.press("Space");
+          await page.keyboard.press("Backspace");
+          await page.waitForTimeout(300);
+        }
+        await b.click({ delay: 50 }).catch(() => {});
+        console.log("[message] Send button clicked via Playwright locator");
+        break;
+      }
     }
   }
 
-  await targetSendBtn.waitFor({ state: "visible", timeout: 10000 });
-
-  // If sendBtn is disabled, try pressing Space + Backspace in compose box to trigger state change
-  if (await targetSendBtn.isDisabled().catch(() => false)) {
-    await page.keyboard.press("Space");
-    await page.keyboard.press("Backspace");
-    await page.waitForTimeout(500);
-  }
-
-  await targetSendBtn.click({ delay: 100 });
+  // Strategy C: Keyboard shortcuts — Control+Enter is the universal shortcut in LinkedIn to send
+  console.log("[message] Sending keyboard send shortcut (Control+Enter)");
+  await page.keyboard.press("Control+Enter");
+  await page.waitForTimeout(500);
+  await page.keyboard.press("Enter");
   await page.waitForTimeout(3000);
+  console.log("[message] Send sequence completed");
 }
