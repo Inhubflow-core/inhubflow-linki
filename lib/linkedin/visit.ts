@@ -18,8 +18,8 @@ export interface ProfileVisitResult {
   evidence: ProfileConnectionEvidence;
 }
 
-const FIRST_DEGREE = /(?:^|[\s•·(])1(?:st|\.?[º°ª]|\.?er)(?:\s*(?:degree|grado|grau))?(?=$|[\s•·),.;])/i;
-const SECOND_OR_THIRD_DEGREE = /(?:^|[\s•·(])(?:2nd|3rd|[23](?:nd|rd|\.?[º°ª]|\.?er|\.?do|\.?ro))(?:\s*(?:degree|grado|grau))?(?=$|[\s•·),.;])/i;
+const FIRST_DEGREE = /(?:^|[\s•·(])1(?:st|\.?[º°ª]|\.?er)(?:\s*(?:degree|grado|grau|degr[eé]|grad))?(?=$|[\s•·),.;])/i;
+const SECOND_OR_THIRD_DEGREE = /(?:^|[\s•·(])(?:2nd|3rd|[23](?:nd|rd|\.?[º°ª]|\.?er|\.?do|\.?ro|\.?e))(?:\s*(?:degree|grado|grau|degr[eé]|grad))?(?=$|[\s•·),.;])/i;
 
 export function detectExplicitProfileDegree(text: string): "first" | "second_or_third" | null {
   if (SECOND_OR_THIRD_DEGREE.test(text)) return "second_or_third";

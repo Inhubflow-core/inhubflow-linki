@@ -1,5 +1,6 @@
 import type { Locator, Page } from "playwright";
 import { isLinkedInAuthenticationWall, LinkedInAuthenticationError } from "./auth-wall";
+import { detectExplicitProfileDegree } from "./visit";
 
 export class WeeklyLimitError extends Error {}
 export class AlreadyConnectedError extends Error {}
@@ -17,15 +18,15 @@ const TOAST_SELECTOR = [
 ].join(",");
 
 const CONNECT_LABEL_RE = /^(?:conectar|connect|se connecter|vernetzen|convidar|invitar|invite)$/i;
-const MORE_LABEL_RE = /^(?:mais|mais ações|mais a[cç][õo]es|mais opções|mais op[cç][õo]es|más|más acciones|more|more actions|more options|actions|options)$/i;
-const PENDING_LABEL_RE = /^(?:pendente|pending|pendiente|convite pendente|invitation pending|invitación pendiente|aguardando confirma[cç][ãa]o|convite enviado|invitation sent|invitación enviada|cancelar convite|retirar convite|cancelar solicitação|withdraw invitation)$/i;
+const MORE_LABEL_RE = /^(?:mais|mais ações|mais a[cç][õo]es|mais opções|mais op[cç][õo]es|más|más acciones|más opciones|more|more actions|more options|actions|options)$/i;
+const PENDING_LABEL_RE = /^(?:pendente|pending|pendiente|convite pendente|invitation pending|invitación pendiente|aguardando confirma[cç][ãa]o|convite enviado|invitation sent|invitación enviada|cancelar convite|retirar convite|cancelar solicitação|cancelar solicitud|retirar solicitud|retirar invitación|cancelar invitación|withdraw invitation)$/i;
 const SENT_LABEL_RE = /(?:convite enviado|invitation sent|invitación enviada|solicitação enviada|pedido enviado|request sent|connection request sent|conexão enviada)/i;
 const NEGATED_SENT_RE = /(?:não (?:foi )?enviado|nao (?:foi )?enviado|não conseguimos enviar|nao conseguimos enviar|not sent|was not sent|wasn't sent|could not send|couldn't send|no (?:se )?(?:envió|envio)|no pudimos enviar)/i;
-const ERROR_LABEL_RE = /(?:algo deu errado|ocorreu um erro|não foi possível|nao foi possivel|tente novamente|could not|couldn't|unable to|something went wrong|try again|no se pudo|ocurrió un error|inténtalo de nuevo)/i;
-const LIMIT_RE = /(?:weekly connection limit|weekly limit|limite semanal|limite de convites|atingiu o limite|reached the limit)/i;
-const EMAIL_PROMPT_RE = /(?:digite|insira|informe|enter|provide).*e-?mail|e-?mail.*(?:para conectar|to connect|connection)/i;
-const ADD_NOTE_RE = /^(?:adicionar uma nota|adicionar nota|add a note|add note|adicionar mensagem|add message)$/i;
-const SEND_WITHOUT_NOTE_RE = /^(?:enviar sem nota|enviar sem uma nota|enviar agora|enviar convite|enviar convite agora|send without a note|send without note|send now|send invitation|send invitation without a note|enviar sin nota|enviar sin una nota)$/i;
+const ERROR_LABEL_RE = /(?:algo deu errado|ocorreu um erro|não foi possível|nao foi possivel|tente novamente|could not|couldn't|unable to|something went wrong|try again|no se pudo|ocurrió un error|inténtalo de nuevo|hubo un error)/i;
+const LIMIT_RE = /(?:weekly connection limit|weekly limit|limite semanal|limite de convites|atingiu o limite|reached the limit|límite semanal|límite de invitaciones|has alcanzado el límite)/i;
+const EMAIL_PROMPT_RE = /(?:digite|insira|informe|enter|provide|ingresa|introduce|escribe).*e-?mail|e-?mail.*(?:para conectar|to connect|connection|para conectarse)/i;
+const ADD_NOTE_RE = /^(?:adicionar uma nota|adicionar nota|add a note|add note|adicionar mensagem|add message|añadir una nota|añadir nota|agregar una nota|agregar nota|incluir nota)$/i;
+const SEND_WITHOUT_NOTE_RE = /^(?:enviar sem nota|enviar sem uma nota|enviar agora|enviar convite|enviar convite agora|send without a note|send without note|send now|send invitation|send invitation without a note|enviar sin nota|enviar sin una nota|enviar sin añadir nota|enviar sin agregar nota)$/i;
 const GENERIC_SEND_RE = /^(?:enviar|send)$/i;
 
 function normalizeLabel(value: string | null | undefined): string {
@@ -659,9 +660,8 @@ export async function sendConnectionRequest(
 
   const topCard = await profileActionScope(page);
   const pageText = await topCard.innerText().catch(() => "");
-  const isExplicit2ndOr3rd = /\b[23][ºªndrdth°\.]/i.test(pageText) || /•\s*[23]º/i.test(pageText);
-  const isExplicit1st = ( /\b1[ºªster°\.]/i.test(pageText) || /•\s*1º/i.test(pageText) ) && !isExplicit2ndOr3rd;
-  if (isExplicit1st) throw new AlreadyConnectedError("Already connected (1st degree)");
+  const explicitDegree = detectExplicitProfileDegree(pageText.slice(0, 600));
+  if (explicitDegree === "first") throw new AlreadyConnectedError("Already connected (1st degree)");
   if (await hasPendingProfileAction(topCard)) throw new PendingInviteError("Invitation already pending");
 
   let connectAction = await visibleCustomInvite(topCard);

@@ -64,18 +64,27 @@ export async function sendMessage(
 async function openComposeFromProfilePage(page: Page): Promise<boolean> {
   try {
     const msgBtn = page.locator(`
-      main section button:has-text("Mensagem"),
+      main section button:has-text("Mensaje"),
       main section button:has-text("Message"),
+      main section button:has-text("Mensagem"),
       main section button:has-text("Enviar mensaje"),
-      main section button[aria-label*="Mensagem"],
-      main section button[aria-label*="Message"],
-      main section button[aria-label*="Enviar mensaje"],
-      main button:has-text("Mensagem"),
+      main section button:has-text("Send message"),
+      main section button:has-text("Enviar mensagem"),
+      main section button[aria-label*="Mensaje" i],
+      main section button[aria-label*="Message" i],
+      main section button[aria-label*="Mensagem" i],
+      main section div[role="button"]:has-text("Mensaje"),
+      main section div[role="button"]:has-text("Message"),
+      main section div[role="button"]:has-text("Mensagem"),
+      main button:has-text("Mensaje"),
       main button:has-text("Message"),
-      main button:has-text("Enviar mensaje"),
-      button:has-text("Mensagem"),
+      main button:has-text("Mensagem"),
+      main button[aria-label*="Mensaje" i],
+      main button[aria-label*="Message" i],
+      main button[aria-label*="Mensagem" i],
+      button:has-text("Mensaje"),
       button:has-text("Message"),
-      button:has-text("Enviar mensaje")
+      button:has-text("Mensagem")
     `).first();
 
     if (await msgBtn.isVisible().catch(() => false)) {
@@ -178,7 +187,10 @@ async function attachFileInCompose(page: Page, filePath: string): Promise<boolea
         div[role='dialog'] button:has-text('Hecho'),
         div[role='dialog'] button:has-text('Continuar'),
         div[role='dialog'] button:has-text('Save'),
-        div[role='dialog'] button:has-text('Guardar')
+        div[role='dialog'] button:has-text('Guardar'),
+        div[role='dialog'] button:has-text('Concluir'),
+        div[role='dialog'] button:has-text('Salvar'),
+        div[role='dialog'] button:has-text('Pronto')
       `).first();
 
       if (await modalPrimaryBtn.isVisible({ timeout: 4000 }).catch(() => false)) {
@@ -217,7 +229,15 @@ async function sendFromComposeBox(page: Page, text: string, attachmentPath?: str
   }
 
   // 3. Send
-  const sendBtn = page.locator("button.msg-form__send-button:visible, button[type='submit'].msg-form__send-button:visible, button.msg-form__send-btn:visible").first();
+  const sendBtn = page.locator(`
+    button.msg-form__send-button:visible,
+    button[type='submit'].msg-form__send-button:visible,
+    button.msg-form__send-btn:visible,
+    button:has-text("Send"):visible,
+    button:has-text("Enviar"):visible,
+    button[aria-label*="Send" i]:visible,
+    button[aria-label*="Enviar" i]:visible
+  `).first();
   await sendBtn.waitFor({ timeout: 8000 });
   await sendBtn.click({ delay: 100 });
   await page.waitForTimeout(3000);

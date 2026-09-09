@@ -106,8 +106,14 @@ const { detectExplicitProfileDegree } = require("../lib/linkedin/visit.ts");
 assert.equal(detectExplicitProfileDegree("Roberto • 1st degree connection"), "first");
 assert.equal(detectExplicitProfileDegree("Contacto de 1er grado"), "first");
 assert.equal(detectExplicitProfileDegree("Conexão de 1º grau"), "first");
+assert.equal(detectExplicitProfileDegree("Roberto • 1.º"), "first");
+assert.equal(detectExplicitProfileDegree("Roberto • 1º"), "first");
+assert.equal(detectExplicitProfileDegree("Pierre • 1er"), "first");
 assert.equal(detectExplicitProfileDegree("Mariana • 2º"), "second_or_third");
+assert.equal(detectExplicitProfileDegree("Mariana • 2.º"), "second_or_third");
 assert.equal(detectExplicitProfileDegree("3rd degree connection"), "second_or_third");
+assert.equal(detectExplicitProfileDegree("Contacto de 3.er grado"), "second_or_third");
+assert.equal(detectExplicitProfileDegree("Claire • 2e"), "second_or_third");
 assert.equal(detectExplicitProfileDegree("Message Roberto"), null);
 
 assert.equal(normalizeLinkedInSameSite("no_restriction"), "None");
