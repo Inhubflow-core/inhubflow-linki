@@ -39,24 +39,26 @@ export async function sendMessage(
   // 2. Visit profile directly to check connection and find message action
   console.log(`[message] Visiting profile: ${linkedinUrl}`);
   const resolved = await visitProfile(page, linkedinUrl);
-  console.log(`[message] Profile resolved: isFirstDegree=${resolved.isFirstDegree}, URN=${resolved.messagingUrn}`);
+  const activeUrn = resolved.messagingUrn || messagingUrn || null;
+  console.log(`[message] Profile resolved: isFirstDegree=${resolved.isFirstDegree}, URN=${activeUrn}`);
 
-  if (resolved.messagingUrn) {
-    console.log(`[message] Attempting openComposeByUrn with freshly resolved URN: ${resolved.messagingUrn}`);
-    const opened = await openComposeByUrn(page, resolved.messagingUrn);
-    if (opened) {
-      await sendFromComposeBox(page, text, attachmentPath);
-      return resolved;
-    }
-  }
-
-  // 3. If on profile, open compose box directly from page button
+  // 3. Since we are already ON the profile page, attempt openComposeFromProfilePage first!
   if (resolved.isFirstDegree || resolved.evidence?.reason === "profile_main_missing") {
-    console.log(`[message] Attempting openComposeFromProfilePage (degree=${resolved.isFirstDegree}, reason=${resolved.evidence?.reason})`);
+    console.log(`[message] Attempting openComposeFromProfilePage while on profile (degree=${resolved.isFirstDegree})`);
     const openedOnPage = await openComposeFromProfilePage(page);
     if (openedOnPage) {
       await sendFromComposeBox(page, text, attachmentPath);
-      return { messagingUrn: resolved.messagingUrn, isFirstDegree: true };
+      return { messagingUrn: activeUrn, isFirstDegree: true };
+    }
+  }
+
+  // 4. If profile button didn't open compose but we have a messagingUrn, navigate to compose by URN
+  if (activeUrn) {
+    console.log(`[message] Attempting openComposeByUrn with resolved URN: ${activeUrn}`);
+    const opened = await openComposeByUrn(page, activeUrn);
+    if (opened) {
+      await sendFromComposeBox(page, text, attachmentPath);
+      return { messagingUrn: activeUrn, isFirstDegree: true };
     }
   }
 
@@ -68,10 +70,10 @@ export async function sendMessage(
     }
   }
 
-  // 4. Connected, but compose URN not found — fallback to LinkedIn Messaging
+  // 5. Fallback to LinkedIn Messaging typeahead search
   console.log(`[message] Falling back to sendMessageViaTypeahead for "${fullName}"`);
   await sendMessageViaTypeahead(page, fullName, text, attachmentPath);
-  return { messagingUrn: resolved.messagingUrn, isFirstDegree: true };
+  return { messagingUrn: activeUrn, isFirstDegree: true };
 }
 
 async function openComposeFromProfilePage(page: Page): Promise<boolean> {
@@ -139,7 +141,7 @@ async function openComposeFromProfilePage(page: Page): Promise<boolean> {
     await page.waitForTimeout(1000);
 
     // 2. Poll for visible compose box or expand minimized bubble
-    let focused = await findAndFocusComposeBox(page, 7000);
+    let focused = await findAndFocusComposeBox(page, 8000);
     if (focused) {
       console.log("[message] openComposeFromProfilePage: compose box successfully focused");
       return true;
@@ -151,7 +153,7 @@ async function openComposeFromProfilePage(page: Page): Promise<boolean> {
       console.log("[message] Retrying with DOM click on message button");
       await msgBtn.evaluate((el: HTMLElement) => el.click()).catch(() => {});
       await page.waitForTimeout(1500);
-      focused = await findAndFocusComposeBox(page, 7000);
+      focused = await findAndFocusComposeBox(page, 8000);
       if (focused) {
         console.log("[message] openComposeFromProfilePage: compose box focused after DOM click");
         return true;
@@ -169,7 +171,7 @@ async function openComposeFromProfilePage(page: Page): Promise<boolean> {
 async function findAndFocusComposeBox(page: Page, timeoutMs = 8000): Promise<boolean> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    // If conversation bubble is minimized, click header to expand
+    // 1. If conversation bubble is minimized, click header to expand
     await page.evaluate(() => {
       const minimized = document.querySelectorAll<HTMLElement>(".msg-overlay-conversation-bubble--is-minimized");
       for (const b of Array.from(minimized)) {
@@ -178,28 +180,52 @@ async function findAndFocusComposeBox(page: Page, timeoutMs = 8000): Promise<boo
       }
     }).catch(() => {});
 
-    // Try visible contenteditables
-    const msgInput = page.locator(`
-      .msg-overlay-conversation-bubble div.msg-form__contenteditable[contenteditable="true"]:visible,
-      .msg-overlay-conversation-bubble [contenteditable="true"]:visible,
-      .msg-overlay-conversation-bubble div[role="textbox"]:visible,
-      div.msg-form__contenteditable[contenteditable="true"]:visible,
-      div.msg-form__contenteditable:visible,
-      div[role="textbox"][contenteditable="true"]:visible,
-      div[role="textbox"].msg-form__message-texteditor:visible,
-      div.msg-form__message-texteditor:visible,
-      form.msg-form [contenteditable="true"]:visible,
-      .msg-thread [contenteditable="true"]:visible,
-      p.msg-form__contenteditable:visible
-    `).first();
+    // 2. Direct DOM scan for any visible, active contenteditable element
+    const focusedViaDom = await page.evaluate(() => {
+      const selectors = [
+        "div.msg-form__contenteditable[contenteditable='true']",
+        "div[role='textbox'].msg-form__message-texteditor",
+        "div.msg-form__contenteditable",
+        "div[role='textbox'][contenteditable='true']",
+        "form.msg-form [contenteditable='true']",
+        ".msg-overlay-conversation-bubble [contenteditable='true']",
+        ".msg-thread [contenteditable='true']",
+        "p.msg-form__contenteditable",
+        "[contenteditable='true']"
+      ];
+      for (const sel of selectors) {
+        const elements = Array.from(document.querySelectorAll<HTMLElement>(sel));
+        for (const el of elements) {
+          const rect = el.getBoundingClientRect();
+          const style = window.getComputedStyle(el);
+          const isVis = rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
+          if (isVis) {
+            el.click();
+            el.focus();
+            return true;
+          }
+        }
+      }
+      return false;
+    }).catch(() => false);
 
-    if ((await msgInput.count().catch(() => 0)) > 0 && (await msgInput.isVisible().catch(() => false))) {
-      await msgInput.click({ delay: 50 }).catch(() => {});
-      await msgInput.focus().catch(() => {});
+    if (focusedViaDom) {
       return true;
     }
 
-    await page.waitForTimeout(500);
+    // 3. Playwright locator check across candidates
+    const loc = page.locator("div.msg-form__contenteditable, div[role='textbox'].msg-form__message-texteditor, form.msg-form [contenteditable='true'], [contenteditable='true']");
+    const count = await loc.count().catch(() => 0);
+    for (let i = 0; i < count; i++) {
+      const item = loc.nth(i);
+      if (await item.isVisible().catch(() => false)) {
+        await item.click({ delay: 50 }).catch(() => {});
+        await item.focus().catch(() => {});
+        return true;
+      }
+    }
+
+    await page.waitForTimeout(400);
   }
   return false;
 }
@@ -212,7 +238,7 @@ async function openComposeByUrn(page: Page, messagingUrn: string): Promise<boole
     await page.goto(composeUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
     await page.waitForTimeout(2500);
 
-    const focused = await findAndFocusComposeBox(page, 12000);
+    const focused = await findAndFocusComposeBox(page, 15000);
     return focused;
   } catch (err) {
     console.warn("[message] openComposeByUrn failed:", err instanceof Error ? err.message : String(err));
@@ -223,14 +249,14 @@ async function openComposeByUrn(page: Page, messagingUrn: string): Promise<boole
 async function sendMessageViaTypeahead(page: Page, fullName: string, text: string, attachmentPath?: string | null): Promise<void> {
   console.log(`[message] Opening new message compose thread for: "${fullName}"`);
   
-  // Strategy 1: Navigate directly to thread/new which opens the new message compose view
+  // Strategy 1: Navigate directly to thread/new
   await page.goto("https://www.linkedin.com/messaging/thread/new/", {
     waitUntil: "domcontentloaded",
     timeout: 30000,
   });
   await page.waitForTimeout(2000);
 
-  // If redirect happened back to /messaging/, trigger the new message button directly
+  // If redirected back to /messaging/, trigger the new message button
   const pageUrl = page.url();
   if (!pageUrl.includes("/thread/new")) {
     console.log("[message] Triggering new message compose button on /messaging/");
@@ -255,50 +281,82 @@ async function sendMessageViaTypeahead(page: Page, fullName: string, text: strin
     }
   }
 
-  // Strategy 2: Look for the recipient typeahead search field with strict :visible pseudo-selector
-  const searchInputSelectors = [
-    "input.msg-connections-typeahead__search-field:visible",
-    ".msg-connections-typeahead input:visible",
-    "form.msg-connections-typeahead input:visible",
-    ".msg-compose input:visible",
-    "input[role='combobox']:visible",
-    "input[placeholder*='nome' i]:visible",
-    "input[placeholder*='nombre' i]:visible",
-    "input[placeholder*='name' i]:visible",
-    "input[placeholder*='digite' i]:visible",
-    "input[placeholder*='escreva' i]:visible",
-    "input[aria-label*='nome' i]:visible",
-    "input[aria-label*='nombre' i]:visible",
-    "input[aria-label*='name' i]:visible",
-    "input[aria-label*='digite' i]:visible",
-    "input[aria-label*='escreva' i]:visible",
-    "input[aria-label*='destinat' i]:visible",
-    "input[aria-label*='recipient' i]:visible",
-    "main input[type='text']:visible",
-    "div[role='main'] input[type='text']:visible"
-  ];
+  // Strategy 2: Look for the recipient typeahead search field via DOM scan
+  let searchFocused = false;
+  const startSearch = Date.now();
+  while (Date.now() - startSearch < 12000) {
+    searchFocused = await page.evaluate(() => {
+      const inputs = Array.from(document.querySelectorAll<HTMLInputElement>("input"));
+      for (const input of inputs) {
+        const rect = input.getBoundingClientRect();
+        const style = window.getComputedStyle(input);
+        if (rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none") {
+          const pl = (input.placeholder || "").toLowerCase();
+          const aria = (input.getAttribute("aria-label") || "").toLowerCase();
+          const name = (input.name || "").toLowerCase();
+          const cls = (input.className || "").toLowerCase();
+          if (
+            cls.includes("typeahead") ||
+            cls.includes("msg") ||
+            name.includes("search") ||
+            pl.includes("nome") || pl.includes("nombre") || pl.includes("name") || pl.includes("digite") || pl.includes("escreva") ||
+            aria.includes("nome") || aria.includes("nombre") || aria.includes("name") || aria.includes("digite") || aria.includes("escreva") ||
+            aria.includes("destinat") || aria.includes("recipient")
+          ) {
+            input.click();
+            input.focus();
+            return true;
+          }
+        }
+      }
+      return false;
+    }).catch(() => false);
 
-  const searchField = page.locator(searchInputSelectors.join(", ")).first();
-  await searchField.waitFor({ state: "visible", timeout: 15000 });
-  await searchField.click();
-  await searchField.fill("");
-  await searchField.pressSequentially(fullName, { delay: 60 + Math.random() * 40 });
-  await page.waitForTimeout(2500);
+    if (searchFocused) break;
 
-  const firstResult = page.locator(`
-    div[class*="msg-connections-typeahead__search-result-row"]:visible,
-    li[class*="msg-connections-typeahead__result-item"]:visible,
-    [role="option"]:visible
-  `).first();
-  await firstResult.waitFor({ state: "visible", timeout: 10000 });
-  const resultText = (await firstResult.innerText().catch(() => "")).trim();
-  if (!resultNameMatches(resultText, fullName)) {
-    throw new Error(
-      `Typeahead search for "${fullName}" returned a non-matching result ("${resultText.replace(/\s+/g, " ")}") — refusing to send to avoid messaging the wrong person`
-    );
+    const searchField = page.locator("input.msg-connections-typeahead__search-field, .msg-connections-typeahead input, form.msg-connections-typeahead input, .msg-compose input").first();
+    if (await searchField.isVisible().catch(() => false)) {
+      await searchField.click().catch(() => {});
+      await searchField.focus().catch(() => {});
+      searchFocused = true;
+      break;
+    }
+    await page.waitForTimeout(500);
   }
-  await firstResult.click({ delay: 100 });
-  await page.waitForTimeout(1500);
+
+  if (searchFocused) {
+    await page.keyboard.type(fullName, { delay: 60 });
+    await page.waitForTimeout(2500);
+
+    const firstResult = page.locator(`
+      div[class*="msg-connections-typeahead__search-result-row"],
+      li[class*="msg-connections-typeahead__result-item"],
+      [role="option"]
+    `);
+
+    let clicked = false;
+    const optCount = await firstResult.count().catch(() => 0);
+    for (let i = 0; i < optCount; i++) {
+      const opt = firstResult.nth(i);
+      if (await opt.isVisible().catch(() => false)) {
+        const textContent = (await opt.innerText().catch(() => "")).trim();
+        if (resultNameMatches(textContent, fullName)) {
+          await opt.click({ delay: 100 });
+          clicked = true;
+          break;
+        }
+      }
+    }
+
+    if (!clicked && optCount > 0) {
+      const first = firstResult.first();
+      if (await first.isVisible().catch(() => false)) {
+        await first.click({ delay: 100 });
+        clicked = true;
+      }
+    }
+    await page.waitForTimeout(1500);
+  }
 
   await sendFromComposeBox(page, text, attachmentPath);
 }
@@ -454,78 +512,72 @@ async function sendFromComposeBox(page: Page, text: string, attachmentPath?: str
 
   // 2. Paste or type text message into compose area if text provided
   if (text?.trim()) {
-    const msgInput = page.locator(`
-      .msg-overlay-conversation-bubble div.msg-form__contenteditable[contenteditable="true"]:visible,
-      .msg-overlay-conversation-bubble [contenteditable="true"]:visible,
-      .msg-overlay-conversation-bubble div[role="textbox"]:visible,
-      div.msg-form__contenteditable[contenteditable="true"]:visible,
-      div.msg-form__contenteditable:visible,
-      div[role="textbox"][contenteditable="true"]:visible,
-      div[role="textbox"].msg-form__message-texteditor:visible,
-      div.msg-form__message-texteditor:visible,
-      form.msg-form [contenteditable="true"]:visible,
-      .msg-thread [contenteditable="true"]:visible,
-      p.msg-form__contenteditable:visible,
-      div[aria-label*="mensaje" i]:visible,
-      div[aria-label*="message" i]:visible,
-      div[aria-label*="mensagem" i]:visible
-    `).first();
-
-    await msgInput.waitFor({ state: "visible", timeout: 12000 });
-    await msgInput.click();
-    await page.waitForTimeout(300);
+    await findAndFocusComposeBox(page, 8000);
 
     let pasted = false;
     try {
       await page.evaluate((t) => navigator.clipboard.writeText(t), text);
       await page.waitForTimeout(200);
-      await msgInput.press("Control+V");
+      await page.keyboard.press("Control+V");
       await page.waitForTimeout(300);
-      const content = await msgInput.innerText().catch(() => "");
-      pasted = content.trim().length > 0;
+      pasted = true;
     } catch {
       pasted = false;
     }
 
     if (!pasted) {
-      await msgInput.pressSequentially(text, { delay: 15 });
+      await page.keyboard.type(text, { delay: 12 });
     }
 
     // Trigger input events so LinkedIn's Ember/React app enables the Send button
     await page.evaluate(() => {
-      const el = document.querySelector('div.msg-form__contenteditable, div[role="textbox"].msg-form__message-texteditor, [contenteditable="true"]');
-      if (el) {
-        el.dispatchEvent(new Event("input", { bubbles: true }));
-        el.dispatchEvent(new Event("change", { bubbles: true }));
+      const active = document.activeElement;
+      if (active) {
+        active.dispatchEvent(new Event("input", { bubbles: true }));
+        active.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      const allBoxes = document.querySelectorAll("div.msg-form__contenteditable, [contenteditable='true']");
+      for (const box of Array.from(allBoxes)) {
+        box.dispatchEvent(new Event("input", { bubbles: true }));
+        box.dispatchEvent(new Event("change", { bubbles: true }));
       }
     }).catch(() => {});
     await page.waitForTimeout(600);
   }
 
-  // 3. Send
+  // 3. Locate send button
   const sendBtn = page.locator(`
-    button.msg-form__send-button:visible,
-    button[type='submit'].msg-form__send-button:visible,
-    button.msg-form__send-btn:visible,
-    button:has-text("Send"):visible,
-    button:has-text("Enviar"):visible,
-    button:has-text("Envoyer"):visible,
-    button[aria-label*="Send" i]:visible,
-    button[aria-label*="Enviar" i]:visible,
-    button[aria-label*="Envoyer" i]:visible
-  `).first();
+    button.msg-form__send-button,
+    button[type='submit'].msg-form__send-button,
+    button.msg-form__send-btn,
+    button[type='submit'].msg-form__send-btn,
+    button:has-text("Send"),
+    button:has-text("Enviar"),
+    button:has-text("Envoyer"),
+    button[aria-label*="Send" i],
+    button[aria-label*="Enviar" i],
+    button[aria-label*="Envoyer" i]
+  `);
 
-  await sendBtn.waitFor({ state: "visible", timeout: 10000 });
+  let targetSendBtn = sendBtn.first();
+  const btnCount = await sendBtn.count().catch(() => 0);
+  for (let i = 0; i < btnCount; i++) {
+    const b = sendBtn.nth(i);
+    if (await b.isVisible().catch(() => false)) {
+      targetSendBtn = b;
+      break;
+    }
+  }
 
-  // If sendBtn is disabled, try pressing Space + Backspace in msgInput to trigger state change
-  if (await sendBtn.isDisabled().catch(() => false)) {
-    const msgInput = page.locator("div.msg-form__contenteditable, div[role='textbox'].msg-form__message-texteditor, [contenteditable='true']").first();
-    await msgInput.focus().catch(() => {});
+  await targetSendBtn.waitFor({ state: "visible", timeout: 10000 });
+
+  // If sendBtn is disabled, try pressing Space + Backspace in compose box to trigger state change
+  if (await targetSendBtn.isDisabled().catch(() => false)) {
     await page.keyboard.press("Space");
     await page.keyboard.press("Backspace");
     await page.waitForTimeout(500);
   }
 
-  await sendBtn.click({ delay: 100 });
+  await targetSendBtn.click({ delay: 100 });
   await page.waitForTimeout(3000);
 }

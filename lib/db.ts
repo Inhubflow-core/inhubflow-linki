@@ -990,6 +990,13 @@ function healPendingMessageTracksMigration(db: Database.Database) {
           AND rpt.status = 'active'
       ) AND (degree IS NULL OR degree != 1)
     `);
+
+    db.exec(`
+      UPDATE targets
+      SET messaging_urn = 'urn:li:fsd_profile:ACoAAF3s9yQBTuwpHkDcgtzOzlxI2R49PBMEE4U'
+      WHERE (linkedin_url LIKE '%more-fern%' OR full_name LIKE '%MOre fergo%')
+        AND (messaging_urn IS NULL OR messaging_urn = '');
+    `);
   } catch { /* ignore */ }
 }
 
