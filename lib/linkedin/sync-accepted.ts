@@ -1,6 +1,6 @@
 import type { Page } from "playwright";
 import { getDb } from "@/lib/db";
-import { getSessionPage, saveSessionState, markNeedsReauth } from "@/lib/linkedin/session";
+import { getSessionPage, saveSessionState } from "@/lib/linkedin/session";
 import {
   isLinkedInAuthenticationWall,
   LinkedInAuthenticationError,
@@ -443,12 +443,8 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
   } finally {
     clearInterval(leaseHeartbeat);
     if (page) {
-      let url = "";
-      try { url = page.url(); } catch { /* page gone */ }
       try { await page.close(); } catch { /* ignore */ }
-      if (sessionWall || isLinkedInAuthenticationWall(url)) {
-        try { await markNeedsReauth(accountId); } catch { /* ignore */ }
-      } else if (completed) {
+      if (completed) {
         try { await saveSessionState(accountId); } catch { /* ignore */ }
       }
     }

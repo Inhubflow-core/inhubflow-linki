@@ -643,6 +643,27 @@ async function executeStep(
           return;
         }
 
+        // Live profile verification fallback if Voyager API was unreachable or returned 401
+        try {
+          const profileUrl = await getLinkedinUrl(db, target, accountId);
+          const page = await getSessionPage(accountId);
+          try {
+            const check = await visitProfile(page, profileUrl);
+            if (check.isFirstDegree) {
+              db.prepare("UPDATE targets SET degree = 1, connected_at = COALESCE(connected_at, ?), messaging_urn = COALESCE(messaging_urn, ?) WHERE id = ?")
+                .run(nowIso(), check.messagingUrn, target.id);
+              freshTarget = db.prepare("SELECT * FROM targets WHERE id = ?").get(target.id) as Target;
+              log(db, runId, target.id, "info", `${name} verified as 1st-degree via live profile (${check.evidence.reason}) — advancing`);
+              trAdvance(db, tr, steps);
+              return;
+            }
+          } finally {
+            await page.close();
+          }
+        } catch (liveCheckErr) {
+          console.warn(`[runner] Live connection check warning for ${name}:`, liveCheckErr instanceof Error ? liveCheckErr.message : liveCheckErr);
+        }
+
         const requestedAt = freshTarget.connection_requested_at;
         if (!requestedAt) {
           log(db, runId, target.id, "warn", `${name} lost its connection-request timestamp during reconciliation — rescheduling safely`);
@@ -655,8 +676,6 @@ async function executeStep(
           trSkip(db, tr, `Did not accept connection after ${CONNECTION_MAX_WAIT_DAYS} days`);
           return;
         }
-        // Acceptance is reconciled from LinkedIn's authoritative connections API.
-        // The next runner tick will re-check the persisted degree.
         log(db, runId, target.id, "info", `${name} not yet accepted — rechecking in ${CONNECTION_RECHECK_HOURS}h`);
         trWait(db, tr, CONNECTION_RECHECK_HOURS);
         return;
