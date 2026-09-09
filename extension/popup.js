@@ -51,12 +51,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const cookieMap = new Map();
         for (const c of allCookies) {
-          if (c && c.name && c.value && !cookieMap.has(c.name)) {
-            cookieMap.set(c.name, c);
-          }
+          if (!c || typeof c.name !== "string" || typeof c.value !== "string" || !c.name || !c.value) continue;
+          const domain = typeof c.domain === "string" && c.domain ? c.domain.toLowerCase() : "linkedin.com";
+          if (!(domain === "linkedin.com" || domain.endsWith(".linkedin.com"))) continue;
+          const path = typeof c.path === "string" && c.path.startsWith("/") ? c.path : "/";
+          const key = `${c.name}|${domain}|${path}`;
+          // URL and domain queries can return the same cookie. Preserve one
+          // deterministic record without collapsing distinct path/domain cookies.
+          if (!cookieMap.has(key)) cookieMap.set(key, { ...c, domain, path });
         }
 
-        const liAt = cookieMap.get("li_at");
+        const liAt = Array.from(cookieMap.values()).find((c) => c.name === "li_at");
         if (!liAt || !liAt.value || liAt.value.length < 20) {
           rawToken = "";
           displayToken = "";
@@ -66,17 +71,39 @@ document.addEventListener("DOMContentLoaded", () => {
 
         displayToken = liAt.value.trim();
 
-        // Include all valid session cookies normalized for Playwright
+        function normalizeSameSite(value) {
+          const normalized = String(value || "").toLowerCase();
+          if (normalized === "none" || normalized === "no_restriction") return "None";
+          if (normalized === "strict") return "Strict";
+          return "Lax";
+        }
+
+        // Include all valid session cookies normalized for Playwright. Session
+        // cookies intentionally remain session cookies; do not invent an expiry.
         const sessionCookies = Array.from(cookieMap.values()).map((c) => ({
           name: c.name,
           value: c.value,
-          domain: ".linkedin.com",
-          path: "/",
+          domain: c.domain,
+          path: c.path,
           httpOnly: Boolean(c.httpOnly),
           secure: Boolean(c.secure ?? true),
-          sameSite: c.sameSite === "no_restriction" ? "None" : (c.sameSite === "strict" ? "Strict" : "Lax"),
-          expires: c.expirationDate ? Math.round(c.expirationDate) : Math.floor(Date.now() / 1000) + 31536000,
+          sameSite: normalizeSameSite(c.sameSite),
+          ...(c.session || !Number.isFinite(c.expirationDate) || c.expirationDate <= 0
+            ? {}
+            : { expires: Math.round(c.expirationDate) }),
         }));
+
+        // Keep the token that will be displayed/captured aligned with the
+        // cookie selected for the generated bundle.
+        const liAtCookie = sessionCookies.find((c) => c.name === "li_at");
+        if (!liAtCookie || liAtCookie.value.length < 20) {
+          rawToken = "";
+          displayToken = "";
+          stateError.classList.remove("hidden");
+          return;
+        }
+        displayToken = liAtCookie.value.trim();
+
 
         const payload = {
           v: 2,

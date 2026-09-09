@@ -1,4 +1,5 @@
 import type { Page } from "playwright";
+import { isLinkedInAuthenticationWall, LinkedInAuthenticationError } from "./auth-wall";
 
 export interface ProfileConnectionEvidence {
   pageUrl: string;
@@ -17,7 +18,6 @@ export interface ProfileVisitResult {
   evidence: ProfileConnectionEvidence;
 }
 
-const AUTH_WALL = /\/login|\/authwall|\/checkpoint|\/uas\//i;
 const FIRST_DEGREE = /(?:^|[\s•(])1(?:st|er|º|ª|°)(?:\s*(?:degree|grado|grau))?(?=$|[\s•),.;])/i;
 const SECOND_OR_THIRD_DEGREE = /(?:^|[\s•(])(?:2nd|3rd|[23](?:er|º|ª|°))(?:\s*(?:degree|grado|grau))?(?=$|[\s•),.;])/i;
 
@@ -47,9 +47,9 @@ export async function visitProfile(page: Page, linkedinUrl: string): Promise<Pro
         if (
           retryMsg.includes("ERR_TOO_MANY_REDIRECTS") ||
           retryMsg.includes("ERR_HTTP_RESPONSE_CODE_FAILURE") ||
-          AUTH_WALL.test(page.url())
+          isLinkedInAuthenticationWall(page.url())
         ) {
-          throw new Error("Sesión de LinkedIn caducada o bloqueada por verificación de seguridad. Por favor re-autentica tu cuenta en Configuración con un nuevo Código de Conexión.");
+          throw new LinkedInAuthenticationError("Sesión de LinkedIn caducada o bloqueada por verificación de seguridad. Por favor re-autentica tu cuenta en Configuración con un nuevo Código de Conexión.");
         }
         throw retryErr;
       }
@@ -60,8 +60,8 @@ export async function visitProfile(page: Page, linkedinUrl: string): Promise<Pro
   await page.waitForTimeout(3_000 + Math.random() * 2_000);
 
   const pageUrl = page.url();
-  if (AUTH_WALL.test(pageUrl)) {
-    throw new Error(`LinkedIn authentication wall while checking profile (${pageUrl})`);
+  if (isLinkedInAuthenticationWall(pageUrl)) {
+    throw new LinkedInAuthenticationError(`LinkedIn authentication wall while checking profile (${pageUrl})`);
   }
 
   const main = page.locator("main").first();

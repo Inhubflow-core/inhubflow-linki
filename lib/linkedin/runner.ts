@@ -1,8 +1,16 @@
 import { getDb } from "@/lib/db";
 import { randomUUID } from "crypto";
-import { getSessionPage, saveSessionState, getSessionContext } from "@/lib/linkedin/session";
+import { getSessionPage, saveSessionState, getSessionContext, markNeedsReauth } from "@/lib/linkedin/session";
 import { visitProfile } from "@/lib/linkedin/visit";
-import { sendConnectionRequest, WeeklyLimitError, AlreadyConnectedError, PendingInviteError } from "@/lib/linkedin/connect";
+import {
+  sendConnectionRequest,
+  WeeklyLimitError,
+  AlreadyConnectedError,
+  PendingInviteError,
+  ConnectionPreSubmitError,
+  UncertainConnectionOutcomeError,
+} from "@/lib/linkedin/connect";
+import { LinkedInAuthenticationError } from "@/lib/linkedin/auth-wall";
 import { sendMessage, NotConnectedError } from "@/lib/linkedin/message";
 import { shouldSyncAccepted, syncAcceptedConnectionsDetailed, type AcceptedSyncResult } from "@/lib/linkedin/sync-accepted";
 import { campaignInboxSchedulerEnabled, listCampaignInboxAccountIds, shouldSyncLinkedInCampaignInbox, syncLinkedInCampaignInbox } from "@/lib/linkedin/campaign-inbox";
@@ -33,6 +41,11 @@ function inmailCreditsExhaustedToday(accountId: string): boolean {
 // preflight can otherwise make every due lead open its own 60-second scan.
 const ACCEPTED_PREFLIGHT_COOLDOWN_MS = 5 * 60 * 1000;
 const acceptedSyncByAccount = new Map<string, { startedAt: number; promise: Promise<AcceptedSyncResult> }>();
+function acceptedReconciliationCoolingDown(accountId: string): boolean {
+  const cached = acceptedSyncByAccount.get(accountId);
+  return Boolean(cached && Date.now() - cached.startedAt < ACCEPTED_PREFLIGHT_COOLDOWN_MS);
+}
+
 function reconcileAcceptedConnections(accountId: string): Promise<AcceptedSyncResult> {
   const now = Date.now();
   const cached = acceptedSyncByAccount.get(accountId);
@@ -549,6 +562,8 @@ async function executeStep(
 
   const step = steps[stepIndex];
   const name = target.full_name ?? target.linkedin_url;
+  let connectionMarkerCreated = false;
+  let connectionSendInvoked = false;
 
   try {
     if (step.step_type === "delay") {
@@ -618,11 +633,18 @@ async function executeStep(
       log(db, runId, target.id, "info", `Sending connection request to ${name}`);
       const linkedinUrl = await getLinkedinUrl(db, target, accountId);
       const page = await getSessionPage(accountId);
+      // Claim the request before clicking Send. If LinkedIn accepts the request
+      // but confirmation fails, a retry must reconcile the pending request
+      // instead of issuing a duplicate invitation.
+      const marker = db.prepare(
+        "UPDATE targets SET connection_requested_at = ? WHERE id = ? AND connection_requested_at IS NULL"
+      ).run(nowIso(), target.id);
+      connectionMarkerCreated = marker.changes > 0;
+      connectionSendInvoked = true;
       try { await sendConnectionRequest(page, linkedinUrl); } finally { await page.close(); }
       await saveSessionState(accountId);
-      db.prepare("UPDATE targets SET connection_requested_at = ? WHERE id = ?").run(nowIso(), target.id);
       trWait(db, tr, CONNECTION_RECHECK_HOURS);
-      log(db, runId, target.id, "info", `Connection request sent to ${name} — will recheck in ${CONNECTION_RECHECK_HOURS}h`);
+      log(db, runId, target.id, "info", `Connection request confirmed for ${name} — will recheck in ${CONNECTION_RECHECK_HOURS}h`);
 
     } else if (step.step_type === "message") {
       await ensureSalesNavEnriched(db, target, accountId);
@@ -1010,9 +1032,34 @@ async function executeStep(
 
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    if (err instanceof LinkedInAuthenticationError) {
+      try { await markNeedsReauth(accountId); } catch { /* best effort */ }
+      db.prepare("UPDATE runs SET status = 'paused' WHERE account_id = ? AND status = 'running'").run(accountId);
+      if (connectionMarkerCreated && !err.submissionAttempted) {
+        db.prepare("UPDATE targets SET connection_requested_at = NULL WHERE id = ?").run(target.id);
+      }
+      if (err.submissionAttempted) {
+        trWait(db, tr, CONNECTION_RECHECK_HOURS);
+        log(db, runId, target.id, "warn", `${name} connection outcome is pending after session expiry — account requires reauthentication`);
+      } else {
+        trFail(db, tr, msg);
+        log(db, runId, target.id, "error", `LinkedIn session expired for ${name} — account paused for reauthentication`);
+      }
+      return;
+    }
     if (err instanceof WeeklyLimitError) {
+      if (connectionMarkerCreated) {
+        db.prepare("UPDATE targets SET connection_requested_at = NULL WHERE id = ?").run(target.id);
+      }
       log(db, runId, target.id, "error", `Weekly connection limit reached — pausing run`);
       db.prepare("UPDATE runs SET status = 'paused' WHERE id = ?").run(runId);
+      return;
+    }
+    if (err instanceof ConnectionPreSubmitError) {
+      if (connectionMarkerCreated) {
+        db.prepare("UPDATE targets SET connection_requested_at = NULL WHERE id = ?").run(target.id);
+      }
+      trFail(db, tr, msg);
       return;
     }
     if (err instanceof AlreadyConnectedError) {
@@ -1025,6 +1072,14 @@ async function executeStep(
       log(db, runId, target.id, "info", `${name} invite already pending — will recheck`);
       if (!target.connection_requested_at) db.prepare("UPDATE targets SET connection_requested_at = ? WHERE id = ?").run(nowIso(), target.id);
       trWait(db, tr, CONNECTION_RECHECK_HOURS);
+      return;
+    }
+    if (err instanceof UncertainConnectionOutcomeError || connectionMarkerCreated || connectionSendInvoked) {
+      // Once the send routine has been entered, the request may have reached
+      // LinkedIn even if the browser did not observe confirmation. Keep the
+      // marker and use the normal reconciliation path to avoid duplicates.
+      trWait(db, tr, CONNECTION_RECHECK_HOURS);
+      log(db, runId, target.id, "warn", `${name} connection outcome uncertain — will reconcile in ${CONNECTION_RECHECK_HOURS}h`);
       return;
     }
     if (msg.includes("No InMail credits left")) {
@@ -1118,7 +1173,7 @@ async function tick(db: ReturnType<typeof getDb>): Promise<void> {
 
   // Periodic authoritative reconciliation (up to once per 8h per account).
   for (const accountId of seenAccounts) {
-    if (shouldSyncAccepted(accountId)) {
+    if (shouldSyncAccepted(accountId) && !acceptedReconciliationCoolingDown(accountId)) {
       try {
         console.log(`[runner] Starting accepted-connections sync for account ${accountId}`);
         const syncResult = await reconcileAcceptedConnections(accountId);
@@ -1223,7 +1278,7 @@ async function tick(db: ReturnType<typeof getDb>): Promise<void> {
            a.active_hours_start, a.active_hours_end, a.timezone, a.working_days
     FROM runs r
     JOIN accounts a ON a.id = r.account_id
-    WHERE r.status = 'running'
+    WHERE r.status = 'running' AND a.is_authenticated = 1
   `).all() as Array<{ run_id: string; workflow_id: string; account_id: string; email_account_id: string | null } & AccountLimits>;
 
   if (stillActive.length === 0) return;

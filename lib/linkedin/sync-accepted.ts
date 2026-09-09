@@ -1,6 +1,8 @@
 import type { Page } from "playwright";
 import { getDb } from "@/lib/db";
 import { getSessionPage, saveSessionState, markNeedsReauth } from "@/lib/linkedin/session";
+import { isLinkedInAuthenticationWall, LinkedInAuthenticationError } from "./auth-wall";
+import { linkedinCsrfFromCookies } from "./cookie-state";
 import {
   calculateConnectionScanFloor,
   canonicalLinkedInVanity,
@@ -28,7 +30,6 @@ const OVERLAP_MARGIN_MS = 24 * 60 * 60 * 1000;
 const REQUEST_MARGIN_MS = 24 * 60 * 60 * 1000;
 const MAX_WAIT_MS = 7 * 24 * 60 * 60 * 1000;
 const DECORATION = "com.linkedin.voyager.dash.deco.web.mynetwork.ConnectionListWithProfile-16";
-const AUTH_WALL = /\/login|\/authwall|\/checkpoint|\/uas\//i;
 
 export function shouldSyncAccepted(accountId: string): boolean {
   const db = getDb();
@@ -59,6 +60,16 @@ interface ApiPageResult {
 
 interface AccountTarget extends PendingConnectionTarget {
   accountId: string;
+}
+
+function isLinkedInPageUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (url.protocol === "https:" || url.protocol === "http:") &&
+      (url.hostname === "linkedin.com" || url.hostname.endsWith(".linkedin.com"));
+  } catch {
+    return false;
+  }
 }
 
 function parseDeclaredTotal(text: string): number | null {
@@ -148,22 +159,32 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
     await page.goto("https://www.linkedin.com/mynetwork/invite-connect/connections/", {
       waitUntil: "domcontentloaded",
       timeout: 35_000,
-    }).catch(() => {});
+    }).catch((error) => {
+      console.warn(`[sync-accepted] Connections page navigation warning: ${error instanceof Error ? error.message : String(error)}`);
+    });
     await page.waitForTimeout(3000 + Math.random() * 1500);
-    if (AUTH_WALL.test(page.url())) {
+    if (isLinkedInAuthenticationWall(page.url())) {
       // Warm up session on /feed/ and retry once
-      await page.goto("https://www.linkedin.com/feed/", { waitUntil: "domcontentloaded", timeout: 25_000 }).catch(() => {});
+      await page.goto("https://www.linkedin.com/feed/", { waitUntil: "domcontentloaded", timeout: 25_000 }).catch((error) => {
+        console.warn(`[sync-accepted] Feed warm-up warning: ${error instanceof Error ? error.message : String(error)}`);
+      });
       await page.waitForTimeout(2000);
-      if (!AUTH_WALL.test(page.url())) {
+      if (!isLinkedInAuthenticationWall(page.url())) {
         await page.goto("https://www.linkedin.com/mynetwork/invite-connect/connections/", {
           waitUntil: "domcontentloaded",
           timeout: 35_000,
-        }).catch(() => {});
+        }).catch((error) => {
+          console.warn(`[sync-accepted] Connections retry warning: ${error instanceof Error ? error.message : String(error)}`);
+        });
       }
     }
-    if (AUTH_WALL.test(page.url())) {
+    const currentUrl = page.url();
+    if (isLinkedInAuthenticationWall(currentUrl)) {
       sessionWall = true;
       return { success: false, partial: false, stamped: 0, unmarked: 0, pages: 0, connectionsRead: 0, pendingTargets: pendingTargets.length, matchedTargets: 0, declaredTotal: null, reason: "auth_wall" };
+    }
+    if (!isLinkedInPageUrl(currentUrl)) {
+      return { success: false, partial: true, stamped: 0, unmarked: 0, pages: 0, connectionsRead: 0, pendingTargets: pendingTargets.length, matchedTargets: 0, declaredTotal: null, reason: "invalid_response" };
     }
     declaredTotal = parseDeclaredTotal(await page.locator("body").innerText().catch(() => ""));
 
@@ -273,12 +294,20 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
       })();
     }
 
-    completed = reachedFloor && !apiError;
-    if (completed && newestSeen !== null) {
-      db.prepare("UPDATE accounts SET connections_synced_through_ms = ? WHERE id = ?").run(newestSeen, accountId);
-    }
-    if (completed && declaredTotal !== null) {
-      db.prepare("UPDATE accounts SET li_connections = ? WHERE id = ?").run(declaredTotal, accountId);
+    const scanComplete = reachedFloor && !apiError;
+    if (scanComplete) {
+      // Advance all freshness metadata together. A partial scan must never move
+      // the cursor because doing so can permanently hide an accepted contact.
+      db.transaction(() => {
+        if (newestSeen !== null) {
+          db.prepare("UPDATE accounts SET connections_synced_through_ms = ? WHERE id = ?").run(newestSeen, accountId);
+        }
+        if (declaredTotal !== null) {
+          db.prepare("UPDATE accounts SET li_connections = ? WHERE id = ?").run(declaredTotal, accountId);
+        }
+        db.prepare("UPDATE accounts SET accepted_sync_at = datetime('now') WHERE id = ?").run(accountId);
+      })();
+      completed = true;
     }
 
     const result: AcceptedSyncResult = {
@@ -296,6 +325,22 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
     console.log(`[sync-accepted] ${completed ? "Complete" : "Incomplete"}: ${stamped} accepted, ${matchedTargets} matches, ${connectionsRead} connections, ${pages} pages (floor=${scanFloor ?? "full"}, declared=${declaredTotal ?? "unknown"})`);
     return result;
   } catch (error) {
+    if (error instanceof LinkedInAuthenticationError) {
+      sessionWall = true;
+      console.warn(`[sync-accepted] Authentication wall: ${error.message}`);
+      return {
+        success: false,
+        partial: false,
+        stamped,
+        unmarked,
+        pages,
+        connectionsRead,
+        pendingTargets: pendingTargets.length,
+        matchedTargets,
+        declaredTotal,
+        reason: "auth_wall",
+      };
+    }
     console.warn(`[sync-accepted] Failed: ${error instanceof Error ? error.message : String(error)}`);
     return {
       success: false,
@@ -314,12 +359,12 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
       let url = "";
       try { url = page.url(); } catch { /* page gone */ }
       try { await page.close(); } catch { /* ignore */ }
-      if (!sessionWall && !AUTH_WALL.test(url)) {
+      if (sessionWall || isLinkedInAuthenticationWall(url)) {
+        try { await markNeedsReauth(accountId); } catch { /* ignore */ }
+      } else if (completed) {
         try { await saveSessionState(accountId); } catch { /* ignore */ }
       }
     }
-    // A failed pass must not make the next retry wait eight hours.
-    if (completed) db.prepare("UPDATE accounts SET accepted_sync_at = datetime('now') WHERE id = ?").run(accountId);
   }
 }
 
@@ -334,14 +379,21 @@ function msToSqlite(ms: number): string {
 }
 
 async function fetchConnectionsPage(page: Page, start: number, count: number): Promise<ApiPageResult | null> {
-  const payload = await page.evaluate(
-    async ({ start, count, decoration }) => {
-      const cookies = document.cookie.split("; ").reduce((values: Record<string, string>, cookie) => {
-        const index = cookie.indexOf("=");
-        if (index > 0) values[cookie.slice(0, index)] = cookie.slice(index + 1);
-        return values;
-      }, {});
-      const csrf = (cookies.JSESSIONID || "").replace(/"/g, "");
+  let csrf = "";
+  try {
+    const cookies = await page.context().cookies("https://www.linkedin.com");
+    csrf = linkedinCsrfFromCookies(cookies) ?? "";
+  } catch (error) {
+    console.warn(`[sync-accepted] Could not read context cookies: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+  if (!csrf) {
+    console.warn("[sync-accepted] JSESSIONID cookie is missing");
+    return null;
+  }
+
+  const payloadResult = await page.evaluate(
+    async ({ start, count, decoration, csrf }) => {
       const url = `https://www.linkedin.com/voyager/api/relationships/dash/connections?decorationId=${decoration}&count=${count}&q=search&sortType=RECENTLY_ADDED&start=${start}`;
       try {
         const response = await fetch(url, {
@@ -353,16 +405,26 @@ async function fetchConnectionsPage(page: Page, start: number, count: number): P
           },
           credentials: "include",
         });
-        if (!response.ok) return null;
-        return await response.json();
+        if (response.status === 401 || response.status === 403) {
+          return { status: response.status, payload: null };
+        }
+        if (!response.ok) return { status: response.status, payload: null };
+        const text = await response.text();
+        if (!text) return { status: response.status, payload: null };
+        return { status: response.status, payload: JSON.parse(text) };
       } catch {
-        return null;
+        return { status: 0, payload: null };
       }
     },
-    { start, count, decoration: DECORATION }
-  ) as import("./connection-reconciliation").VoyagerConnectionsPayload | null;
+    { start, count, decoration: DECORATION, csrf }
+  ) as { status: number; payload: import("./connection-reconciliation").VoyagerConnectionsPayload | null };
 
-  if (!payload) return null;
+  if (payloadResult.status === 401 || payloadResult.status === 403) {
+    throw new LinkedInAuthenticationError(`LinkedIn connections API returned HTTP ${payloadResult.status}`);
+  }
+  if (!payloadResult.payload || typeof payloadResult.payload !== "object") return null;
+  const payload = payloadResult.payload as import("./connection-reconciliation").VoyagerConnectionsPayload;
+  if (!payload.data && !Array.isArray(payload.included)) return null;
   const parsed = parseVoyagerConnections(payload);
   return { connections: parsed.connections, referencedElements: parsed.referencedElements };
 }

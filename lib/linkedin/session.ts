@@ -1,5 +1,5 @@
 import { chromium } from "playwright-extra";
-import type { Browser, BrowserContext, Page } from "playwright";
+import type { Browser, BrowserContext, BrowserContextOptions, Page } from "playwright";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import { getDb } from "@/lib/db";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
@@ -19,18 +19,21 @@ const LAUNCH_ARGS = [
   "--disable-gpu",
 ];
 
+type BrowserStorageState = Awaited<ReturnType<BrowserContext["storageState"]>>;
+type PersistedStorageState = BrowserStorageState & { userAgent?: string };
+
 /**
  * Shared browser-context fingerprint. Login and runtime MUST use the identical
  * options so the LinkedIn session is BORN under the exact fingerprint it will
  * later be used with — a mismatch (or a drift) triggers a forced re-auth.
  */
-function contextOptions(storageState?: any) {
+function contextOptions(storageState?: PersistedStorageState): BrowserContextOptions {
   const customUserAgent =
     (typeof storageState?.userAgent === "string" && storageState.userAgent) ||
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
   return {
-    storageState: storageState as any,
+    storageState,
     viewport: { width: 1920, height: 1080 },
     userAgent: customUserAgent,
     locale: "en-US",
@@ -68,12 +71,28 @@ async function getOrCreateContext(accountId: string): Promise<BrowserContext> {
   if (!contexts.has(accountId)) {
     const b = await getBrowser();
 
-    let storageState: object | undefined;
+    let storageState: PersistedStorageState | undefined;
     if (account.cookies_json) {
       try {
-        storageState = JSON.parse(decryptSecret(account.cookies_json)!);
+        const parsed = JSON.parse(decryptSecret(account.cookies_json)!) as PersistedStorageState;
+        const cookies = Array.isArray(parsed?.cookies) ? parsed.cookies : [];
+        const hasLiAt = cookies.some((cookie: unknown) => {
+          if (!cookie || typeof cookie !== "object") return false;
+          const candidate = cookie as { name?: unknown; value?: unknown };
+          return candidate.name === "li_at" && typeof candidate.value === "string" && candidate.value.length > 20;
+        });
+        if (hasLiAt) {
+          storageState = parsed;
+        } else {
+          // A syntactically valid storage state without li_at cannot authenticate
+          // LinkedIn. Do not leave the account looking connected while the
+          // runner repeatedly creates empty contexts.
+          db.prepare("UPDATE accounts SET is_authenticated = 0 WHERE id = ?").run(accountId);
+        }
       } catch {
-        // Invalid storage state — will need re-auth
+        // Invalid storage state — require re-authentication rather than keeping
+        // a stale authenticated flag.
+        db.prepare("UPDATE accounts SET is_authenticated = 0 WHERE id = ?").run(accountId);
       }
     }
 
@@ -167,7 +186,17 @@ export async function saveSessionState(accountId: string): Promise<void> {
   if (!ctx) return;
   const db = getDb();
   const state = await ctx.storageState();
-  db.prepare("UPDATE accounts SET cookies_json = ?, is_authenticated = 1 WHERE id = ?").run(
+  const hasLiAt = state.cookies.some((cookie) =>
+    cookie.name === "li_at" && typeof cookie.value === "string" && cookie.value.length > 20
+  );
+  if (!hasLiAt) {
+    console.warn(`[session] refusing to persist account ${accountId} without a valid li_at cookie`);
+    return;
+  }
+
+  // Persisting a live browser context is not proof that LinkedIn accepted the
+  // session. Only explicit authentication flows may set is_authenticated=1.
+  db.prepare("UPDATE accounts SET cookies_json = ? WHERE id = ?").run(
     encryptSecret(JSON.stringify(state)),
     accountId
   );

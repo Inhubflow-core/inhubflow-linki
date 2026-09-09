@@ -6,6 +6,7 @@ import {
   type CapturedInboundMessage,
 } from "../sdr-agent/repository";
 import type { SdrInboundMessage } from "../sdr-agent/contracts";
+import { isLinkedInAuthenticationWall } from "./auth-wall";
 
 interface SessionRuntime {
   getSessionPage(accountId: string): Promise<Page>;
@@ -31,7 +32,6 @@ const ADAPTER_VERSION = "2a-contract";
 const MAX_EVENT_ID_LENGTH = 512;
 const LINKEDIN_PROFILE_HOSTS = new Set(["linkedin.com", "www.linkedin.com"]);
 const FSD_PROFILE_URN = /^urn:li:fsd_profile:[^\s]+$/;
-const AUTH_WALL_PATTERN = /\/login|\/authwall|\/checkpoint|\/uas\//i;
 
 export type LinkedInInboxDirection = "inbound" | "outbound" | "system";
 
@@ -432,10 +432,6 @@ export function captureLinkedInInboxObservations(
   }
 
   return result;
-}
-
-export function isLinkedInAuthenticationWall(url: string): boolean {
-  return AUTH_WALL_PATTERN.test(url);
 }
 
 /**

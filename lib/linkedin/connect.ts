@@ -1,8 +1,11 @@
 import type { Locator, Page } from "playwright";
+import { isLinkedInAuthenticationWall, LinkedInAuthenticationError } from "./auth-wall";
 
 export class WeeklyLimitError extends Error {}
 export class AlreadyConnectedError extends Error {}
 export class PendingInviteError extends Error {}
+export class ConnectionPreSubmitError extends Error {}
+export class UncertainConnectionOutcomeError extends Error {}
 
 const MODAL_SELECTOR = '[role="dialog"]:visible, .artdeco-modal:visible, [data-test-modal]:visible';
 const MENU_SELECTOR = '[role="menu"]:visible, .artdeco-dropdown__content:visible, .artdeco-dropdown__menu:visible';
@@ -33,10 +36,6 @@ function normalizeLabel(value: string | null | undefined): string {
     .replace(/\s+/g, " ")
     .trim()
     .toLocaleLowerCase("pt-BR");
-}
-
-function matchesLabel(value: string | null | undefined, expression: RegExp): boolean {
-  return expression.test(normalizeLabel(value));
 }
 
 async function visibleAction(
@@ -529,8 +528,20 @@ async function profileShowsPending(page: Page): Promise<boolean> {
 }
 
 async function confirmOnProfile(page: Page, linkedinUrl: string): Promise<boolean> {
-  await page.goto(linkedinUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+  try {
+    await page.goto(linkedinUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+  } catch (error) {
+    const url = page.url();
+    if (isLinkedInAuthenticationWall(url)) {
+      throw new LinkedInAuthenticationError(`LinkedIn authentication wall after connection submission (${url})`, true);
+    }
+    throw error;
+  }
   await page.waitForTimeout(2000);
+  const url = page.url();
+  if (isLinkedInAuthenticationWall(url)) {
+    throw new LinkedInAuthenticationError(`LinkedIn authentication wall after connection submission (${url})`);
+  }
   return profileShowsPending(page);
 }
 
@@ -567,27 +578,23 @@ async function confirmConnectionRequest(page: Page, linkedinUrl: string): Promis
   // If a sent toast was seen, the invitation was confirmed by LinkedIn's UI
   if (sawSentToast) return;
 
-  // Otherwise, give LinkedIn 2 seconds and re-check the profile
+  // Otherwise, give LinkedIn 2 seconds and re-check the profile. A pending
+  // action is the only reliable UI confirmation when no sent toast appeared.
   await page.waitForTimeout(2000);
   for (let attempt = 0; attempt < 2; attempt++) {
-    if (await confirmOnProfile(page, linkedinUrl).catch(() => false)) return;
+    try {
+      if (await confirmOnProfile(page, linkedinUrl)) return;
+    } catch (error) {
+      if (error instanceof LinkedInAuthenticationError) throw error;
+    }
     if (attempt === 0) await page.waitForTimeout(2000);
   }
 
-  // In Creator Mode, after the modal closed without error or limit alert,
-  // check if a direct Connect button is absent from the top card.
-  const scope = await profileActionScope(page);
-  const connectAction = await visibleAction(
-    scope,
-    (text, aria, title) => isConnectAction(text, aria, title),
-    'button, a, [role="button"]'
+  // Creator Mode may omit a direct Connect button even when no invitation was
+  // created. Its absence is therefore not evidence of a successful send.
+  throw new UncertainConnectionOutcomeError(
+    "LinkedIn closed the invitation modal, but no sent or pending confirmation was observed"
   );
-  if (!connectAction) {
-    // No direct Connect button remains on top card; invitation was sent successfully
-    return;
-  }
-
-  throw new Error("LinkedIn closed the invitation modal, but the profile still offers Connect; the connection request was not confirmed");
 }
 
 /**
@@ -606,7 +613,7 @@ export async function sendConnectionRequest(page: Page, linkedinUrl: string): Pr
 
   const feedUrl = page.url();
   if (feedUrl.includes("/login") || feedUrl.includes("/checkpoint") || feedUrl.includes("/uas/")) {
-    throw new Error("Sesión de LinkedIn caducada o cerrada. Por favor actualiza tu Código de Conexión en Configuración.");
+    throw new LinkedInAuthenticationError("Sesión de LinkedIn caducada o cerrada. Por favor actualiza tu Código de Conexión en Configuración.");
   }
 
   // 2. Navigate to target profile
@@ -619,8 +626,8 @@ export async function sendConnectionRequest(page: Page, linkedinUrl: string): Pr
         await page.goto("https://www.linkedin.com/feed/", { waitUntil: "domcontentloaded", timeout: 25000 });
         await page.waitForTimeout(2000);
         await page.goto(linkedinUrl, { waitUntil: "domcontentloaded", timeout: 35000 });
-      } catch (retryErr) {
-        throw new Error("Sesión de LinkedIn caducada o bloqueada por verificación de seguridad. Por favor actualiza tu Código de Conexión en Configuración.");
+      } catch {
+        throw new LinkedInAuthenticationError("Sesión de LinkedIn caducada o bloqueada por verificación de seguridad. Por favor actualiza tu Código de Conexión en Configuración.");
       }
     } else {
       throw err;
@@ -631,12 +638,12 @@ export async function sendConnectionRequest(page: Page, linkedinUrl: string): Pr
 
   const currentUrl = page.url();
   if (currentUrl.includes("/login") || currentUrl.includes("/authwall") || currentUrl.includes("/checkpoint") || currentUrl.includes("/uas/")) {
-    throw new Error("Sesión de LinkedIn caducada o cerrada. Por favor actualiza tu Código de Conexión en Configuración.");
+    throw new LinkedInAuthenticationError("Sesión de LinkedIn caducada o cerrada. Por favor actualiza tu Código de Conexión en Configuración.");
   }
 
   const isPublicPrompt = await page.locator('#public_profile_contextual-sign-in, [data-tracking-control-name="public_profile_contextual-sign-in"], .contextual-sign-in-modal').count().catch(() => 0);
   if (isPublicPrompt > 0) {
-    throw new Error("Sesión de LinkedIn caducada (perfil cargó en modo público sin autenticación). Por favor actualiza tu Código de Conexión en Configuración.");
+    throw new LinkedInAuthenticationError("Sesión de LinkedIn caducada (perfil cargó en modo público sin autenticación). Por favor actualiza tu Código de Conexión en Configuración.");
   }
 
   const topCard = await profileActionScope(page);
@@ -672,7 +679,7 @@ export async function sendConnectionRequest(page: Page, linkedinUrl: string): Pr
         });
         await page.waitForTimeout(2000);
       } else {
-        throw new Error("Could not find the LinkedIn More/Mais menu or its Connect/Conectar option");
+        throw new ConnectionPreSubmitError("Could not find the LinkedIn More/Mais menu or its Connect/Conectar option");
       }
     }
   }
@@ -685,7 +692,7 @@ export async function sendConnectionRequest(page: Page, linkedinUrl: string): Pr
     if (limit || LIMIT_RE.test(normalizeLabel(await page.locator("body").innerText().catch(() => "")))) {
       throw new WeeklyLimitError(limit || "Weekly connection limit reached");
     }
-    throw new Error("LinkedIn did not open the connection invitation modal");
+    throw new ConnectionPreSubmitError("LinkedIn did not open the connection invitation modal");
   }
 
   const modalText = await modal.innerText().catch(() => "");
@@ -697,21 +704,21 @@ export async function sendConnectionRequest(page: Page, linkedinUrl: string): Pr
       'button, [role="button"]'
     );
     if (closeButton) await closeButton.click({ force: true }).catch(() => {});
-    throw new Error("LinkedIn requires an email address to connect with this target");
+    throw new ConnectionPreSubmitError("LinkedIn requires an email address to connect with this target");
   }
 
   const sendButton = await findSendButton(modal);
   if (!sendButton) {
-    throw new Error("LinkedIn connection modal opened, but no 'Send without a note' button was found");
+    throw new ConnectionPreSubmitError("LinkedIn connection modal opened, but no 'Send without a note' button was found");
   }
   if (!(await waitForEnabled(sendButton))) {
-    throw new Error("LinkedIn connection send button remained disabled");
+    throw new ConnectionPreSubmitError("LinkedIn connection send button remained disabled");
   }
 
   try {
     await sendButton.click({ force: true, timeout: 10000 });
   } catch (error) {
-    throw new Error(`Could not click LinkedIn's send-without-note button: ${error instanceof Error ? error.message : String(error)}`);
+    throw new UncertainConnectionOutcomeError(`Could not confirm LinkedIn's send-without-note click: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   await confirmConnectionRequest(page, linkedinUrl);

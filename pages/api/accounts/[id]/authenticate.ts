@@ -1,6 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getDb } from "@/lib/db";
 import { encryptSecret } from "@/lib/crypto";
+import {
+  dedupeLinkedInCookies,
+  hasValidLinkedInLiAt,
+  normalizeLinkedInCookie,
+  normalizeLinkedInCookieList,
+  type LinkedInSessionCookie,
+} from "@/lib/linkedin/cookie-state";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();
@@ -11,67 +18,61 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const account = db.prepare("SELECT * FROM accounts WHERE id = ?").get(id);
   if (!account) return res.status(404).json({ error: "Account not found" });
 
-  const { li_at, document_cookie } = req.body as { li_at?: string; document_cookie?: string };
-  if (!li_at || typeof li_at !== "string") {
+  const body = (req.body ?? {}) as { li_at?: unknown; document_cookie?: unknown };
+  if (typeof body.li_at !== "string" || !body.li_at.trim()) {
     return res.status(400).json({ error: "El Código de Conexión es obligatorio" });
   }
 
-  const rawInput = li_at.trim();
-  let sessionCookies: Array<{
-    name: string;
-    value: string;
-    domain: string;
-    path: string;
-    httpOnly?: boolean;
-    secure?: boolean;
-    sameSite?: "Strict" | "Lax" | "None";
-  }> = [];
+  const rawInput = body.li_at.trim();
+  let sessionCookies: LinkedInSessionCookie[] = [];
   let detectedUserAgent: string | undefined;
+  let structuredInput = false;
 
-  // Check if it's the full bundle from InHubFlow Connect (ihf_ + base64)
+  // Full bundle from InHubFlow Connect (ihf_ + base64)
   if (rawInput.startsWith("ihf_")) {
+    structuredInput = true;
     try {
       const decodedJson = Buffer.from(rawInput.slice(4), "base64").toString("utf-8");
-      const parsed = JSON.parse(decodedJson);
+      const parsed = JSON.parse(decodedJson) as Record<string, unknown>;
       if (typeof parsed.userAgent === "string" && parsed.userAgent.length > 10) {
         detectedUserAgent = parsed.userAgent;
       }
-      if (Array.isArray(parsed.cookies) && parsed.cookies.length > 0) {
-        sessionCookies = parsed.cookies.map((c: any) => ({
-          name: c.name,
-          value: c.value,
-          domain: c.domain?.startsWith(".") ? c.domain : `.${c.domain || "linkedin.com"}`,
-          path: c.path || "/",
-          httpOnly: c.httpOnly ?? true,
-          secure: c.secure ?? true,
-          sameSite: (c.sameSite === "None" ? "None" : (c.sameSite === "Strict" ? "Strict" : "Lax")),
-        }));
+      const normalized = normalizeLinkedInCookieList(parsed.cookies, { domain: ".linkedin.com", httpOnly: true });
+      if (!normalized || normalized.length === 0) throw new Error("Bundle cookies are invalid");
+      sessionCookies = dedupeLinkedInCookies(normalized);
+      if (!hasValidLinkedInLiAt(sessionCookies) && typeof parsed.li_at === "string" && parsed.li_at.length > 20) {
+        sessionCookies.unshift(normalizeLinkedInCookie({
+          name: "li_at",
+          value: parsed.li_at,
+          domain: ".linkedin.com",
+          path: "/",
+          httpOnly: true,
+          secure: true,
+          sameSite: "Lax",
+        })!);
       }
     } catch {
-      // Fallback below
+      return res.status(400).json({
+        error: "El Código de Conexión de la extensión está dañado o no contiene cookies válidas de LinkedIn.",
+      });
     }
   } else if (rawInput.startsWith("[") && rawInput.endsWith("]")) {
     // Cookie-Editor export JSON format
+    structuredInput = true;
     try {
       const parsed = JSON.parse(rawInput);
-      if (Array.isArray(parsed)) {
-        sessionCookies = parsed.map((c: any) => ({
-          name: c.name,
-          value: c.value,
-          domain: c.domain?.startsWith(".") ? c.domain : `.${c.domain || "linkedin.com"}`,
-          path: c.path || "/",
-          httpOnly: c.httpOnly ?? true,
-          secure: c.secure ?? true,
-          sameSite: "Lax" as const,
-        }));
-      }
+      const normalized = normalizeLinkedInCookieList(parsed, { domain: ".linkedin.com", httpOnly: false });
+      if (!normalized || normalized.length === 0) throw new Error("Cookie export is invalid");
+      sessionCookies = dedupeLinkedInCookies(normalized);
     } catch {
-      // Fallback below
+      return res.status(400).json({
+        error: "La exportación de cookies no es válida. Vuelve a copiar las cookies de LinkedIn.",
+      });
     }
   }
 
-  // If not bundled, parse as raw token
-  if (sessionCookies.length === 0) {
+  // Raw li_at token (legacy support)
+  if (sessionCookies.length === 0 && !structuredInput) {
     if (
       rawInput.includes("copy(") ||
       rawInput.includes("document.cookie") ||
@@ -95,29 +96,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 
-  // Parse document.cookie string into extra cookie objects if provided
-  if (document_cookie) {
-    for (const part of document_cookie.split(";")) {
+  // Legacy document.cookie values are additive only and are never httpOnly.
+  if (typeof body.document_cookie === "string") {
+    for (const part of body.document_cookie.split(";")) {
       const eqIdx = part.indexOf("=");
       if (eqIdx === -1) continue;
-      const name = part.slice(0, eqIdx).trim();
-      const value = part.slice(eqIdx + 1).trim();
-      if (name && value && !sessionCookies.some((c) => c.name === name)) {
-        sessionCookies.push({ name, value, domain: ".linkedin.com", path: "/", httpOnly: true, secure: true, sameSite: "Lax" });
+      const cookie = normalizeLinkedInCookie({
+        name: part.slice(0, eqIdx).trim(),
+        value: part.slice(eqIdx + 1).trim(),
+        domain: ".linkedin.com",
+        path: "/",
+        httpOnly: false,
+        secure: true,
+        sameSite: "Lax",
+      });
+      if (cookie && !sessionCookies.some((existing) => existing.name === cookie.name)) {
+        sessionCookies.push(cookie);
       }
     }
   }
 
-  // Ensure li_at is present
-  const hasLiAt = sessionCookies.some((c) => c.name === "li_at" && c.value && c.value.length > 20);
-  if (!hasLiAt) {
+  if (!hasValidLinkedInLiAt(sessionCookies)) {
     return res.status(400).json({
       error: "El código no contiene un token de sesión li_at válido de LinkedIn.",
     });
   }
 
   // Build Playwright-compatible storageState
-  const storageState: { cookies: typeof sessionCookies; origins: any[]; userAgent?: string } = {
+  const storageState: { cookies: typeof sessionCookies; origins: unknown[]; userAgent?: string } = {
     cookies: sessionCookies,
     origins: [],
   };

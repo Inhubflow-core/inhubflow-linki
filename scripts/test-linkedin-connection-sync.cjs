@@ -26,6 +26,18 @@ const {
   matchAcceptedConnection,
   parseVoyagerConnections,
 } = require("../lib/linkedin/connection-reconciliation.ts");
+const {
+  dedupeLinkedInCookies,
+  hasValidLinkedInLiAt,
+  linkedinCsrfFromCookies,
+  normalizeLinkedInCookie,
+  normalizeLinkedInCookieList,
+  normalizeLinkedInSameSite,
+} = require("../lib/linkedin/cookie-state.ts");
+const {
+  isLinkedInAuthenticationWall,
+  LinkedInAuthenticationError,
+} = require("../lib/linkedin/auth-wall.ts");
 
 function target(id, url, urn = null, memberUrn = null) {
   return {
@@ -84,6 +96,55 @@ assert.equal(detectExplicitProfileDegree("Conexão de 1º grau"), "first");
 assert.equal(detectExplicitProfileDegree("Mariana • 2º"), "second_or_third");
 assert.equal(detectExplicitProfileDegree("3rd degree connection"), "second_or_third");
 assert.equal(detectExplicitProfileDegree("Message Roberto"), null);
+
+assert.equal(normalizeLinkedInSameSite("no_restriction"), "None");
+assert.equal(normalizeLinkedInSameSite("Strict"), "Strict");
+assert.equal(normalizeLinkedInSameSite(undefined), "Lax");
+
+const sessionCookie = normalizeLinkedInCookie({
+  name: "li_at",
+  value: "synthetic-linkedin-session-token",
+  domain: ".linkedin.com",
+  path: "/",
+  httpOnly: true,
+  secure: true,
+  sameSite: "no_restriction",
+});
+assert.ok(sessionCookie);
+assert.equal(sessionCookie.sameSite, "None");
+assert.equal("expires" in sessionCookie, false);
+assert.equal(hasValidLinkedInLiAt([sessionCookie]), true);
+assert.equal(normalizeLinkedInCookie({
+  name: "li_at",
+  value: "synthetic-linkedin-session-token",
+  domain: ".example.com",
+  path: "/",
+}), null);
+assert.equal(normalizeLinkedInCookie({
+  name: "invalid cookie",
+  value: "x",
+  domain: ".linkedin.com",
+  path: "/",
+}), null);
+assert.equal(normalizeLinkedInCookieList([
+  sessionCookie,
+  { name: "bad cookie", value: "x", domain: ".linkedin.com", path: "/" },
+]), null);
+
+const duplicateCookies = dedupeLinkedInCookies([
+  sessionCookie,
+  { ...sessionCookie, value: "ignored-duplicate" },
+  { ...sessionCookie, path: "/sales", value: "path-specific" },
+]);
+assert.equal(duplicateCookies.length, 2);
+assert.equal(duplicateCookies[0].value, "synthetic-linkedin-session-token");
+assert.equal(linkedinCsrfFromCookies([{ name: "JSESSIONID", value: '"ajax:123456"' }]), "ajax:123456");
+assert.equal(linkedinCsrfFromCookies([]), null);
+
+assert.equal(isLinkedInAuthenticationWall("https://www.linkedin.com/checkpoint/challenge/"), true);
+assert.equal(isLinkedInAuthenticationWall("https://www.linkedin.com/in/example/"), false);
+assert.equal(new LinkedInAuthenticationError("post-submit", true).submissionAttempted, true);
+assert.equal(new LinkedInAuthenticationError("pre-submit").submissionAttempted, false);
 
 console.log("LinkedIn accepted-connection reconciliation tests passed");
 
