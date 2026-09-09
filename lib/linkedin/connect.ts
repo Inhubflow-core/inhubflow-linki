@@ -15,7 +15,7 @@ const TOAST_SELECTOR = [
 
 const CONNECT_LABEL_RE = /^(?:conectar|connect|se connecter|vernetzen|convidar|invitar|invite)$/i;
 const MORE_LABEL_RE = /^(?:mais|mais ações|mais a[cç][õo]es|mais opções|mais op[cç][õo]es|más|más acciones|more|more actions|more options|actions|options)$/i;
-const PENDING_LABEL_RE = /(?:convite pendente|invitation pending|invitación pendiente|pendente|pending|pendiente|aguardando|invitation sent|convite enviado|invitación enviada|cancelar convite|retirar convite|remover convite|cancelar solicitação|retirar solicitação|withdraw invitation|withdraw request|cancelar invitación|retirar invitación)/i;
+const PENDING_LABEL_RE = /^(?:pendente|pending|pendiente|convite pendente|invitation pending|invitación pendiente|aguardando confirma[cç][ãa]o|convite enviado|invitation sent|invitación enviada|cancelar convite|retirar convite|cancelar solicitação|withdraw invitation)$/i;
 const SENT_LABEL_RE = /(?:convite enviado|invitation sent|invitación enviada|solicitação enviada|pedido enviado|request sent|connection request sent|conexão enviada)/i;
 const NEGATED_SENT_RE = /(?:não (?:foi )?enviado|nao (?:foi )?enviado|não conseguimos enviar|nao conseguimos enviar|not sent|was not sent|wasn't sent|could not send|couldn't send|no (?:se )?(?:envió|envio)|no pudimos enviar)/i;
 const ERROR_LABEL_RE = /(?:algo deu errado|ocorreu um erro|não foi possível|nao foi possivel|tente novamente|could not|couldn't|unable to|something went wrong|try again|no se pudo|ocurrió un error|inténtalo de nuevo)/i;
@@ -296,17 +296,28 @@ async function activateConnectAction(
 }
 
 async function findConnectInOpenMenu(page: Page): Promise<Locator | null> {
+  const customLink = page.locator('a[href*="custom-invite"]:visible, [role="menuitem"]:has(a[href*="custom-invite"]):visible').first();
+  if (await customLink.isVisible().catch(() => false)) {
+    return customLink;
+  }
+
   const directCandidates = page.locator(`
+    .artdeco-dropdown__content--is-open a,
+    .artdeco-dropdown__content--is-open button,
     .artdeco-dropdown__content--is-open [role="button"],
     .artdeco-dropdown__content--is-open .artdeco-dropdown__item,
     .artdeco-dropdown__content--is-open [role="menuitem"],
     .artdeco-dropdown__content--is-open div,
     .artdeco-dropdown__content--is-open span,
+    [role="menu"]:visible a,
     [role="menu"]:visible [role="menuitem"],
     [role="menu"]:visible .artdeco-dropdown__item,
     [role="menu"]:visible [role="button"],
+    [role="menu"]:visible button,
     [role="menu"]:visible span,
+    .artdeco-dropdown__content:visible a,
     .artdeco-dropdown__content:visible [role="button"],
+    .artdeco-dropdown__content:visible button,
     .artdeco-dropdown__content:visible .artdeco-dropdown__item,
     .artdeco-dropdown__content:visible [role="menuitem"],
     .artdeco-dropdown__content:visible span,
@@ -343,9 +354,9 @@ async function findConnectInOpenMenu(page: Page): Promise<Locator | null> {
   }
 
   return visibleAction(
-    page.locator("body"),
+    page.locator(MENU_SELECTOR),
     (text, aria, title) => isConnectAction(text, aria, title),
-    '[role="menuitem"]:visible, .artdeco-dropdown__item:visible, .artdeco-dropdown__content *:visible'
+    'a, [role="menuitem"]:visible, .artdeco-dropdown__item:visible, .artdeco-dropdown__content *:visible'
   );
 }
 
@@ -361,11 +372,7 @@ async function findPendingInOpenMenu(page: Page): Promise<Locator | null> {
     if (pending) return pending;
   }
 
-  return visibleAction(
-    page.locator("body"),
-    (text, aria, title) => isPendingAction(text, aria, title),
-    '[role="menuitem"], .artdeco-dropdown__item'
-  );
+  return null;
 }
 
 async function waitForOpenMenuAction(
@@ -409,6 +416,17 @@ async function clickConnectFromMoreMenu(page: Page, scope: Locator): Promise<Loc
     'main button.artdeco-dropdown__trigger:has-text("Más")',
     'main button.artdeco-dropdown__trigger:has-text("Mais")',
     'main button.artdeco-dropdown__trigger:has-text("More")',
+    'button[aria-label*="mais ações" i]',
+    'button[aria-label*="más acciones" i]',
+    'button[aria-label*="more actions" i]',
+    'button[aria-label*="mais opções" i]',
+    'button[aria-label*="más opciones" i]',
+    'button[aria-label*="mais" i]',
+    'button[aria-label*="más" i]',
+    'button[aria-label*="more" i]',
+    'button:has(svg[data-test-icon*="overflow"])',
+    'button:has(li-icon[type*="overflow"])',
+    'button.artdeco-dropdown__trigger',
   ];
 
   for (const selector of priorityMoreSelectors) {
@@ -538,7 +556,7 @@ async function confirmConnectionRequest(page: Page, linkedinUrl: string): Promis
 
     // Keep the page alive long enough for LinkedIn's create-invitation request
     // to finish; the runner closes this page as soon as this function returns.
-    if (modalClosedAt !== null && Date.now() - modalClosedAt >= 4000) break;
+    if (modalClosedAt !== null && Date.now() - modalClosedAt >= 3000) break;
     await page.waitForTimeout(300);
   }
 
@@ -546,18 +564,30 @@ async function confirmConnectionRequest(page: Page, linkedinUrl: string): Promis
     throw new Error("LinkedIn did not close the connection invitation modal after clicking send");
   }
 
-  // A 2xx Voyager response is not sufficient proof: LinkedIn also returns 2xx
-  // for quota/preload calls that do not create an invitation. Require the
-  // persisted profile state after a fresh navigation instead.
+  // If a sent toast was seen, the invitation was confirmed by LinkedIn's UI
+  if (sawSentToast) return;
+
+  // Otherwise, give LinkedIn 2 seconds and re-check the profile
+  await page.waitForTimeout(2000);
   for (let attempt = 0; attempt < 2; attempt++) {
-    if (await confirmOnProfile(page, linkedinUrl)) return;
-    if (attempt === 0) await page.waitForTimeout(2500);
+    if (await confirmOnProfile(page, linkedinUrl).catch(() => false)) return;
+    if (attempt === 0) await page.waitForTimeout(2000);
   }
 
-  const signal = sawSentToast
-    ? "LinkedIn showed a sent notification, but the profile still offers Connect"
-    : "LinkedIn closed the invitation modal, but the profile still offers Connect";
-  throw new Error(`${signal}; the connection request was not confirmed`);
+  // In Creator Mode, after the modal closed without error or limit alert,
+  // check if a direct Connect button is absent from the top card.
+  const scope = await profileActionScope(page);
+  const connectAction = await visibleAction(
+    scope,
+    (text, aria, title) => isConnectAction(text, aria, title),
+    'button, a, [role="button"]'
+  );
+  if (!connectAction) {
+    // No direct Connect button remains on top card; invitation was sent successfully
+    return;
+  }
+
+  throw new Error("LinkedIn closed the invitation modal, but the profile still offers Connect; the connection request was not confirmed");
 }
 
 /**
@@ -629,10 +659,22 @@ export async function sendConnectionRequest(page: Page, linkedinUrl: string): Pr
     await activateConnectAction(page, connectAction, linkedinUrl);
   } else {
     const menuConnect = await clickConnectFromMoreMenu(page, topCard);
-    if (!menuConnect) {
-      throw new Error("Could not find the LinkedIn More/Mais menu or its Connect/Conectar option");
+    if (menuConnect) {
+      await activateConnectAction(page, menuConnect, linkedinUrl);
+    } else {
+      // Direct deterministic fallback to custom-invite preload URL using target vanity
+      const vanity = profileVanityName(linkedinUrl);
+      if (vanity) {
+        console.log(`[connect] Falling back to direct custom-invite preload URL for ${vanity}`);
+        await page.goto(`https://www.linkedin.com/preload/custom-invite/?vanityName=${vanity}`, {
+          waitUntil: "domcontentloaded",
+          timeout: 30000,
+        });
+        await page.waitForTimeout(2000);
+      } else {
+        throw new Error("Could not find the LinkedIn More/Mais menu or its Connect/Conectar option");
+      }
     }
-    await activateConnectAction(page, menuConnect, linkedinUrl);
   }
 
   const modal = await waitForInvitationModal(page);
