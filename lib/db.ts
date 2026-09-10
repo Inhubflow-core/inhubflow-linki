@@ -1014,13 +1014,16 @@ function healPendingMessageTracksMigration(db: Database.Database) {
       WHERE run_profile_id IN (
         SELECT rp.id FROM run_profiles rp
         JOIN targets t ON t.id = rp.target_id
-        WHERE (t.id = '2e428bfe-2aab-4e20-9b6c-a1f55033c12d' OR t.linkedin_url LIKE '%more-fern%' OR t.full_name LIKE '%MOre fergo%')
+        WHERE (t.id IN ('2e428bfe-2aab-4e20-9b6c-a1f55033c12d', '2d73a154-fca2-4d9a-ae82-0e80a30b1c1f')
+           OR t.linkedin_url LIKE '%more-fern%'
+           OR t.full_name LIKE '%MOre fergo%'
+           OR t.full_name LIKE '%Gaby Reina%')
       )
       AND track = 'linkedin'
       AND state != 'completed'
     `).run();
   } catch (err) {
-    console.warn("[heal-migration] reset More track:", err instanceof Error ? err.message : err);
+    console.warn("[heal-migration] reset test tracks:", err instanceof Error ? err.message : err);
   }
 }
 

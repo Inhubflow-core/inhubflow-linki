@@ -37,7 +37,7 @@ export async function sendMessage(
   console.log(`[message] Starting sendMessage to "${fullName}" (cached URN: ${messagingUrn || "none"})`);
 
   // 0. Verify session authentication state before attempting any send
-  const cookies = await page.context().cookies("https://www.linkedin.com").catch(() => []);
+  const cookies = await page.context().cookies().catch(() => []);
   const hasLiAt = cookies.some(c => c.name === "li_at" && typeof c.value === "string" && c.value.length > 20);
   if (!hasLiAt) {
     throw new LinkedInAuthenticationError("LinkedIn session expired or missing valid li_at cookie — please reauthenticate account in InHubFlow");
@@ -152,46 +152,67 @@ async function openComposeFromProfilePage(page: Page): Promise<boolean> {
       return focused;
     }
 
+    // Prepare popup listener in case LinkedIn opens a separate window/tab
+    const popupPromise = page.context().waitForEvent("page", { timeout: 3000 }).catch(() => null);
+
     // Scroll and click button
     await msgBtn.scrollIntoViewIfNeeded().catch(() => {});
     await page.waitForTimeout(400);
     await msgBtn.click({ delay: 50 }).catch(async () => {
       await msgBtn.click({ force: true });
     });
-    await page.waitForTimeout(1500);
+
+    const popupPage = await popupPromise;
+    let targetPage = page;
+    if (popupPage) {
+      console.log("[message] openComposeFromProfilePage: popup/new page detected, switching to popup");
+      targetPage = popupPage;
+      await popupPage.waitForLoadState("domcontentloaded").catch(() => {});
+    }
+
+    await targetPage.waitForTimeout(1500);
 
     // If click navigated the page to /messaging/
-    if (page.url().includes("/messaging/")) {
+    if (targetPage.url().includes("/messaging/")) {
       console.log("[message] openComposeFromProfilePage: navigated to messaging, focusing compose box");
-      const focused = await findAndFocusComposeBox(page, 10000);
+      const focused = await findAndFocusComposeBox(targetPage, 10000);
       if (focused) return true;
     }
 
-    // 2. Poll for visible compose box or expand minimized bubble
-    let focused = await findAndFocusComposeBox(page, 8000);
+    // 2. Poll for visible compose box across targetPage and all open pages
+    let focused = await findAndFocusComposeBox(targetPage, 8000);
     if (focused) {
       console.log("[message] openComposeFromProfilePage: compose box successfully focused");
       return true;
     }
 
-    // If no bubble is in DOM at all, retry with direct DOM click
-    const bubbleCount = await page.locator(".msg-overlay-conversation-bubble, aside .msg-overlay-conversation-bubble").count().catch(() => 0);
-    if (bubbleCount === 0) {
-      console.log("[message] Retrying with DOM click on message button");
-      await msgBtn.evaluate((el: HTMLElement) => el.click()).catch(() => {});
-      await page.waitForTimeout(1500);
-
-      if (page.url().includes("/messaging/")) {
-        console.log("[message] openComposeFromProfilePage: navigated to messaging after DOM click");
-        const focusedAfterNav = await findAndFocusComposeBox(page, 10000);
-        if (focusedAfterNav) return true;
+    // Check if any other page in context has the compose box
+    const allPages = page.context().pages();
+    for (const otherPage of allPages) {
+      if (otherPage !== targetPage) {
+        const otherFocused = await findAndFocusComposeBox(otherPage, 2000);
+        if (otherFocused) {
+          console.log("[message] openComposeFromProfilePage: compose box found on secondary page");
+          return true;
+        }
       }
+    }
 
-      focused = await findAndFocusComposeBox(page, 8000);
-      if (focused) {
-        console.log("[message] openComposeFromProfilePage: compose box focused after DOM click");
-        return true;
-      }
+    // Retry with DOM click on message button
+    console.log("[message] Retrying with DOM click on message button");
+    await msgBtn.evaluate((el: HTMLElement) => el.click()).catch(() => {});
+    await targetPage.waitForTimeout(1500);
+
+    if (targetPage.url().includes("/messaging/")) {
+      console.log("[message] openComposeFromProfilePage: navigated to messaging after DOM click");
+      const focusedAfterNav = await findAndFocusComposeBox(targetPage, 10000);
+      if (focusedAfterNav) return true;
+    }
+
+    focused = await findAndFocusComposeBox(targetPage, 8000);
+    if (focused) {
+      console.log("[message] openComposeFromProfilePage: compose box focused after DOM click");
+      return true;
     }
 
     console.warn("[message] openComposeFromProfilePage: compose box not visible after retries");
@@ -214,30 +235,41 @@ async function findAndFocusComposeBox(page: Page, timeoutMs = 8000): Promise<boo
       }
     }).catch(() => {});
 
-    // 2. Direct DOM scan for any visible, active contenteditable element
+    // 2. Direct DOM scan for any visible, active contenteditable or textarea element
     const focusedViaDom = await page.evaluate(() => {
       const selectors = [
         "div.msg-form__contenteditable[contenteditable='true']",
-        "div[role='textbox'].msg-form__message-texteditor",
         "div.msg-form__contenteditable",
+        "div[role='textbox'].msg-form__message-texteditor",
         "div[role='textbox'][contenteditable='true']",
+        "div[role='textbox']",
         "form.msg-form [contenteditable='true']",
+        "form.msg-form textarea",
         ".msg-overlay-conversation-bubble [contenteditable='true']",
+        ".msg-overlay-conversation-bubble textarea",
         ".msg-thread [contenteditable='true']",
+        ".msg-thread textarea",
+        "div[data-placeholder][contenteditable='true']",
+        "div[aria-label*='mensagem' i][contenteditable='true']",
+        "div[aria-label*='mensaje' i][contenteditable='true']",
+        "div[aria-label*='message' i][contenteditable='true']",
+        "div.ql-editor",
+        "textarea.msg-form__textarea",
+        "textarea[name='message']",
+        "textarea[placeholder*='mensagem' i]",
+        "textarea[placeholder*='mensaje' i]",
+        "textarea[placeholder*='message' i]",
         "p.msg-form__contenteditable",
         "[contenteditable='true']"
       ];
       for (const sel of selectors) {
         const elements = Array.from(document.querySelectorAll<HTMLElement>(sel));
         for (const el of elements) {
-          const rect = el.getBoundingClientRect();
-          const style = window.getComputedStyle(el);
-          const isVis = rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
-          if (isVis) {
+          try {
             el.click();
             el.focus();
             return true;
-          }
+          } catch { /* continue */ }
         }
       }
       return false;
@@ -248,7 +280,15 @@ async function findAndFocusComposeBox(page: Page, timeoutMs = 8000): Promise<boo
     }
 
     // 3. Playwright locator check across candidates
-    const loc = page.locator("div.msg-form__contenteditable, div[role='textbox'].msg-form__message-texteditor, form.msg-form [contenteditable='true'], [contenteditable='true']");
+    const loc = page.locator(`
+      div.msg-form__contenteditable,
+      div[role='textbox'].msg-form__message-texteditor,
+      div[role='textbox'],
+      form.msg-form [contenteditable='true'],
+      form.msg-form textarea,
+      textarea.msg-form__textarea,
+      [contenteditable='true']
+    `);
     const count = await loc.count().catch(() => 0);
     for (let i = 0; i < count; i++) {
       const item = loc.nth(i);
@@ -304,6 +344,7 @@ async function sendMessageViaTypeahead(
     const composeDirect = page.locator(`
       a[href*="/messaging/thread/new"]:visible,
       button.msg-conversations-container__compose-btn:visible,
+      button[data-control-name="compose_message"]:visible,
       button:has(svg[data-test-icon*="compose"]):visible,
       button:has(li-icon[type*="compose"]):visible,
       button[aria-label*="escrever" i]:visible,
@@ -314,7 +355,7 @@ async function sendMessageViaTypeahead(
       button[aria-label*="compose" i]:visible
     `).first();
     if ((await composeDirect.count().catch(() => 0)) > 0) {
-      await composeDirect.click().catch(() => {});
+      await composeDirect.click({ force: true }).catch(() => {});
       await page.waitForTimeout(1500);
     } else {
       await triggerNewMessageButton(page);
@@ -322,27 +363,49 @@ async function sendMessageViaTypeahead(
     }
   }
 
-  // Strategy 2: Look for the recipient typeahead search field via DOM scan
+  // Strategy 2: Look for the recipient typeahead search field
   let searchFocused = false;
   const startSearch = Date.now();
   while (Date.now() - startSearch < 12000) {
+    const searchField = page.locator(`
+      input.msg-connections-typeahead__search-field,
+      .msg-connections-typeahead input,
+      form.msg-connections-typeahead input,
+      .msg-compose input,
+      input[role="combobox"][aria-label*="destinat" i],
+      input[role="combobox"][placeholder*="nome" i],
+      input[role="combobox"][placeholder*="nombre" i],
+      input[role="combobox"][placeholder*="name" i],
+      input[role="combobox"],
+      input[placeholder*="nome" i]:not(.msg-search-form__search-field),
+      input[placeholder*="nombre" i]:not(.msg-search-form__search-field),
+      input[placeholder*="name" i]:not(.msg-search-form__search-field)
+    `).first();
+
+    if (await searchField.isVisible().catch(() => false)) {
+      await searchField.click().catch(() => {});
+      await searchField.focus().catch(() => {});
+      searchFocused = true;
+      break;
+    }
+
+    // Try DOM scan as fallback
     searchFocused = await page.evaluate(() => {
       const inputs = Array.from(document.querySelectorAll<HTMLInputElement>("input"));
       for (const input of inputs) {
+        if (input.className.includes("msg-search-form")) continue; // Skip left sidebar search
         const rect = input.getBoundingClientRect();
         const style = window.getComputedStyle(input);
         if (rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none") {
           const pl = (input.placeholder || "").toLowerCase();
           const aria = (input.getAttribute("aria-label") || "").toLowerCase();
-          const name = (input.name || "").toLowerCase();
           const cls = (input.className || "").toLowerCase();
+          const role = (input.getAttribute("role") || "").toLowerCase();
           if (
             cls.includes("typeahead") ||
-            cls.includes("msg") ||
-            name.includes("search") ||
+            role === "combobox" ||
             pl.includes("nome") || pl.includes("nombre") || pl.includes("name") || pl.includes("digite") || pl.includes("escreva") ||
-            aria.includes("nome") || aria.includes("nombre") || aria.includes("name") || aria.includes("digite") || aria.includes("escreva") ||
-            aria.includes("destinat") || aria.includes("recipient")
+            aria.includes("nome") || aria.includes("nombre") || aria.includes("name") || aria.includes("destinat") || aria.includes("recipient")
           ) {
             input.click();
             input.focus();
@@ -355,14 +418,9 @@ async function sendMessageViaTypeahead(
 
     if (searchFocused) break;
 
-    const searchField = page.locator("input.msg-connections-typeahead__search-field, .msg-connections-typeahead input, form.msg-connections-typeahead input, .msg-compose input").first();
-    if (await searchField.isVisible().catch(() => false)) {
-      await searchField.click().catch(() => {});
-      await searchField.focus().catch(() => {});
-      searchFocused = true;
-      break;
-    }
-    await page.waitForTimeout(500);
+    // Retry triggering new message compose button if still not open
+    await triggerNewMessageButton(page);
+    await page.waitForTimeout(600);
   }
 
   // Build ordered list of candidate search queries to try
