@@ -1025,6 +1025,28 @@ function healPendingMessageTracksMigration(db: Database.Database) {
   } catch (err) {
     console.warn("[heal-migration] reset test tracks:", err instanceof Error ? err.message : err);
   }
+
+  // 4. Restore account authenticated state if it has valid cookies_json, and unpause runs
+  try {
+    db.prepare(`
+      UPDATE accounts
+      SET is_authenticated = 1
+      WHERE cookies_json IS NOT NULL
+        AND is_authenticated = 0
+    `).run();
+  } catch (err) {
+    console.warn("[heal-migration] restore authenticated accounts:", err instanceof Error ? err.message : err);
+  }
+
+  try {
+    db.prepare(`
+      UPDATE runs
+      SET status = 'running'
+      WHERE status = 'paused'
+    `).run();
+  } catch (err) {
+    console.warn("[heal-migration] unpause runs:", err instanceof Error ? err.message : err);
+  }
 }
 
 // Cleanup migration for previously inserted targets that had concatenated DOM card strings

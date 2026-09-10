@@ -36,13 +36,6 @@ export async function sendMessage(
 
   console.log(`[message] Starting sendMessage to "${fullName}" (cached URN: ${messagingUrn || "none"})`);
 
-  // 0. Verify session authentication state before attempting any send
-  const cookies = await page.context().cookies().catch(() => []);
-  const hasLiAt = cookies.some(c => c.name === "li_at" && typeof c.value === "string" && c.value.length > 20);
-  if (!hasLiAt) {
-    throw new LinkedInAuthenticationError("LinkedIn session expired or missing valid li_at cookie — please reauthenticate account in InHubFlow");
-  }
-
   // 1. If messagingUrn is cached, try direct compose URL
   if (messagingUrn) {
     console.log(`[message] Attempting openComposeByUrn with cached URN: ${messagingUrn}`);
