@@ -1,6 +1,6 @@
 import type { Page } from "playwright";
 import { visitProfile } from "./visit";
-import { LinkedInAuthenticationError } from "./auth-wall";
+import { isLinkedInAuthenticationWall, LinkedInAuthenticationError } from "./auth-wall";
 
 export class NotConnectedError extends Error {}
 
@@ -73,11 +73,20 @@ export async function sendMessage(
     timeout: 35000,
   });
 
+  const pageUrl = page.url();
+  if (isLinkedInAuthenticationWall(pageUrl)) {
+    throw new LinkedInAuthenticationError(`Tu sesión de LinkedIn ha caducado o requiere re-autenticación (redirigido a ${pageUrl}). Por favor conecta tu cuenta de nuevo en Configuración usando el Código de Conexión de la extensión.`);
+  }
+
   // Wait up to 15s for the messaging layout to mount
   await page.locator(".scaffold-layout__aside, .msg-conversations-container, input.msg-search-form__search-field, main, div[role='main']").first()
     .waitFor({ state: "attached", timeout: 15000 })
     .catch(() => {});
   await page.waitForTimeout(1500);
+
+  if (isLinkedInAuthenticationWall(page.url())) {
+    throw new LinkedInAuthenticationError(`Tu sesión de LinkedIn ha caducado (redirigido a ${page.url()}). Por favor re-autentica tu cuenta en Configuración.`);
+  }
 
   // 4. Phase 1: Search and open existing conversation (instant match for existing contacts/spouses)
   const foundExisting = await searchExistingConversation(page, candidateNames);
@@ -387,6 +396,9 @@ async function searchExistingConversation(page: Page, candidateNames: string[]):
 
     const searchInputFound = await searchInput.waitFor({ state: "visible", timeout: 10000 }).then(() => true).catch(() => false);
     if (!searchInputFound || !(await searchInput.isVisible().catch(() => false))) {
+      if (isLinkedInAuthenticationWall(page.url())) {
+        throw new LinkedInAuthenticationError(`Tu sesión de LinkedIn ha caducado o requiere inicio de sesión (redirigido a ${page.url()}). Por favor vuelve a conectar tu cuenta en Configuración usando el Código de Conexión de la extensión.`);
+      }
       const domInputs = await page.evaluate(() => {
         return Array.from(document.querySelectorAll("input")).map(i => ({
           type: i.type,
@@ -536,6 +548,10 @@ async function sendMessageViaTypeahead(
       }
       return false;
     }).catch(() => false);
+  }
+
+  if (!searchFocused && isLinkedInAuthenticationWall(page.url())) {
+    throw new LinkedInAuthenticationError(`Tu sesión de LinkedIn ha caducado o requiere inicio de sesión (redirigido a ${page.url()}). Por favor vuelve a conectar tu cuenta en Configuración usando el Código de Conexión de la extensión.`);
   }
 
   let clicked = false;

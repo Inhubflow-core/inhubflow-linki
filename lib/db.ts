@@ -1025,19 +1025,7 @@ function healPendingMessageTracksMigration(db: Database.Database) {
     console.warn("[heal-migration] reset test tracks:", err instanceof Error ? err.message : err);
   }
 
-  // 4. Restore account authenticated state if it has valid cookies_json
-  try {
-    db.prepare(`
-      UPDATE accounts
-      SET is_authenticated = 1
-      WHERE cookies_json IS NOT NULL
-        AND is_authenticated = 0
-    `).run();
-  } catch (err) {
-    console.warn("[heal-migration] restore authenticated accounts:", err instanceof Error ? err.message : err);
-  }
-
-  // 5. Unpause runs or reactivate runs containing test targets
+  // 4. Unpause runs or reactivate runs containing test targets
   try {
     db.prepare(`
       UPDATE runs
