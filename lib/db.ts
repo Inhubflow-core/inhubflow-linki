@@ -1020,7 +1020,6 @@ function healPendingMessageTracksMigration(db: Database.Database) {
            OR t.full_name LIKE '%Gaby Reina%')
       )
       AND track = 'linkedin'
-      AND (state != 'completed' OR t.id = '2e428bfe-2aab-4e20-9b6c-a1f55033c12d' OR t.full_name LIKE '%MOre fergo%')
     `).run();
   } catch (err) {
     console.warn("[heal-migration] reset test tracks:", err instanceof Error ? err.message : err);

@@ -70,9 +70,14 @@ export async function sendMessage(
   console.log(`[message] Navigating to https://www.linkedin.com/messaging/ for "${fullName}"`);
   await page.goto("https://www.linkedin.com/messaging/", {
     waitUntil: "domcontentloaded",
-    timeout: 30000,
+    timeout: 35000,
   });
-  await page.waitForTimeout(2000);
+
+  // Wait up to 15s for the messaging layout to mount
+  await page.locator(".scaffold-layout__aside, .msg-conversations-container, input.msg-search-form__search-field, main, div[role='main']").first()
+    .waitFor({ state: "attached", timeout: 15000 })
+    .catch(() => {});
+  await page.waitForTimeout(1500);
 
   // 4. Phase 1: Search and open existing conversation (instant match for existing contacts/spouses)
   const foundExisting = await searchExistingConversation(page, candidateNames);
@@ -177,6 +182,20 @@ async function openComposeFromProfilePage(page: Page): Promise<boolean> {
     ]);
     console.log(`[message] openComposeFromProfilePage: clicking "${btnText.trim()}" (aria: "${btnAria.trim()}")`);
 
+    // Check if the button or its parent anchor points directly to a message thread
+    const directHref = await msgBtn.evaluate((el: HTMLElement) => {
+      const a = el.closest("a") || el.querySelector("a");
+      return a ? a.getAttribute("href") : el.getAttribute("href");
+    }).catch(() => null);
+
+    if (directHref && directHref.includes("/messaging/thread/")) {
+      const targetUrl = directHref.startsWith("http") ? directHref : `https://www.linkedin.com${directHref}`;
+      console.log(`[message] openComposeFromProfilePage: following direct conversation thread link: ${targetUrl}`);
+      await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+      const focused = await findAndFocusComposeBox(page, 10000);
+      if (focused) return true;
+    }
+
     // Prepare popup listener in case LinkedIn opens a separate window/tab
     const popupPromise = page.context().waitForEvent("page", { timeout: 2000 }).catch(() => null);
 
@@ -207,12 +226,12 @@ async function openComposeFromProfilePage(page: Page): Promise<boolean> {
     // If click navigated the page to /messaging/
     if (targetPage.url().includes("/messaging/")) {
       console.log("[message] openComposeFromProfilePage: navigated to messaging, focusing compose box");
-      const focused = await findAndFocusComposeBox(targetPage, 6000);
+      const focused = await findAndFocusComposeBox(targetPage, 8000);
       if (focused) return true;
     }
 
     // Poll for visible compose box across targetPage and all open pages
-    let focused = await findAndFocusComposeBox(targetPage, 4000);
+    let focused = await findAndFocusComposeBox(targetPage, 6000);
     if (focused) {
       console.log("[message] openComposeFromProfilePage: compose box successfully focused");
       return true;
@@ -317,24 +336,47 @@ async function searchExistingConversation(page: Page, candidateNames: string[]):
   try {
     console.log(`[message] Searching existing conversations for: ${JSON.stringify(candidateNames)}`);
 
-    // 1. Check if recipient is already in visible conversation items without searching
-    const existingItems = page.locator(".msg-conversations-container__conversations-list li, .msg-conversation-listitem, .msg-conversations-container__convo-item");
+    // 1. Wait for either conversations list items or search input to appear in DOM
+    const conversationListAnchor = page.locator(`
+      .msg-conversations-container__conversations-list li,
+      .msg-conversation-listitem,
+      .msg-conversations-container__convo-item,
+      li[class*='msg-conversation'],
+      input.msg-search-form__search-field,
+      input[placeholder*='Pesquisar' i],
+      input[placeholder*='Search' i]
+    `).first();
+    await conversationListAnchor.waitFor({ state: "attached", timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(1000);
+
+    // 2. Check if recipient is already in visible conversation items without searching
+    const existingItems = page.locator(`
+      .msg-conversations-container__conversations-list li,
+      .msg-conversation-listitem,
+      .msg-conversations-container__convo-item,
+      li[class*='msg-conversation']
+    `);
     const initCount = await existingItems.count().catch(() => 0);
-    for (let i = 0; i < Math.min(initCount, 15); i++) {
+    console.log(`[message] Initial visible conversation items: ${initCount}`);
+    for (let i = 0; i < Math.min(initCount, 20); i++) {
       const item = existingItems.nth(i);
       const rowText = await item.innerText().catch(() => "");
       if (candidateNames.some(cand => resultNameMatches(rowText, cand))) {
         console.log(`[message] Match found in visible conversations: "${rowText.split('\n')[0]}"`);
         await item.click();
         await page.waitForTimeout(1500);
-        const focused = await findAndFocusComposeBox(page, 5000);
+        const focused = await findAndFocusComposeBox(page, 8000);
         if (focused) return true;
       }
     }
 
-    // 2. Search via the search input in the messaging sidebar
+    // 3. Search via the search input in the messaging sidebar
     const searchInput = page.locator(`
       input.msg-search-form__search-field,
+      form.msg-search-form input,
+      .msg-search-form input,
+      .msg-conversations-container input,
+      .scaffold-layout__aside input,
       input[placeholder*="Pesquisar" i],
       input[placeholder*="Buscar" i],
       input[placeholder*="Search" i],
@@ -343,8 +385,17 @@ async function searchExistingConversation(page: Page, candidateNames: string[]):
       input[aria-label*="Search" i]
     `).first();
 
-    if ((await searchInput.count().catch(() => 0)) === 0 || !(await searchInput.isVisible().catch(() => false))) {
-      console.log("[message] Messaging search input not found in left panel");
+    const searchInputFound = await searchInput.waitFor({ state: "visible", timeout: 10000 }).then(() => true).catch(() => false);
+    if (!searchInputFound || !(await searchInput.isVisible().catch(() => false))) {
+      const domInputs = await page.evaluate(() => {
+        return Array.from(document.querySelectorAll("input")).map(i => ({
+          type: i.type,
+          className: i.className,
+          placeholder: i.placeholder,
+          ariaLabel: i.getAttribute("aria-label"),
+        }));
+      }).catch(() => []);
+      console.log(`[message] Messaging search input not found. Total inputs in DOM (${page.url()}):`, JSON.stringify(domInputs));
       return false;
     }
 
@@ -357,20 +408,26 @@ async function searchExistingConversation(page: Page, candidateNames: string[]):
 
       await searchInput.pressSequentially(term, { delay: 40 });
       await page.keyboard.press("Enter");
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(2500);
 
-      const filteredItems = page.locator(".msg-conversations-container__conversations-list li, .msg-conversation-listitem, .msg-search-results li, .msg-conversations-container__convo-item");
+      const filteredItems = page.locator(`
+        .msg-conversations-container__conversations-list li,
+        .msg-conversation-listitem,
+        .msg-search-results li,
+        .msg-conversations-container__convo-item,
+        li[class*='msg-conversation']
+      `);
       const fCount = await filteredItems.count().catch(() => 0);
       console.log(`[message] Filtered conversation items found: ${fCount}`);
 
-      for (let i = 0; i < Math.min(fCount, 10); i++) {
+      for (let i = 0; i < Math.min(fCount, 15); i++) {
         const item = filteredItems.nth(i);
         const rowText = await item.innerText().catch(() => "");
         if (candidateNames.some(cand => resultNameMatches(rowText, cand)) || resultNameMatches(rowText, term)) {
           console.log(`[message] Found matching conversation for "${term}": "${rowText.split('\n')[0]}"`);
           await item.click();
           await page.waitForTimeout(1500);
-          const focused = await findAndFocusComposeBox(page, 5000);
+          const focused = await findAndFocusComposeBox(page, 8000);
           if (focused) return true;
         }
       }
@@ -392,93 +449,67 @@ async function sendMessageViaTypeahead(
   console.log(`[message] Opening new message compose thread via typeahead for candidates: ${JSON.stringify(candidateNames)}`);
 
   // 1. Locate and trigger the compose button
-  let composeOpened = false;
   const composeBtn = page.locator(`
-    a[href*="/messaging/thread/new"]:visible,
-    button.msg-conversations-container__compose-btn:visible,
-    a.msg-conversations-container__compose-btn:visible,
-    button[data-control-name="compose_message"]:visible,
-    .msg-conversations-container__title-actions button:visible,
-    .msg-conversations-container__title-actions a:visible,
-    button:has(svg[data-test-icon*="compose"]):visible,
-    button:has(svg[data-test-icon*="edit"]):visible,
-    a:has(svg[data-test-icon*="compose"]):visible,
-    a:has(svg[data-test-icon*="edit"]):visible,
-    button[aria-label*="mensagem" i]:visible,
-    button[aria-label*="conversa" i]:visible,
-    button[aria-label*="escrever" i]:visible,
-    button[aria-label*="compor" i]:visible,
-    button[aria-label*="redactar" i]:visible,
-    button[aria-label*="compose" i]:visible,
-    a[aria-label*="mensagem" i]:visible,
-    a[aria-label*="conversa" i]:visible,
-    a[aria-label*="escrever" i]:visible,
-    a[aria-label*="compor" i]:visible,
-    a[aria-label*="redactar" i]:visible,
-    a[aria-label*="compose" i]:visible
+    a[href*="/messaging/thread/new"],
+    button.msg-conversations-container__compose-btn,
+    a.msg-conversations-container__compose-btn,
+    button[data-control-name="compose_message"],
+    .msg-conversations-container__title-actions button,
+    .msg-conversations-container__title-actions a,
+    button:has(svg[data-test-icon*="compose"]),
+    button:has(svg[data-test-icon*="edit"]),
+    a:has(svg[data-test-icon*="compose"]),
+    a:has(svg[data-test-icon*="edit"]),
+    button[aria-label*="mensagem" i],
+    button[aria-label*="conversa" i],
+    button[aria-label*="escrever" i],
+    button[aria-label*="compor" i],
+    button[aria-label*="redactar" i],
+    button[aria-label*="compose" i],
+    a[aria-label*="mensagem" i],
+    a[aria-label*="conversa" i],
+    a[aria-label*="escrever" i],
+    a[aria-label*="compor" i],
+    a[aria-label*="redactar" i],
+    a[aria-label*="compose" i]
   `).first();
 
-  if ((await composeBtn.count().catch(() => 0)) > 0) {
+  const composeBtnVisible = await composeBtn.waitFor({ state: "visible", timeout: 8000 }).then(() => true).catch(() => false);
+  if (composeBtnVisible) {
     console.log("[message] Clicking new compose button");
     await composeBtn.click({ delay: 50 }).catch(async () => {
       await composeBtn.click({ force: true });
     });
     await page.waitForTimeout(1500);
-    composeOpened = true;
-  }
-
-  if (!composeOpened) {
+  } else {
     console.log("[message] Triggering new message button via DOM helper");
     await triggerNewMessageButton(page);
     await page.waitForTimeout(1500);
   }
 
-  // Check if we need to navigate to thread/new directly
-  const searchInputCandidate = page.locator(`
+  // 2. Look for the recipient typeahead search field
+  const searchField = page.locator(`
     input.msg-connections-typeahead__search-field,
     .msg-connections-typeahead input,
     form.msg-connections-typeahead input,
     .msg-compose input,
-    input[role="combobox"]
+    input[role="combobox"][aria-label*="destinat" i],
+    input[role="combobox"][placeholder*="nome" i],
+    input[role="combobox"][placeholder*="nombre" i],
+    input[role="combobox"][placeholder*="name" i],
+    input[role="combobox"]:not(.msg-search-form__search-field),
+    input[placeholder*="nome" i]:not(.msg-search-form__search-field),
+    input[placeholder*="nombre" i]:not(.msg-search-form__search-field),
+    input[placeholder*="name" i]:not(.msg-search-form__search-field)
   `).first();
 
-  if ((await searchInputCandidate.count().catch(() => 0)) === 0 || !(await searchInputCandidate.isVisible().catch(() => false))) {
-    console.log("[message] Recipient typeahead not visible, navigating to https://www.linkedin.com/messaging/thread/new/");
-    await page.goto("https://www.linkedin.com/messaging/thread/new/", {
-      waitUntil: "domcontentloaded",
-      timeout: 25000,
-    }).catch(() => {});
-    await page.waitForTimeout(2000);
-    await triggerNewMessageButton(page);
-    await page.waitForTimeout(1000);
-  }
+  let searchFocused = await searchField.waitFor({ state: "visible", timeout: 8000 }).then(async () => {
+    await searchField.click().catch(() => {});
+    await searchField.focus().catch(() => {});
+    return true;
+  }).catch(() => false);
 
-  // 2. Look for the recipient typeahead search field
-  let searchFocused = false;
-  const startSearch = Date.now();
-  while (Date.now() - startSearch < 10000) {
-    const searchField = page.locator(`
-      input.msg-connections-typeahead__search-field,
-      .msg-connections-typeahead input,
-      form.msg-connections-typeahead input,
-      .msg-compose input,
-      input[role="combobox"][aria-label*="destinat" i],
-      input[role="combobox"][placeholder*="nome" i],
-      input[role="combobox"][placeholder*="nombre" i],
-      input[role="combobox"][placeholder*="name" i],
-      input[role="combobox"],
-      input[placeholder*="nome" i]:not(.msg-search-form__search-field),
-      input[placeholder*="nombre" i]:not(.msg-search-form__search-field),
-      input[placeholder*="name" i]:not(.msg-search-form__search-field)
-    `).first();
-
-    if (await searchField.isVisible().catch(() => false)) {
-      await searchField.click().catch(() => {});
-      await searchField.focus().catch(() => {});
-      searchFocused = true;
-      break;
-    }
-
+  if (!searchFocused) {
     // Try DOM scan
     searchFocused = await page.evaluate(() => {
       const inputs = Array.from(document.querySelectorAll<HTMLInputElement>("input"));
@@ -505,9 +536,6 @@ async function sendMessageViaTypeahead(
       }
       return false;
     }).catch(() => false);
-
-    if (searchFocused) break;
-    await page.waitForTimeout(500);
   }
 
   let clicked = false;
