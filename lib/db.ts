@@ -1020,13 +1020,13 @@ function healPendingMessageTracksMigration(db: Database.Database) {
            OR t.full_name LIKE '%Gaby Reina%')
       )
       AND track = 'linkedin'
-      AND state != 'completed'
+      AND (state != 'completed' OR t.id = '2e428bfe-2aab-4e20-9b6c-a1f55033c12d' OR t.full_name LIKE '%MOre fergo%')
     `).run();
   } catch (err) {
     console.warn("[heal-migration] reset test tracks:", err instanceof Error ? err.message : err);
   }
 
-  // 4. Restore account authenticated state if it has valid cookies_json, and unpause runs
+  // 4. Restore account authenticated state if it has valid cookies_json
   try {
     db.prepare(`
       UPDATE accounts
@@ -1038,6 +1038,7 @@ function healPendingMessageTracksMigration(db: Database.Database) {
     console.warn("[heal-migration] restore authenticated accounts:", err instanceof Error ? err.message : err);
   }
 
+  // 5. Unpause runs or reactivate runs containing test targets
   try {
     db.prepare(`
       UPDATE runs
@@ -1046,6 +1047,23 @@ function healPendingMessageTracksMigration(db: Database.Database) {
     `).run();
   } catch (err) {
     console.warn("[heal-migration] unpause runs:", err instanceof Error ? err.message : err);
+  }
+
+  try {
+    db.prepare(`
+      UPDATE runs
+      SET status = 'running'
+      WHERE status = 'completed'
+        AND id IN (
+          SELECT rp.run_id FROM run_profiles rp
+          JOIN targets t ON t.id = rp.target_id
+          WHERE t.id = '2e428bfe-2aab-4e20-9b6c-a1f55033c12d'
+             OR t.linkedin_url LIKE '%more-fern%'
+             OR t.full_name LIKE '%MOre fergo%'
+        )
+    `).run();
+  } catch (err) {
+    console.warn("[heal-migration] reactivate test run:", err instanceof Error ? err.message : err);
   }
 }
 

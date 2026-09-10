@@ -36,17 +36,7 @@ export async function sendMessage(
 
   console.log(`[message] Starting sendMessage to "${fullName}" (cached URN: ${messagingUrn || "none"})`);
 
-  // 1. If messagingUrn is cached, try direct compose URL
-  if (messagingUrn) {
-    console.log(`[message] Attempting openComposeByUrn with cached URN: ${messagingUrn}`);
-    const opened = await openComposeByUrn(page, messagingUrn);
-    if (opened) {
-      await sendFromComposeBox(page, text, attachmentPath);
-      return { messagingUrn, isFirstDegree: true };
-    }
-  }
-
-  // 2. Visit profile directly to check connection and find message action
+  // 1. Live profile verification and data extraction
   console.log(`[message] Visiting profile: ${linkedinUrl}`);
   const resolved = await visitProfile(page, linkedinUrl);
   let activeUrn = resolved.messagingUrn || messagingUrn || null;
@@ -55,21 +45,14 @@ export async function sendMessage(
   }
   console.log(`[message] Profile resolved: isFirstDegree=${resolved.isFirstDegree}, URN=${activeUrn}, name=${resolved.profileName ?? "unknown"}`);
 
-  // 3. Since we are already ON the profile page, attempt openComposeFromProfilePage first!
+  const candidateNames = buildSearchCandidates(fullName, resolved.profileName, linkedinUrl);
+  console.log(`[message] Search candidates for recipient: ${JSON.stringify(candidateNames)}`);
+
+  // 2. Since we are already ON the profile page, attempt openComposeFromProfilePage first!
   if (resolved.isFirstDegree || resolved.evidence?.reason === "profile_main_missing") {
     console.log(`[message] Attempting openComposeFromProfilePage while on profile (degree=${resolved.isFirstDegree})`);
     const openedOnPage = await openComposeFromProfilePage(page);
     if (openedOnPage) {
-      await sendFromComposeBox(page, text, attachmentPath);
-      return { messagingUrn: activeUrn, isFirstDegree: true };
-    }
-  }
-
-  // 4. If profile button didn't open compose but we have a messagingUrn, navigate to compose by URN
-  if (activeUrn) {
-    console.log(`[message] Attempting openComposeByUrn with resolved URN: ${activeUrn}`);
-    const opened = await openComposeByUrn(page, activeUrn);
-    if (opened) {
       await sendFromComposeBox(page, text, attachmentPath);
       return { messagingUrn: activeUrn, isFirstDegree: true };
     }
@@ -83,10 +66,73 @@ export async function sendMessage(
     }
   }
 
-  // 5. Fallback to LinkedIn Messaging typeahead search
-  console.log(`[message] Falling back to sendMessageViaTypeahead for "${fullName}"`);
-  await sendMessageViaTypeahead(page, fullName, text, attachmentPath, linkedinUrl, resolved.profileName);
+  // 3. Navigate directly to LinkedIn full messaging interface
+  console.log(`[message] Navigating to https://www.linkedin.com/messaging/ for "${fullName}"`);
+  await page.goto("https://www.linkedin.com/messaging/", {
+    waitUntil: "domcontentloaded",
+    timeout: 30000,
+  });
+  await page.waitForTimeout(2000);
+
+  // 4. Phase 1: Search and open existing conversation (instant match for existing contacts/spouses)
+  const foundExisting = await searchExistingConversation(page, candidateNames);
+  if (foundExisting) {
+    console.log(`[message] Existing conversation opened for "${fullName}", sending message`);
+    await sendFromComposeBox(page, text, attachmentPath);
+    return { messagingUrn: activeUrn, isFirstDegree: true };
+  }
+
+  // 5. Phase 2: Start new conversation thread via typeahead
+  console.log(`[message] No existing conversation found — composing new thread via typeahead for "${fullName}"`);
+  await sendMessageViaTypeahead(page, candidateNames, fullName, text, attachmentPath);
   return { messagingUrn: activeUrn, isFirstDegree: true };
+}
+
+function buildSearchCandidates(
+  fullName: string,
+  resolvedProfileName?: string | null,
+  linkedinUrl?: string
+): string[] {
+  const candidates: string[] = [];
+  const add = (name: string | null | undefined) => {
+    if (!name) return;
+    const clean = name.replace(/\s+/g, " ").trim();
+    if (clean.length >= 2 && !candidates.some(c => c.toLowerCase() === clean.toLowerCase())) {
+      candidates.push(clean);
+    }
+  };
+
+  // 1. Profile display name is top priority because that's how LinkedIn formats names in messaging
+  add(resolvedProfileName);
+
+  // 2. Full name from target record
+  add(fullName);
+
+  // 3. Vanity URL slug decoded
+  if (linkedinUrl) {
+    const match = linkedinUrl.match(/\/in\/([^/?#]+)/i);
+    if (match && match[1]) {
+      const decodedVanity = decodeURIComponent(match[1])
+        .replace(/[-_]/g, " ")
+        .replace(/[^a-zA-ZÀ-ÿ0-9\s]/g, "")
+        .trim();
+      add(decodedVanity);
+    }
+  }
+
+  // 4. First name
+  const first = (fullName || "").trim().split(/\s+/)[0];
+  if (first && first.length >= 3) {
+    add(first);
+  }
+  if (resolvedProfileName) {
+    const firstResolved = resolvedProfileName.trim().split(/\s+/)[0];
+    if (firstResolved && firstResolved.length >= 3) {
+      add(firstResolved);
+    }
+  }
+
+  return candidates;
 }
 
 async function openComposeFromProfilePage(page: Page): Promise<boolean> {
@@ -113,7 +159,10 @@ async function openComposeFromProfilePage(page: Page): Promise<boolean> {
       a:has-text("Message"),
       button[aria-label*="mensagem" i],
       button[aria-label*="mensaje" i],
-      button[aria-label*="message" i]
+      button[aria-label*="message" i],
+      a[aria-label*="mensagem" i],
+      a[aria-label*="mensaje" i],
+      a[aria-label*="message" i]
     `).first();
 
     const btnCount = await msgBtn.count().catch(() => 0);
@@ -128,32 +177,22 @@ async function openComposeFromProfilePage(page: Page): Promise<boolean> {
     ]);
     console.log(`[message] openComposeFromProfilePage: clicking "${btnText.trim()}" (aria: "${btnAria.trim()}")`);
 
-    // Check if the button has a direct messaging link
-    let href = await msgBtn.getAttribute("href").catch(() => null);
-    if (!href) {
-      const childLink = msgBtn.locator("a[href*='/messaging/']").first();
-      if ((await childLink.count().catch(() => 0)) > 0) {
-        href = await childLink.getAttribute("href").catch(() => null);
-      }
-    }
-
-    if (href && href.includes("/messaging/")) {
-      const targetUrl = href.startsWith("http") ? href : `https://www.linkedin.com${href}`;
-      console.log(`[message] Following direct messaging link: ${targetUrl}`);
-      await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
-      const focused = await findAndFocusComposeBox(page, 10000);
-      return focused;
-    }
-
     // Prepare popup listener in case LinkedIn opens a separate window/tab
-    const popupPromise = page.context().waitForEvent("page", { timeout: 3000 }).catch(() => null);
+    const popupPromise = page.context().waitForEvent("page", { timeout: 2000 }).catch(() => null);
 
     // Scroll and click button
     await msgBtn.scrollIntoViewIfNeeded().catch(() => {});
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(300);
     await msgBtn.click({ delay: 50 }).catch(async () => {
       await msgBtn.click({ force: true });
     });
+
+    // Also dispatch DOM click on self and closest anchor
+    await msgBtn.evaluate((el: HTMLElement) => {
+      el.click();
+      const a = el.closest("a");
+      if (a && a !== el) a.click();
+    }).catch(() => {});
 
     const popupPage = await popupPromise;
     let targetPage = page;
@@ -163,52 +202,23 @@ async function openComposeFromProfilePage(page: Page): Promise<boolean> {
       await popupPage.waitForLoadState("domcontentloaded").catch(() => {});
     }
 
-    await targetPage.waitForTimeout(1500);
+    await targetPage.waitForTimeout(1000);
 
     // If click navigated the page to /messaging/
     if (targetPage.url().includes("/messaging/")) {
       console.log("[message] openComposeFromProfilePage: navigated to messaging, focusing compose box");
-      const focused = await findAndFocusComposeBox(targetPage, 10000);
+      const focused = await findAndFocusComposeBox(targetPage, 6000);
       if (focused) return true;
     }
 
-    // 2. Poll for visible compose box across targetPage and all open pages
-    let focused = await findAndFocusComposeBox(targetPage, 8000);
+    // Poll for visible compose box across targetPage and all open pages
+    let focused = await findAndFocusComposeBox(targetPage, 4000);
     if (focused) {
       console.log("[message] openComposeFromProfilePage: compose box successfully focused");
       return true;
     }
 
-    // Check if any other page in context has the compose box
-    const allPages = page.context().pages();
-    for (const otherPage of allPages) {
-      if (otherPage !== targetPage) {
-        const otherFocused = await findAndFocusComposeBox(otherPage, 2000);
-        if (otherFocused) {
-          console.log("[message] openComposeFromProfilePage: compose box found on secondary page");
-          return true;
-        }
-      }
-    }
-
-    // Retry with DOM click on message button
-    console.log("[message] Retrying with DOM click on message button");
-    await msgBtn.evaluate((el: HTMLElement) => el.click()).catch(() => {});
-    await targetPage.waitForTimeout(1500);
-
-    if (targetPage.url().includes("/messaging/")) {
-      console.log("[message] openComposeFromProfilePage: navigated to messaging after DOM click");
-      const focusedAfterNav = await findAndFocusComposeBox(targetPage, 10000);
-      if (focusedAfterNav) return true;
-    }
-
-    focused = await findAndFocusComposeBox(targetPage, 8000);
-    if (focused) {
-      console.log("[message] openComposeFromProfilePage: compose box focused after DOM click");
-      return true;
-    }
-
-    console.warn("[message] openComposeFromProfilePage: compose box not visible after retries");
+    console.warn("[message] openComposeFromProfilePage: compose box not visible on profile after click");
     return false;
   } catch (err) {
     console.warn("[message] openComposeFromProfilePage error:", err instanceof Error ? err.message : String(err));
@@ -216,14 +226,18 @@ async function openComposeFromProfilePage(page: Page): Promise<boolean> {
   }
 }
 
-async function findAndFocusComposeBox(page: Page, timeoutMs = 8000): Promise<boolean> {
+async function findAndFocusComposeBox(page: Page, timeoutMs = 6000): Promise<boolean> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    // 1. If conversation bubble is minimized, click header to expand
+    // 1. If conversation bubble in overlay is minimized, click header to expand
     await page.evaluate(() => {
-      const minimized = document.querySelectorAll<HTMLElement>(".msg-overlay-conversation-bubble--is-minimized");
+      const minimized = document.querySelectorAll<HTMLElement>(
+        ".msg-overlay-conversation-bubble--is-minimized, aside#msg-overlay.msg-overlay-container--is-minimized"
+      );
       for (const b of Array.from(minimized)) {
-        const header = b.querySelector<HTMLElement>("header, .msg-overlay-bubble-header, button[data-control-name='overlay.toggle_conversation']");
+        const header = b.querySelector<HTMLElement>(
+          "header, .msg-overlay-bubble-header, button[data-control-name='overlay.toggle_conversation'], button[data-control-name='overlay.expand']"
+        );
         if (header) header.click();
       }
     }).catch(() => {});
@@ -258,11 +272,13 @@ async function findAndFocusComposeBox(page: Page, timeoutMs = 8000): Promise<boo
       for (const sel of selectors) {
         const elements = Array.from(document.querySelectorAll<HTMLElement>(sel));
         for (const el of elements) {
-          try {
+          const rect = el.getBoundingClientRect();
+          const style = window.getComputedStyle(el);
+          if (rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none") {
             el.click();
             el.focus();
             return true;
-          } catch { /* continue */ }
+          }
         }
       }
       return false;
@@ -292,74 +308,155 @@ async function findAndFocusComposeBox(page: Page, timeoutMs = 8000): Promise<boo
       }
     }
 
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(300);
   }
   return false;
 }
 
-async function openComposeByUrn(page: Page, messagingUrn: string): Promise<boolean> {
+async function searchExistingConversation(page: Page, candidateNames: string[]): Promise<boolean> {
   try {
-    const recipientId = messagingUrn.split(":").pop();
-    const composeUrl = `https://www.linkedin.com/messaging/compose/?profileUrn=${encodeURIComponent(messagingUrn)}&recipient=${recipientId}`;
-    console.log(`[message] Navigating to composeUrl: ${composeUrl}`);
-    await page.goto(composeUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
-    await page.waitForTimeout(2500);
+    console.log(`[message] Searching existing conversations for: ${JSON.stringify(candidateNames)}`);
 
-    const focused = await findAndFocusComposeBox(page, 15000);
-    return focused;
+    // 1. Check if recipient is already in visible conversation items without searching
+    const existingItems = page.locator(".msg-conversations-container__conversations-list li, .msg-conversation-listitem, .msg-conversations-container__convo-item");
+    const initCount = await existingItems.count().catch(() => 0);
+    for (let i = 0; i < Math.min(initCount, 15); i++) {
+      const item = existingItems.nth(i);
+      const rowText = await item.innerText().catch(() => "");
+      if (candidateNames.some(cand => resultNameMatches(rowText, cand))) {
+        console.log(`[message] Match found in visible conversations: "${rowText.split('\n')[0]}"`);
+        await item.click();
+        await page.waitForTimeout(1500);
+        const focused = await findAndFocusComposeBox(page, 5000);
+        if (focused) return true;
+      }
+    }
+
+    // 2. Search via the search input in the messaging sidebar
+    const searchInput = page.locator(`
+      input.msg-search-form__search-field,
+      input[placeholder*="Pesquisar" i],
+      input[placeholder*="Buscar" i],
+      input[placeholder*="Search" i],
+      input[aria-label*="Pesquisar" i],
+      input[aria-label*="Buscar" i],
+      input[aria-label*="Search" i]
+    `).first();
+
+    if ((await searchInput.count().catch(() => 0)) === 0 || !(await searchInput.isVisible().catch(() => false))) {
+      console.log("[message] Messaging search input not found in left panel");
+      return false;
+    }
+
+    for (const term of candidateNames) {
+      console.log(`[message] Filtering conversations list with term: "${term}"`);
+      await searchInput.click();
+      await page.keyboard.press("Control+A");
+      await page.keyboard.press("Backspace");
+      await page.waitForTimeout(150);
+
+      await searchInput.pressSequentially(term, { delay: 40 });
+      await page.keyboard.press("Enter");
+      await page.waitForTimeout(2000);
+
+      const filteredItems = page.locator(".msg-conversations-container__conversations-list li, .msg-conversation-listitem, .msg-search-results li, .msg-conversations-container__convo-item");
+      const fCount = await filteredItems.count().catch(() => 0);
+      console.log(`[message] Filtered conversation items found: ${fCount}`);
+
+      for (let i = 0; i < Math.min(fCount, 10); i++) {
+        const item = filteredItems.nth(i);
+        const rowText = await item.innerText().catch(() => "");
+        if (candidateNames.some(cand => resultNameMatches(rowText, cand)) || resultNameMatches(rowText, term)) {
+          console.log(`[message] Found matching conversation for "${term}": "${rowText.split('\n')[0]}"`);
+          await item.click();
+          await page.waitForTimeout(1500);
+          const focused = await findAndFocusComposeBox(page, 5000);
+          if (focused) return true;
+        }
+      }
+    }
+    return false;
   } catch (err) {
-    console.warn("[message] openComposeByUrn failed:", err instanceof Error ? err.message : String(err));
+    console.warn("[message] searchExistingConversation error:", err instanceof Error ? err.message : String(err));
     return false;
   }
 }
 
 async function sendMessageViaTypeahead(
   page: Page,
+  candidateNames: string[],
   fullName: string,
   text: string,
   attachmentPath?: string | null,
-  linkedinUrl?: string,
-  resolvedProfileName?: string | null,
 ): Promise<void> {
-  console.log(`[message] Opening new message compose thread for: "${fullName}" (profile: ${resolvedProfileName ?? "none"})`);
-  
-  // Strategy 1: Navigate directly to thread/new
-  await page.goto("https://www.linkedin.com/messaging/thread/new/", {
-    waitUntil: "domcontentloaded",
-    timeout: 30000,
-  });
-  await page.waitForTimeout(2000);
+  console.log(`[message] Opening new message compose thread via typeahead for candidates: ${JSON.stringify(candidateNames)}`);
 
-  // If redirected back to /messaging/, trigger the new message button
-  const pageUrl = page.url();
-  if (!pageUrl.includes("/thread/new")) {
-    console.log("[message] Triggering new message compose button on /messaging/");
-    const composeDirect = page.locator(`
-      a[href*="/messaging/thread/new"]:visible,
-      button.msg-conversations-container__compose-btn:visible,
-      button[data-control-name="compose_message"]:visible,
-      button:has(svg[data-test-icon*="compose"]):visible,
-      button:has(li-icon[type*="compose"]):visible,
-      button[aria-label*="escrever" i]:visible,
-      button[aria-label*="criar" i]:visible,
-      button[aria-label*="nova mensagem" i]:visible,
-      button[aria-label*="novo mensaje" i]:visible,
-      button[aria-label*="redactar" i]:visible,
-      button[aria-label*="compose" i]:visible
-    `).first();
-    if ((await composeDirect.count().catch(() => 0)) > 0) {
-      await composeDirect.click({ force: true }).catch(() => {});
-      await page.waitForTimeout(1500);
-    } else {
-      await triggerNewMessageButton(page);
-      await page.waitForTimeout(1500);
-    }
+  // 1. Locate and trigger the compose button
+  let composeOpened = false;
+  const composeBtn = page.locator(`
+    a[href*="/messaging/thread/new"]:visible,
+    button.msg-conversations-container__compose-btn:visible,
+    a.msg-conversations-container__compose-btn:visible,
+    button[data-control-name="compose_message"]:visible,
+    .msg-conversations-container__title-actions button:visible,
+    .msg-conversations-container__title-actions a:visible,
+    button:has(svg[data-test-icon*="compose"]):visible,
+    button:has(svg[data-test-icon*="edit"]):visible,
+    a:has(svg[data-test-icon*="compose"]):visible,
+    a:has(svg[data-test-icon*="edit"]):visible,
+    button[aria-label*="mensagem" i]:visible,
+    button[aria-label*="conversa" i]:visible,
+    button[aria-label*="escrever" i]:visible,
+    button[aria-label*="compor" i]:visible,
+    button[aria-label*="redactar" i]:visible,
+    button[aria-label*="compose" i]:visible,
+    a[aria-label*="mensagem" i]:visible,
+    a[aria-label*="conversa" i]:visible,
+    a[aria-label*="escrever" i]:visible,
+    a[aria-label*="compor" i]:visible,
+    a[aria-label*="redactar" i]:visible,
+    a[aria-label*="compose" i]:visible
+  `).first();
+
+  if ((await composeBtn.count().catch(() => 0)) > 0) {
+    console.log("[message] Clicking new compose button");
+    await composeBtn.click({ delay: 50 }).catch(async () => {
+      await composeBtn.click({ force: true });
+    });
+    await page.waitForTimeout(1500);
+    composeOpened = true;
   }
 
-  // Strategy 2: Look for the recipient typeahead search field
+  if (!composeOpened) {
+    console.log("[message] Triggering new message button via DOM helper");
+    await triggerNewMessageButton(page);
+    await page.waitForTimeout(1500);
+  }
+
+  // Check if we need to navigate to thread/new directly
+  const searchInputCandidate = page.locator(`
+    input.msg-connections-typeahead__search-field,
+    .msg-connections-typeahead input,
+    form.msg-connections-typeahead input,
+    .msg-compose input,
+    input[role="combobox"]
+  `).first();
+
+  if ((await searchInputCandidate.count().catch(() => 0)) === 0 || !(await searchInputCandidate.isVisible().catch(() => false))) {
+    console.log("[message] Recipient typeahead not visible, navigating to https://www.linkedin.com/messaging/thread/new/");
+    await page.goto("https://www.linkedin.com/messaging/thread/new/", {
+      waitUntil: "domcontentloaded",
+      timeout: 25000,
+    }).catch(() => {});
+    await page.waitForTimeout(2000);
+    await triggerNewMessageButton(page);
+    await page.waitForTimeout(1000);
+  }
+
+  // 2. Look for the recipient typeahead search field
   let searchFocused = false;
   const startSearch = Date.now();
-  while (Date.now() - startSearch < 12000) {
+  while (Date.now() - startSearch < 10000) {
     const searchField = page.locator(`
       input.msg-connections-typeahead__search-field,
       .msg-connections-typeahead input,
@@ -382,11 +479,11 @@ async function sendMessageViaTypeahead(
       break;
     }
 
-    // Try DOM scan as fallback
+    // Try DOM scan
     searchFocused = await page.evaluate(() => {
       const inputs = Array.from(document.querySelectorAll<HTMLInputElement>("input"));
       for (const input of inputs) {
-        if (input.className.includes("msg-search-form")) continue; // Skip left sidebar search
+        if (input.className.includes("msg-search-form")) continue;
         const rect = input.getBoundingClientRect();
         const style = window.getComputedStyle(input);
         if (rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none") {
@@ -410,49 +507,18 @@ async function sendMessageViaTypeahead(
     }).catch(() => false);
 
     if (searchFocused) break;
-
-    // Retry triggering new message compose button if still not open
-    await triggerNewMessageButton(page);
-    await page.waitForTimeout(600);
+    await page.waitForTimeout(500);
   }
-
-  // Build ordered list of candidate search queries to try
-  const searchCandidates: string[] = [];
-  if (resolvedProfileName && resolvedProfileName.trim().length >= 2) {
-    searchCandidates.push(resolvedProfileName.trim());
-  }
-  if (fullName && fullName.trim().length >= 2 && !searchCandidates.includes(fullName.trim())) {
-    searchCandidates.push(fullName.trim());
-  }
-  if (linkedinUrl) {
-    const match = linkedinUrl.match(/\/in\/([^/?#]+)/i);
-    if (match && match[1]) {
-      const decodedVanity = decodeURIComponent(match[1])
-        .replace(/[-_]/g, " ")
-        .replace(/[^a-zA-ZÀ-ÿ0-9\s]/g, "")
-        .trim();
-      if (decodedVanity && decodedVanity.length >= 2 && !searchCandidates.includes(decodedVanity)) {
-        searchCandidates.push(decodedVanity);
-      }
-    }
-  }
-  const firstName = (fullName || "").trim().split(/\s+/)[0];
-  if (firstName && firstName.length >= 3 && !searchCandidates.includes(firstName)) {
-    searchCandidates.push(firstName);
-  }
-
-  console.log(`[message] Search queries for typeahead: ${JSON.stringify(searchCandidates)}`);
 
   let clicked = false;
   if (searchFocused) {
-    for (let cIdx = 0; cIdx < searchCandidates.length; cIdx++) {
-      const term = searchCandidates[cIdx];
+    for (let cIdx = 0; cIdx < candidateNames.length; cIdx++) {
+      const term = candidateNames[cIdx];
       console.log(`[message] Trying typeahead search with term: "${term}"`);
 
-      // Clear input before typing next term
       await page.keyboard.press("Control+A");
       await page.keyboard.press("Backspace");
-      await page.waitForTimeout(200);
+      await page.waitForTimeout(150);
 
       await page.keyboard.type(term, { delay: 50 });
       await page.waitForTimeout(2500);
@@ -471,11 +537,7 @@ async function sendMessageViaTypeahead(
         const opt = resultRows.nth(i);
         if (await opt.isVisible().catch(() => false)) {
           const textContent = (await opt.innerText().catch(() => "")).trim();
-          if (
-            resultNameMatches(textContent, term) ||
-            resultNameMatches(textContent, fullName) ||
-            (resolvedProfileName && resultNameMatches(textContent, resolvedProfileName))
-          ) {
+          if (candidateNames.some(cand => resultNameMatches(textContent, cand)) || resultNameMatches(textContent, term)) {
             console.log(`[message] Matching recipient found in results: "${textContent}"`);
             await opt.click({ delay: 100 });
             clicked = true;
@@ -486,7 +548,6 @@ async function sendMessageViaTypeahead(
 
       if (clicked) break;
 
-      // If only 1 result returned and we searched by specific profile name or vanity, accept it
       if (!clicked && optCount === 1) {
         const single = resultRows.first();
         if (await single.isVisible().catch(() => false)) {
@@ -505,48 +566,6 @@ async function sendMessageViaTypeahead(
   }
 
   await sendFromComposeBox(page, text, attachmentPath);
-}
-
-async function searchExistingConversation(page: Page, fullName: string): Promise<boolean> {
-  try {
-    const searchInput = page.locator(`
-      input.msg-search-form__search-field,
-      input[placeholder*="Pesquisar" i],
-      input[placeholder*="Buscar" i],
-      input[placeholder*="Search" i],
-      input[aria-label*="Pesquisar" i],
-      input[aria-label*="Buscar" i],
-      input[aria-label*="Search" i]
-    `).first();
-
-    if ((await searchInput.count().catch(() => 0)) === 0 || !(await searchInput.isVisible().catch(() => false))) {
-      return false;
-    }
-
-    await searchInput.click();
-    await searchInput.fill("");
-    await searchInput.pressSequentially(fullName, { delay: 40 });
-    await page.keyboard.press("Enter");
-    await page.waitForTimeout(2000);
-
-    const convItems = page.locator(".msg-conversations-container__conversations-list li, .msg-conversation-listitem");
-    const count = await convItems.count().catch(() => 0);
-    for (let i = 0; i < Math.min(count, 5); i++) {
-      const item = convItems.nth(i);
-      const rowText = await item.innerText().catch(() => "");
-      if (resultNameMatches(rowText, fullName)) {
-        await item.click();
-        await page.waitForTimeout(1500);
-        const composeBox = page.locator("div.msg-form__contenteditable, [contenteditable='true']").first();
-        if (await composeBox.isVisible({ timeout: 4000 }).catch(() => false)) {
-          return true;
-        }
-      }
-    }
-    return false;
-  } catch {
-    return false;
-  }
 }
 
 async function triggerNewMessageButton(page: Page): Promise<boolean> {
@@ -573,7 +592,9 @@ async function triggerNewMessageButton(page: Page): Promise<boolean> {
           aria.includes("compose") ||
           aria.includes("nova mensagem") ||
           aria.includes("escrever") ||
-          b.querySelector('svg[data-test-icon*="compose"], li-icon[type*="compose"]')
+          aria.includes("compor") ||
+          aria.includes("nova conversa") ||
+          b.querySelector('svg[data-test-icon*="compose"], svg[data-test-icon*="edit"], li-icon[type*="compose"], li-icon[type*="edit"]')
         ) {
           b.click();
           return true;
@@ -586,22 +607,22 @@ async function triggerNewMessageButton(page: Page): Promise<boolean> {
   }
 }
 
-export function resultNameMatches(resultText: string, fullName: string): boolean {
+export function resultNameMatches(resultText: string, targetName: string): boolean {
   const normalize = (s: string) =>
     s.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
-  const target = normalize(fullName);
+  const target = normalize(targetName);
   const result = normalize(resultText);
   if (!target || !result) return false;
   if (result.includes(target)) return true;
 
-  // Check word by word or first name match (e.g. "More Fernandez" matches "More")
   const targetWords = target.split(" ").filter(w => w.length > 1);
-  if (targetWords.length > 0 && targetWords.every(w => result.includes(w))) {
+  if (targetWords.length > 1 && targetWords.every(w => result.includes(w))) {
     return true;
   }
   const firstTarget = targetWords[0];
-  if (firstTarget && firstTarget.length >= 3 && result.includes(firstTarget)) {
-    return true;
+  if (firstTarget && firstTarget.length >= 3) {
+    const regex = new RegExp(`(?:^|\\s)${firstTarget}(?:$|\\s)`, "i");
+    if (regex.test(result)) return true;
   }
   return false;
 }
