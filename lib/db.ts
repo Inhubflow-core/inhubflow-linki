@@ -993,9 +993,27 @@ function healPendingMessageTracksMigration(db: Database.Database) {
 
     db.exec(`
       UPDATE targets
-      SET messaging_urn = 'urn:li:fsd_profile:ACoAAF3s9yQBTuwpHkDcgtzOzlxI2R49PBMEE4U'
-      WHERE (linkedin_url LIKE '%more-fern%' OR full_name LIKE '%MOre fergo%')
-        AND (messaging_urn IS NULL OR messaging_urn = '');
+      SET messaging_urn = 'urn:li:fsd_profile:ACoAAF3s9yQBTuwpHkDcgtzOzlxI2R49PBMEE4U',
+          message_sent_at = NULL
+      WHERE (linkedin_url LIKE '%more-fern%' OR full_name LIKE '%MOre fergo%');
+    `);
+
+    db.exec(`
+      UPDATE run_profile_tracks
+      SET current_step_id = (
+            SELECT ws.id FROM workflow_steps ws
+            JOIN run_profiles rp ON rp.campaign_id = ws.campaign_id
+            WHERE rp.id = run_profile_tracks.run_profile_id AND ws.step_type = 'message'
+            ORDER BY ws.step_order ASC LIMIT 1
+          ),
+          status = 'active',
+          next_action_at = datetime('now', '-1 minute'),
+          force_run_once = 1
+      WHERE run_profile_id IN (
+        SELECT rp.id FROM run_profiles rp
+        JOIN targets t ON t.id = rp.target_id
+        WHERE (t.linkedin_url LIKE '%more-fern%' OR t.full_name LIKE '%MOre fergo%')
+      );
     `);
   } catch { /* ignore */ }
 }

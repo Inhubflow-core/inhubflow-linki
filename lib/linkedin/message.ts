@@ -1,5 +1,6 @@
 import type { Page } from "playwright";
 import { visitProfile } from "./visit";
+import { LinkedInAuthenticationError } from "./auth-wall";
 
 export class NotConnectedError extends Error {}
 
@@ -25,6 +26,13 @@ export async function sendMessage(
   attachmentPath?: string | null,
 ): Promise<SendMessageResult> {
   console.log(`[message] Starting sendMessage to "${fullName}" (cached URN: ${messagingUrn || "none"})`);
+
+  // 0. Verify session authentication state before attempting any send
+  const cookies = await page.context().cookies("https://www.linkedin.com").catch(() => []);
+  const hasLiAt = cookies.some(c => c.name === "li_at" && typeof c.value === "string" && c.value.length > 20);
+  if (!hasLiAt) {
+    throw new LinkedInAuthenticationError("LinkedIn session expired or missing valid li_at cookie — please reauthenticate account in InHubFlow");
+  }
 
   // 1. If messagingUrn is cached, try direct compose URL
   if (messagingUrn) {
@@ -324,6 +332,7 @@ async function sendMessageViaTypeahead(page: Page, fullName: string, text: strin
     await page.waitForTimeout(500);
   }
 
+  let clicked = false;
   if (searchFocused) {
     await page.keyboard.type(fullName, { delay: 60 });
     await page.waitForTimeout(2500);
@@ -334,7 +343,6 @@ async function sendMessageViaTypeahead(page: Page, fullName: string, text: strin
       [role="option"]
     `);
 
-    let clicked = false;
     const optCount = await firstResult.count().catch(() => 0);
     for (let i = 0; i < optCount; i++) {
       const opt = firstResult.nth(i);
@@ -356,6 +364,10 @@ async function sendMessageViaTypeahead(page: Page, fullName: string, text: strin
       }
     }
     await page.waitForTimeout(1500);
+  }
+
+  if (!searchFocused || !clicked) {
+    throw new Error(`Could not find or select recipient "${fullName}" in LinkedIn messaging — aborting to prevent false delivery`);
   }
 
   await sendFromComposeBox(page, text, attachmentPath);
@@ -513,7 +525,10 @@ async function sendFromComposeBox(page: Page, text: string, attachmentPath?: str
   // 2. Focus and enter text message into compose area
   if (text?.trim()) {
     console.log("[message] Focusing compose box for text entry");
-    await findAndFocusComposeBox(page, 8000);
+    const focused = await findAndFocusComposeBox(page, 8000);
+    if (!focused) {
+      throw new Error("LinkedIn compose box not found or not focused — aborting to prevent false delivery");
+    }
 
     // Try clipboard paste first
     try {
