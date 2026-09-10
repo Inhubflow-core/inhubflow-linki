@@ -12,6 +12,26 @@ export type LinkedInSessionCookie = {
 const COOKIE_NAME_RE = /^[-!#$%&'*+.^_`|~0-9A-Za-z]+$/;
 const LINKEDIN_HOST_RE = /(^|\.)linkedin\.com$/i;
 
+/**
+ * Fallback User-Agent for LinkedIn browser contexts, used ONLY when the stored
+ * session carries none.
+ *
+ * A stale UA is not cosmetic: LinkedIn revokes a li_at whose UA drifts from the
+ * browser the session was born in, which presents as "the cookie expired after
+ * a few days" even though li_at is nominally valid for ~a year. Keep this
+ * current via LINKEDIN_USER_AGENT (set it to the real UA of the browser used to
+ * connect), and always prefer a UA captured at connect time over this default.
+ *
+ * Lives here, not in session.ts, so API routes can read it without pulling
+ * Playwright into their module graph.
+ */
+export function linkedInDefaultUserAgent(): string {
+  return (
+    process.env.LINKEDIN_USER_AGENT?.trim() ||
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36"
+  );
+}
+
 function hasControlCharacters(value: string): boolean {
   return [...value].some((character) => {
     const code = character.charCodeAt(0);

@@ -17,7 +17,12 @@ import {
   createLinkedInConnectionAttempt,
   updateLinkedInConnectionAttempt,
 } from "@/lib/linkedin/connection-attempts";
-import { sendMessage, NotConnectedError } from "@/lib/linkedin/message";
+import {
+  sendMessage,
+  NotConnectedError,
+  MessageNotDeliveredError,
+  ProfileVerificationError,
+} from "@/lib/linkedin/message";
 import { shouldSyncAccepted, syncAcceptedConnectionsDetailed, type AcceptedSyncResult } from "@/lib/linkedin/sync-accepted";
 import { campaignInboxSchedulerEnabled, listCampaignInboxAccountIds, shouldSyncLinkedInCampaignInbox, syncLinkedInCampaignInbox } from "@/lib/linkedin/campaign-inbox";
 import { sendEmail } from "@/lib/email/sender";
@@ -82,6 +87,10 @@ function reconcileAcceptedConnections(accountId: string): Promise<AcceptedSyncRe
 const CONNECTION_RECHECK_HOURS = 6;
 // Max days to wait for acceptance before giving up
 const CONNECTION_MAX_WAIT_DAYS = 7;
+// Retry delay when a message send ran but LinkedIn never confirmed delivery.
+// Short, because the recipient and the copy are both still valid — only the
+// send needs another attempt.
+const MESSAGE_RETRY_HOURS = 1;
 // Delay between profiles (seconds)
 const PROFILE_DELAY_MIN = 8;
 const PROFILE_DELAY_MAX = 20;
@@ -877,6 +886,23 @@ async function executeStep(
           db.prepare("UPDATE targets SET degree = NULL, connected_at = NULL WHERE id = ?").run(target.id);
           log(db, runId, target.id, "warn", `${name} no longer appears 1st-degree — resetting connection status and rescheduling`);
           trWait(db, tr, CONNECTION_RECHECK_HOURS);
+          return;
+        }
+        // The profile page never rendered, so we could not confirm the degree.
+        // That is not evidence they are unconnected — leave the stored degree
+        // alone (unlike NotConnectedError) and simply retry later.
+        if (err instanceof ProfileVerificationError) {
+          await saveSessionState(accountId);
+          log(db, runId, target.id, "warn", `No se pudo verificar el perfil de ${name} — reprogramando sin marcar como enviado`);
+          trWait(db, tr, CONNECTION_RECHECK_HOURS);
+          return;
+        }
+        // Send ran but LinkedIn never confirmed delivery. Do NOT advance the
+        // track or stamp message_sent_at — that is the phantom "Completed".
+        if (err instanceof MessageNotDeliveredError) {
+          await saveSessionState(accountId);
+          log(db, runId, target.id, "warn", `LinkedIn no confirmó la entrega del mensaje a ${name} — reprogramando sin marcar como enviado`);
+          trWait(db, tr, MESSAGE_RETRY_HOURS);
           return;
         }
         throw err;

@@ -4,6 +4,30 @@ import { isLinkedInAuthenticationWall, LinkedInAuthenticationError } from "./aut
 
 export class NotConnectedError extends Error {}
 
+/**
+ * Raised when the send sequence ran but LinkedIn never confirmed the message
+ * landed in the thread. Distinct from a hard failure: the step must NOT be
+ * recorded as delivered, and is safe to retry.
+ */
+export class MessageNotDeliveredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MessageNotDeliveredError";
+  }
+}
+
+/**
+ * Raised when the recipient's profile could not be verified at all (the page
+ * never rendered its content). Not proof they are unconnected — so it must not
+ * reset the stored degree — but not permission to send either. Retryable.
+ */
+export class ProfileVerificationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProfileVerificationError";
+  }
+}
+
 export interface SendMessageResult {
   messagingUrn: string | null;
   isFirstDegree: boolean;
@@ -25,45 +49,37 @@ export async function sendMessage(
   messagingUrn?: string | null,
   attachmentPath?: string | null,
 ): Promise<SendMessageResult> {
-  // Check known recipient overrides (e.g. More Fernández)
-  const isMore =
-    (linkedinUrl && (linkedinUrl.includes("more-fern") || linkedinUrl.includes("ACoAAF3s9yQBTuwpHkDcgtzOzlxI2R49PBMEE4U"))) ||
-    (fullName && (fullName.toLowerCase().includes("more fergo") || fullName.toLowerCase().includes("more fernandez")));
-  if (!messagingUrn && isMore) {
-    messagingUrn = "urn:li:fsd_profile:ACoAAF3s9yQBTuwpHkDcgtzOzlxI2R49PBMEE4U";
-    console.log(`[message] Known URN applied for "${fullName}": ${messagingUrn}`);
-  }
-
   console.log(`[message] Starting sendMessage to "${fullName}" (cached URN: ${messagingUrn || "none"})`);
 
   // 1. Live profile verification and data extraction
   console.log(`[message] Visiting profile: ${linkedinUrl}`);
   const resolved = await visitProfile(page, linkedinUrl);
-  let activeUrn = resolved.messagingUrn || messagingUrn || null;
-  if (!activeUrn && isMore) {
-    activeUrn = "urn:li:fsd_profile:ACoAAF3s9yQBTuwpHkDcgtzOzlxI2R49PBMEE4U";
-  }
+  const activeUrn = resolved.messagingUrn || messagingUrn || null;
   console.log(`[message] Profile resolved: isFirstDegree=${resolved.isFirstDegree}, URN=${activeUrn}, name=${resolved.profileName ?? "unknown"}`);
 
   const candidateNames = buildSearchCandidates(fullName, resolved.profileName, linkedinUrl);
   console.log(`[message] Search candidates for recipient: ${JSON.stringify(candidateNames)}`);
 
-  // 2. Since we are already ON the profile page, attempt openComposeFromProfilePage first!
-  if (resolved.isFirstDegree || resolved.evidence?.reason === "profile_main_missing") {
-    console.log(`[message] Attempting openComposeFromProfilePage while on profile (degree=${resolved.isFirstDegree})`);
-    const openedOnPage = await openComposeFromProfilePage(page);
-    if (openedOnPage) {
-      await sendFromComposeBox(page, text, attachmentPath);
-      return { messagingUrn: activeUrn, isFirstDegree: true };
-    }
-  }
-
+  // A profile whose container never mounted tells us NOTHING about the
+  // connection degree — the page may not have hydrated, or it may have been an
+  // auth wall / error page we could not classify. Treating that as "probably
+  // connected, proceed" is what let sends run against unverified recipients, so
+  // it is a hard stop. It is retryable: the caller reschedules a degree recheck.
   if (!resolved.isFirstDegree) {
     if (resolved.evidence?.reason === "profile_main_missing") {
-      console.log(`[message] Profile container hydration delayed for "${fullName}", proceeding via messaging fallback`);
-    } else {
-      throw new NotConnectedError(`${fullName} is not a 1st-degree connection — refusing to message`);
+      throw new ProfileVerificationError(
+        `No se pudo verificar el perfil de ${fullName} (la página no cargó su contenido en ${resolved.evidence.pageUrl}). No se enviará el mensaje sin confirmar que sigue siendo contacto de 1er grado.`
+      );
     }
+    throw new NotConnectedError(`${fullName} is not a 1st-degree connection — refusing to message`);
+  }
+
+  // 2. Since we are already ON the profile page, attempt openComposeFromProfilePage first!
+  console.log(`[message] Attempting openComposeFromProfilePage while on profile (degree=${resolved.isFirstDegree})`);
+  const openedOnPage = await openComposeFromProfilePage(page);
+  if (openedOnPage) {
+    await sendFromComposeBox(page, text, attachmentPath);
+    return { messagingUrn: activeUrn, isFirstDegree: true };
   }
 
   // 3. Navigate directly to LinkedIn full messaging interface
@@ -862,5 +878,76 @@ async function sendFromComposeBox(page: Page, text: string, attachmentPath?: str
   await page.waitForTimeout(500);
   await page.keyboard.press("Enter");
   await page.waitForTimeout(3000);
-  console.log("[message] Send sequence completed");
+
+  // 4. Confirm delivery. Clicking *a* send button is not evidence the message
+  // left the browser: the click may hit a disabled control, the thread may not
+  // have been open, or LinkedIn may have dropped the draft. Without this check
+  // the step reports "Message sent" whenever nothing threw, which is exactly
+  // how a message can be marked delivered while the recipient never got it.
+  await assertMessageDelivered(page, text);
+  console.log("[message] Send sequence completed and delivery confirmed");
+}
+
+/**
+ * Verifies a just-sent message actually landed in the thread.
+ *
+ * Two independent signals, both required to be consistent with a send:
+ *  - the compose box is now EMPTY (LinkedIn clears it only on successful send),
+ *  - the message text appears in the conversation transcript.
+ * Either one alone can be misleading, so we accept the send when the transcript
+ * shows the text, or when the box cleared and no draft remains.
+ */
+async function assertMessageDelivered(page: Page, text: string): Promise<void> {
+  const expected = (text || "").trim();
+  if (!expected) return; // attachment-only send — nothing textual to confirm
+
+  // Compare on a normalized, reasonably distinctive slice of the message.
+  const normalize = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
+  const needle = normalize(expected).slice(0, 60);
+
+  const deadline = Date.now() + 12_000;
+  let composeEmpty = false;
+  let transcriptHasText = false;
+
+  while (Date.now() < deadline) {
+    const state = await page.evaluate((needleArg: string) => {
+      const norm = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
+
+      const boxes = Array.from(
+        document.querySelectorAll<HTMLElement>("div.msg-form__contenteditable, [contenteditable='true']")
+      ).filter((box) => {
+        const rect = box.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      });
+      const draftRemaining = boxes.some((box) => norm(box.textContent || "").length > 0);
+
+      const transcript = document.querySelector<HTMLElement>(
+        ".msg-s-message-list-content, .msg-s-message-list, .msg-overlay-conversation-bubble__content, .msg-thread"
+      );
+      const transcriptText = norm(transcript?.innerText || "");
+
+      return {
+        boxCount: boxes.length,
+        draftRemaining,
+        transcriptHasText: needleArg.length > 0 && transcriptText.includes(needleArg),
+      };
+    }, needle).catch(() => null);
+
+    if (state) {
+      composeEmpty = state.boxCount > 0 && !state.draftRemaining;
+      transcriptHasText = state.transcriptHasText;
+      if (transcriptHasText) return;
+      if (composeEmpty) break;
+    }
+    await page.waitForTimeout(1000);
+  }
+
+  if (transcriptHasText || composeEmpty) return;
+
+  // The draft is still sitting in the box (or we could not read the thread at
+  // all): treat as NOT delivered so the caller can retry rather than record a
+  // phantom send.
+  throw new MessageNotDeliveredError(
+    `LinkedIn no confirmó la entrega del mensaje (el borrador sigue en el cuadro de redacción en ${page.url()}). No se marcará como enviado.`
+  );
 }

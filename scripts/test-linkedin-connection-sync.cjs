@@ -292,7 +292,13 @@ assert.equal(secondExecution, false);
 
 attemptDb.close();
 
-// Test probeLinkedInAuthenticationWall
+// Test probeLinkedInAuthenticationWall.
+//
+// The probe reports three states, not a boolean. "indeterminate" exists because
+// collapsing a failed probe into "authenticated" is what let a dead session keep
+// being worked: the /feed/ navigation times out, the caller concludes the session
+// is fine, and the runner loops on 401s. Only a CONFIRMED wall may log an account
+// out, and only a COMPLETED navigation may vouch for it.
 (async () => {
   const fakeValidFeedPage = {
     url: () => "https://www.linkedin.com/feed/",
@@ -300,8 +306,7 @@ attemptDb.close();
     waitForTimeout: async () => {},
     locator: () => ({ count: async () => 0 }),
   };
-  const isWallFalse = await probeLinkedInAuthenticationWall(fakeValidFeedPage);
-  assert.equal(isWallFalse, false);
+  assert.equal(await probeLinkedInAuthenticationWall(fakeValidFeedPage), "authenticated");
 
   const fakeAuthWallPage = {
     url: () => "https://www.linkedin.com/uas/login",
@@ -309,9 +314,39 @@ attemptDb.close();
     waitForTimeout: async () => {},
     locator: () => ({ count: async () => 1 }),
   };
-  const isWallTrue = await probeLinkedInAuthenticationWall(fakeAuthWallPage);
-  assert.equal(isWallTrue, true);
-})();
+  assert.equal(await probeLinkedInAuthenticationWall(fakeAuthWallPage), "wall");
+
+  // Feed navigation timed out: we never saw the page, so neither state is proven.
+  const fakeTimeoutPage = {
+    url: () => "https://www.linkedin.com/feed/",
+    goto: async () => { throw new Error("page.goto: Timeout 25000ms exceeded"); },
+    waitForTimeout: async () => {},
+    locator: () => ({ count: async () => 0 }),
+  };
+  assert.equal(await probeLinkedInAuthenticationWall(fakeTimeoutPage), "indeterminate");
+
+  // A public sign-in prompt on an otherwise normal URL is still a wall.
+  const fakePublicSignInPage = {
+    url: () => "https://www.linkedin.com/feed/",
+    goto: async () => {},
+    waitForTimeout: async () => {},
+    locator: () => ({ count: async () => 1 }),
+  };
+  assert.equal(await probeLinkedInAuthenticationWall(fakePublicSignInPage), "wall");
+
+  // A dead page object must not read as a healthy session.
+  const fakeBrokenPage = {
+    url: () => { throw new Error("target closed"); },
+    goto: async () => {},
+    waitForTimeout: async () => {},
+    locator: () => ({ count: async () => 0 }),
+  };
+  assert.equal(await probeLinkedInAuthenticationWall(fakeBrokenPage), "indeterminate");
+  console.log("LinkedIn auth-wall probe tri-state tests passed");
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
 
 // Guard the irreversible connection-send boundary. The durable marker must be
 // created by the callback immediately before the click, never before profile or

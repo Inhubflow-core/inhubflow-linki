@@ -4,6 +4,7 @@ import { encryptSecret } from "@/lib/crypto";
 import {
   dedupeLinkedInCookies,
   hasValidLinkedInLiAt,
+  linkedInDefaultUserAgent,
   normalizeLinkedInCookie,
   normalizeLinkedInCookieList,
   type LinkedInSessionCookie,
@@ -122,13 +123,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 
-  // Build Playwright-compatible storageState
-  const storageState: { cookies: typeof sessionCookies; origins: unknown[]; userAgent?: string } = {
+  // Build Playwright-compatible storageState.
+  //
+  // ALWAYS pin a userAgent. LinkedIn revokes a li_at whose UA drifts from the
+  // browser the cookie was minted in, which surfaces as "the session died after
+  // a few days" rather than as an auth error. The extension bundle carries the
+  // real browser UA — much preferred. Falling back to the runtime default at
+  // least freezes the value now, so a later LINKEDIN_USER_AGENT change cannot
+  // silently re-fingerprint an already-connected account.
+  const storageState: { cookies: typeof sessionCookies; origins: unknown[]; userAgent: string } = {
     cookies: sessionCookies,
     origins: [],
+    userAgent: detectedUserAgent ?? linkedInDefaultUserAgent(),
   };
-  if (detectedUserAgent) {
-    storageState.userAgent = detectedUserAgent;
+  if (!detectedUserAgent) {
+    console.warn(
+      `[authenticate] account ${id} connected without a browser User-Agent (raw token or cookie export). ` +
+      `Pinned the server default instead — sessions connected via the InHubFlow Connect extension are more durable.`
+    );
   }
 
   db.prepare("UPDATE accounts SET cookies_json = ?, is_authenticated = 1 WHERE id = ?").run(

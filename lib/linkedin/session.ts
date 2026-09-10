@@ -3,6 +3,8 @@ import type { Browser, BrowserContext, BrowserContextOptions, Page } from "playw
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import { getDb } from "@/lib/db";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
+import { LinkedInAuthenticationError } from "./auth-wall";
+import { linkedInDefaultUserAgent } from "./cookie-state";
 
 chromium.use(StealthPlugin());
 
@@ -20,6 +22,9 @@ const LAUNCH_ARGS = [
   "--disable-blink-features=AutomationControlled",
 ];
 
+/** Single source of truth for the fallback UA — see linkedInDefaultUserAgent(). */
+const DEFAULT_USER_AGENT = linkedInDefaultUserAgent();
+
 type BrowserStorageState = Awaited<ReturnType<BrowserContext["storageState"]>>;
 type PersistedStorageState = BrowserStorageState & { userAgent?: string };
 
@@ -31,7 +36,7 @@ type PersistedStorageState = BrowserStorageState & { userAgent?: string };
 function contextOptions(storageState?: PersistedStorageState, accountTimezone?: string | null): BrowserContextOptions {
   const customUserAgent =
     (typeof storageState?.userAgent === "string" && storageState.userAgent) ||
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+    DEFAULT_USER_AGENT;
 
   const timezoneId = (accountTimezone && accountTimezone !== "UTC") ? accountTimezone : "America/Sao_Paulo";
   const locale = timezoneId.includes("Sao_Paulo") ? "pt-BR" : (timezoneId.includes("Madrid") || timezoneId.includes("Bogota") || timezoneId.includes("Mexico") ? "es-ES" : "en-US");
@@ -67,10 +72,21 @@ async function getBrowser(headless = HEADLESS): Promise<Browser> {
 async function getOrCreateContext(accountId: string): Promise<BrowserContext> {
   const db = getDb();
   const account = db.prepare("SELECT * FROM accounts WHERE id = ?").get(accountId) as
-    | { cookies_json: string | null; email: string; timezone?: string }
+    | { cookies_json: string | null; email: string; timezone?: string; is_authenticated?: number }
     | undefined;
 
   if (!account) throw new Error(`Account ${accountId} not found`);
+
+  // markNeedsReauth() clears is_authenticated but deliberately keeps
+  // cookies_json (it holds the pinned UA needed for the next connect). Without
+  // this guard, any caller that reaches getSessionPage without checking the
+  // flag would happily rebuild a context from those dead cookies and re-enter
+  // the fail loop. Refuse here so the account stays paused until reconnected.
+  if (account.is_authenticated !== 1 && !contexts.has(accountId)) {
+    throw new LinkedInAuthenticationError(
+      `La cuenta de LinkedIn ${accountId} requiere re-autenticación. Conéctala de nuevo en Configuración con un nuevo Código de Conexión.`
+    );
+  }
 
   if (!contexts.has(accountId)) {
     const b = await getBrowser();
@@ -115,7 +131,10 @@ async function getOrCreateContext(accountId: string): Promise<BrowserContext> {
 export async function getSessionContext(accountId: string): Promise<BrowserContext> {
   try {
     return await getOrCreateContext(accountId);
-  } catch {
+  } catch (err) {
+    // A needs-reauth account will fail identically on retry — surface it now so
+    // the caller pauses instead of burning a second browser launch.
+    if (err instanceof LinkedInAuthenticationError) throw err;
     // First attempt failed — evict and retry once with a fresh context
     contexts.delete(accountId);
     return getOrCreateContext(accountId);
@@ -198,12 +217,35 @@ export async function saveSessionState(accountId: string): Promise<void> {
     return;
   }
 
+  // ctx.storageState() does NOT include userAgent, so writing it back verbatim
+  // would silently DROP the UA captured when the account was connected and
+  // revert this session to DEFAULT_USER_AGENT on the next context build. That
+  // is a fingerprint change mid-session, which LinkedIn answers by revoking
+  // li_at. Carry the pinned UA forward on every save.
+  const persisted: PersistedStorageState = { ...state };
+  const previousUserAgent = readPersistedUserAgent(db, accountId);
+  if (previousUserAgent) persisted.userAgent = previousUserAgent;
+
   // Persisting a live browser context is not proof that LinkedIn accepted the
   // session. Only explicit authentication flows may set is_authenticated=1.
   db.prepare("UPDATE accounts SET cookies_json = ? WHERE id = ?").run(
-    encryptSecret(JSON.stringify(state)),
+    encryptSecret(JSON.stringify(persisted)),
     accountId
   );
+}
+
+/** Reads the UA pinned in the account's stored storageState, if any. */
+function readPersistedUserAgent(db: ReturnType<typeof getDb>, accountId: string): string | null {
+  try {
+    const row = db.prepare("SELECT cookies_json FROM accounts WHERE id = ?").get(accountId) as
+      | { cookies_json: string | null }
+      | undefined;
+    if (!row?.cookies_json) return null;
+    const parsed = JSON.parse(decryptSecret(row.cookies_json)!) as PersistedStorageState;
+    return typeof parsed?.userAgent === "string" && parsed.userAgent.length > 10 ? parsed.userAgent : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function closeSession(accountId: string): Promise<void> {
@@ -234,33 +276,26 @@ export async function markNeedsReauth(accountId: string): Promise<void> {
 export async function authenticateAccount(accountId: string): Promise<void> {
   const db = getDb();
   const account = db.prepare("SELECT * FROM accounts WHERE id = ?").get(accountId) as
-    | { email: string }
+    | { email: string; timezone?: string }
     | undefined;
   if (!account) throw new Error(`Account ${accountId} not found`);
 
   // Close any existing context for this account — start fresh
   await closeSession(accountId);
 
-  // Always launch a VISIBLE browser for manual login
+  // Always launch a VISIBLE browser for manual login. LAUNCH_ARGS (not a
+  // hand-rolled subset) so the login browser matches the runtime one.
   const visibleBrowser = await chromium.launch({
     headless: false,
     executablePath: CHROMIUM_PATH,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-    ],
+    args: LAUNCH_ARGS,
   });
 
   try {
-    const ctx = await visibleBrowser.newContext({
-      viewport: { width: 1440, height: 900 },
-      userAgent:
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-      locale: "en-US",
-      timezoneId: "America/New_York",
-    });
+    // The session MUST be born under the same fingerprint the runner will use
+    // later — UA, locale and timezone included. A hand-built context here is
+    // what silently causes LinkedIn to revoke the cookie days after connecting.
+    const ctx = await visibleBrowser.newContext(contextOptions(undefined, account.timezone));
 
     const page = await ctx.newPage();
     await page.goto("https://www.linkedin.com/login");
@@ -276,10 +311,12 @@ export async function authenticateAccount(accountId: string): Promise<void> {
     // Wait up to 3 minutes for the user to complete login and reach /feed
     await page.waitForURL("**/feed/**", { timeout: 180_000 });
 
-    // Save full storage state (cookies + localStorage) to DB
+    // Save full storage state (cookies + localStorage) to DB, pinning the UA
+    // this session was born under (see saveSessionState).
     const state = await ctx.storageState();
+    const persisted: PersistedStorageState = { ...state, userAgent: DEFAULT_USER_AGENT };
     db.prepare("UPDATE accounts SET cookies_json = ?, is_authenticated = 1 WHERE id = ?").run(
-      encryptSecret(JSON.stringify(state)),
+      encryptSecret(JSON.stringify(persisted)),
       accountId
     );
 
@@ -352,8 +389,10 @@ async function persistLogin(accountId: string, ctx: BrowserContext, page?: Page)
   }
   const db = getDb();
   const state = await ctx.storageState();
+  // Pin the UA this session was actually born under (see saveSessionState).
+  const persisted: PersistedStorageState = { ...state, userAgent: DEFAULT_USER_AGENT };
   db.prepare("UPDATE accounts SET cookies_json = ?, is_authenticated = 1 WHERE id = ?").run(
-    encryptSecret(JSON.stringify(state)),
+    encryptSecret(JSON.stringify(persisted)),
     accountId
   );
   // Drop any stale runtime context so the runner reloads the fresh cookies.

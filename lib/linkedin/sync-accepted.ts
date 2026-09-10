@@ -1,6 +1,6 @@
 import type { Page } from "playwright";
 import { getDb } from "@/lib/db";
-import { getSessionPage, saveSessionState } from "@/lib/linkedin/session";
+import { getSessionPage, markNeedsReauth, saveSessionState } from "@/lib/linkedin/session";
 import {
   isLinkedInAuthenticationWall,
   LinkedInAuthenticationError,
@@ -405,9 +405,27 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
       };
     }
     if (error instanceof LinkedInConnectionsApiAuthorizationError) {
-      const confirmedWall = page ? await probeLinkedInAuthenticationWall(page) : false;
-      if (confirmedWall) {
-        console.warn(`[sync-accepted] Authentication wall probe returned true after API HTTP ${error.status}, preserving account authentication for campaigns`);
+      const probe = page ? await probeLinkedInAuthenticationWall(page) : "indeterminate";
+      if (probe === "wall") {
+        // Positively logged out: flag it so the runner stops working this
+        // account instead of re-entering the 401 loop on the next pass.
+        console.warn(`[sync-accepted] Authentication wall confirmed after API HTTP ${error.status} — flagging account for reauthentication`);
+        sessionWall = true;
+        return {
+          success: false,
+          partial: false,
+          stamped,
+          unmarked,
+          pages,
+          connectionsRead,
+          pendingTargets: pendingTargets.length,
+          matchedTargets,
+          declaredTotal,
+          reason: "auth_wall",
+        };
+      }
+      if (probe === "indeterminate") {
+        console.warn(`[sync-accepted] Connections API returned HTTP ${error.status} and the auth probe was inconclusive — leaving the session untouched and retrying later`);
       } else {
         console.warn(`[sync-accepted] Connections API returned HTTP ${error.status}, but the feed session remains authenticated`);
       }
@@ -466,6 +484,14 @@ export async function syncAcceptedConnectionsDetailed(accountId: string): Promis
       if (completed) {
         try { await saveSessionState(accountId); } catch { /* ignore */ }
       }
+    }
+    // sessionWall means LinkedIn positively refused this session (redirect to a
+    // login/checkpoint URL, or a confirmed wall probe). Act on it: without this
+    // the account keeps its is_authenticated=1 flag and every later pass
+    // re-enters the same 401/authwall loop. Only a CONFIRMED wall gets here —
+    // an inconclusive probe deliberately leaves the session alone.
+    if (sessionWall) {
+      try { await markNeedsReauth(accountId); } catch { /* best effort */ }
     }
     if (leaseOwner) {
       try { releaseRuntimeLease(db, leaseKey, leaseOwner); } catch { /* lease expires safely */ }
