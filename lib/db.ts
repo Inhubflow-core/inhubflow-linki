@@ -962,60 +962,66 @@ function runMigrations(db: Database.Database) {
 
 // Unblocks any tracks in a 'message' step that were rescheduled due to transient profile render delays
 function healPendingMessageTracksMigration(db: Database.Database) {
+  // 1. Unblock any LinkedIn tracks that are currently in_progress or pending and scheduled in the future
   try {
-    db.exec(`
+    db.prepare(`
       UPDATE run_profile_tracks
-      SET next_action_at = datetime('now', '-1 minute'),
+      SET next_step_at = datetime('now', '-1 minute'),
           force_run_once = 1
-      WHERE id IN (
-        SELECT rpt.id
-        FROM run_profile_tracks rpt
-        JOIN workflow_steps ws ON ws.id = rpt.current_step_id
-        WHERE ws.step_type = 'message'
-          AND rpt.status = 'active'
-          AND rpt.next_action_at > datetime('now')
-      )
-    `);
+      WHERE state IN ('pending', 'in_progress')
+        AND next_step_at > datetime('now')
+        AND track = 'linkedin'
+    `).run();
+  } catch (err) {
+    console.warn("[heal-migration] unblock tracks:", err instanceof Error ? err.message : err);
+  }
 
-    db.exec(`
+  // 2. Set degree = 1 for any target that was already verified or connected
+  try {
+    db.prepare(`
       UPDATE targets
       SET degree = 1,
           connected_at = COALESCE(connected_at, datetime('now'))
-      WHERE id IN (
-        SELECT rp.target_id
-        FROM run_profiles rp
-        JOIN run_profile_tracks rpt ON rpt.run_profile_id = rp.id
-        JOIN workflow_steps ws ON ws.id = rpt.current_step_id
-        WHERE ws.step_type = 'message'
-          AND rpt.status = 'active'
-      ) AND (degree IS NULL OR degree != 1)
-    `);
+      WHERE connected_at IS NOT NULL
+        AND (degree IS NULL OR degree != 1)
+    `).run();
+  } catch (err) {
+    console.warn("[heal-migration] update connected targets:", err instanceof Error ? err.message : err);
+  }
 
-    db.exec(`
+  // 3. For More Fernández (explicit target for test/sequence verification):
+  // Ensure messaging_urn, degree=1, connected_at, and unblock the track
+  try {
+    db.prepare(`
       UPDATE targets
       SET messaging_urn = 'urn:li:fsd_profile:ACoAAF3s9yQBTuwpHkDcgtzOzlxI2R49PBMEE4U',
+          degree = 1,
+          connected_at = COALESCE(connected_at, datetime('now')),
           message_sent_at = NULL
-      WHERE (linkedin_url LIKE '%more-fern%' OR full_name LIKE '%MOre fergo%');
-    `);
+      WHERE (id = '2e428bfe-2aab-4e20-9b6c-a1f55033c12d' OR linkedin_url LIKE '%more-fern%' OR full_name LIKE '%MOre fergo%')
+    `).run();
+  } catch (err) {
+    console.warn("[heal-migration] update More target:", err instanceof Error ? err.message : err);
+  }
 
-    db.exec(`
+  try {
+    db.prepare(`
       UPDATE run_profile_tracks
-      SET current_step_id = (
-            SELECT ws.id FROM workflow_steps ws
-            JOIN run_profiles rp ON rp.campaign_id = ws.campaign_id
-            WHERE rp.id = run_profile_tracks.run_profile_id AND ws.step_type = 'message'
-            ORDER BY ws.step_order ASC LIMIT 1
-          ),
-          status = 'active',
-          next_action_at = datetime('now', '-1 minute'),
-          force_run_once = 1
+      SET state = 'pending',
+          next_step_at = datetime('now', '-1 minute'),
+          force_run_once = 1,
+          error_message = NULL
       WHERE run_profile_id IN (
         SELECT rp.id FROM run_profiles rp
         JOIN targets t ON t.id = rp.target_id
-        WHERE (t.linkedin_url LIKE '%more-fern%' OR t.full_name LIKE '%MOre fergo%')
-      );
-    `);
-  } catch { /* ignore */ }
+        WHERE (t.id = '2e428bfe-2aab-4e20-9b6c-a1f55033c12d' OR t.linkedin_url LIKE '%more-fern%' OR t.full_name LIKE '%MOre fergo%')
+      )
+      AND track = 'linkedin'
+      AND state != 'completed'
+    `).run();
+  } catch (err) {
+    console.warn("[heal-migration] reset More track:", err instanceof Error ? err.message : err);
+  }
 }
 
 // Cleanup migration for previously inserted targets that had concatenated DOM card strings

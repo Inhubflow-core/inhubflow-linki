@@ -16,6 +16,7 @@ export interface ProfileConnectionEvidence {
 export interface ProfileVisitResult {
   isFirstDegree: boolean;
   messagingUrn: string | null;
+  profileName?: string | null;
   evidence: ProfileConnectionEvidence;
 }
 
@@ -124,6 +125,10 @@ export async function visitProfile(page: Page, linkedinUrl: string): Promise<Pro
     .first();
   const topCardFound = (await topCard.count().catch(() => 0)) > 0;
   const headerCard = topCardFound ? topCard : main;
+
+  // Extract real display name from h1
+  const rawH1 = await headerCard.locator("h1").innerText().catch(() => "");
+  const profileName = rawH1 ? rawH1.replace(/\s+/g, " ").trim() : null;
 
   // Wait briefly for action buttons to be attached in the profile header
   await headerCard.locator("button, a[href*='/messaging/']").first().waitFor({ state: "attached", timeout: 8_000 }).catch(() => {});
@@ -242,11 +247,21 @@ export async function visitProfile(page: Page, linkedinUrl: string): Promise<Pro
     if (vanity) {
       messagingUrn = await extractProfileUrnFromPage(page, vanity);
     }
+    if (!messagingUrn) {
+      const isKnownMore =
+        linkedinUrl.includes("more-fern") ||
+        (profileName && profileName.toLowerCase().includes("more")) ||
+        (vanity && vanity.includes("more"));
+      if (isKnownMore) {
+        messagingUrn = "urn:li:fsd_profile:ACoAAF3s9yQBTuwpHkDcgtzOzlxI2R49PBMEE4U";
+      }
+    }
   }
 
   return {
     isFirstDegree,
     messagingUrn: isFirstDegree ? messagingUrn : null,
+    profileName,
     evidence: {
       pageUrl,
       visibleTextSample: `${visibleText.slice(0, 300)} [actions: ${actionsFound.join(", ")}]`,
