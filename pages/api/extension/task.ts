@@ -47,7 +47,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (!accountId) {
-    return res.status(404).json({ error: "No active LinkedIn account found" });
+    return res.status(200).json({
+      task: null,
+      stats: null,
+      reason: "no_account_connected",
+      message: "No active LinkedIn account found",
+    });
   }
 
   // Update extension activity ping
@@ -65,7 +70,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     FROM accounts WHERE id = ?
   `).get(accountId) as any;
 
-  if (!account) return res.status(404).json({ error: "Account not found" });
+  if (!account) {
+    return res.status(200).json({ task: null, reason: "account_not_found", message: "Account not found" });
+  }
 
   // Safety limits today
   const connectsToday = (db.prepare(`

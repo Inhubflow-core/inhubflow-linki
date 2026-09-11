@@ -194,8 +194,8 @@ async function runWorkerCycle(triggerSource = "manual") {
 
     if (!taskResponse.ok) {
       const errText = `HTTP ${taskResponse.status}: ${taskResponse.statusText}`;
-      console.error("[InHubFlow ServiceWorker] Respuesta no exitosa del servidor:", errText);
-      await updateWorkerStatus("error_servidor", errText);
+      console.warn("[InHubFlow ServiceWorker] Respuesta del servidor en espera:", errText);
+      await updateWorkerStatus("en_espera", errText);
       isProcessingTask = false;
       return { success: false, error: errText };
     }
