@@ -126,12 +126,16 @@ async function getOrCreateContext(accountId: string): Promise<BrowserContext> {
           // A syntactically valid storage state without li_at cannot authenticate
           // LinkedIn. Do not leave the account looking connected while the
           // runner repeatedly creates empty contexts.
-          db.prepare("UPDATE accounts SET is_authenticated = 0 WHERE id = ?").run(accountId);
+          if ((account as any).extension_active !== 1) {
+            db.prepare("UPDATE accounts SET is_authenticated = 0 WHERE id = ?").run(accountId);
+          }
         }
       } catch {
         // Invalid storage state — require re-authentication rather than keeping
         // a stale authenticated flag.
-        db.prepare("UPDATE accounts SET is_authenticated = 0 WHERE id = ?").run(accountId);
+        if ((account as any).extension_active !== 1) {
+          db.prepare("UPDATE accounts SET is_authenticated = 0 WHERE id = ?").run(accountId);
+        }
       }
     }
 
