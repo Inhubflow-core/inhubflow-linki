@@ -80,53 +80,126 @@ async function syncLinkedInInbox(serverUrl, accountId) {
     const csrf = (cookie?.value || "").replace(/"/g, "");
     if (!csrf) return;
 
-    const res = await fetch("https://www.linkedin.com/voyager/api/messaging/conversations?keyVersion=LEGACY_INBOX&q=participants&start=0&count=20", {
-      headers: {
-        accept: "application/vnd.linkedin.normalized+json+2.1",
-        "x-restli-protocol-version": "2.0.0",
-        "csrf-token": csrf,
-      },
+    const headers = {
+      accept: "application/vnd.linkedin.normalized+json+2.1",
+      "x-restli-protocol-version": "2.0.0",
+      "csrf-token": csrf,
+    };
+
+    // 1. Obtener lista de conversaciones recientes
+    const convRes = await fetch("https://www.linkedin.com/voyager/api/messaging/conversations?keyVersion=LEGACY_INBOX&q=participants&start=0&count=15", {
+      headers,
       credentials: "include",
     });
 
-    if (!res.ok) return;
+    if (!convRes.ok) {
+      console.warn("[InHubFlow ServiceWorker] Voyager conversations status:", convRes.status);
+      return;
+    }
 
-    const payload = await res.json();
-    const elements = payload.elements || [];
+    const convPayload = await convRes.json();
+    const included = convPayload.included || [];
+    const elements = convPayload.elements || [];
+    const allRecords = [...included, ...elements];
+
+    // Mapa de MiniProfiles para asociar nombre y URL pública a cada URN
+    const profiles = new Map();
+    for (const r of allRecords) {
+      if (!r) continue;
+      const urn = r.entityUrn || r.objectUrn;
+      if (urn && (r.$type?.includes("MiniProfile") || r.publicIdentifier || r.firstName)) {
+        profiles.set(urn, {
+          name: `${r.firstName || ""} ${r.lastName || ""}`.trim(),
+          publicIdentifier: r.publicIdentifier || null,
+          profileUrl: r.publicIdentifier ? `https://www.linkedin.com/in/${r.publicIdentifier}` : null,
+          urn,
+        });
+      }
+    }
+
+    // 2. Extraer hilos y buscar eventos en los hilos más recientes
     const observations = [];
+    const convItems = allRecords.filter(
+      (r) => r && (r.$type === "com.linkedin.voyager.messaging.Conversation" || (r.entityUrn && r.entityUrn.includes("msg_conversation")))
+    );
 
-    for (const conv of elements) {
-      const threadId = conv.entityUrn || conv.id;
-      const events = conv.events || [];
-      for (const ev of events) {
-        if (ev.from && !ev.from.isCurrentUser) {
-          const body = ev.eventContent?.attributedBody?.text || ev.body || "";
-          if (body) {
+    for (let i = 0; i < Math.min(convItems.length, 10); i++) {
+      const conv = convItems[i];
+      const convUrn = conv.entityUrn || "";
+      const match = convUrn.match(/urn:li:msg_conversation:\((?:[^,]+),(.+)\)$/);
+      const threadPathId = match ? match[1] : (conv.id || convUrn);
+      if (!threadPathId) continue;
+
+      try {
+        const evRes = await fetch(
+          `https://www.linkedin.com/voyager/api/messaging/conversations/${encodeURIComponent(threadPathId)}/events?start=0&count=25`,
+          { headers, credentials: "include" }
+        );
+
+        if (evRes.ok) {
+          const evPayload = await evRes.json();
+          const evIncluded = evPayload.included || [];
+          const evElements = evPayload.elements || [];
+          const evAll = [...evIncluded, ...evElements];
+
+          for (const r of evAll) {
+            if (!r) continue;
+            const urn = r.entityUrn || r.objectUrn;
+            if (urn && (r.$type?.includes("MiniProfile") || r.publicIdentifier || r.firstName)) {
+              profiles.set(urn, {
+                name: `${r.firstName || ""} ${r.lastName || ""}`.trim(),
+                publicIdentifier: r.publicIdentifier || null,
+                profileUrl: r.publicIdentifier ? `https://www.linkedin.com/in/${r.publicIdentifier}` : null,
+                urn,
+              });
+            }
+          }
+
+          for (const r of evAll) {
+            if (!r) continue;
+            const isEvent =
+              r.$type?.includes("MessageEvent") ||
+              r.$type?.includes("Event") ||
+              (r.entityUrn && r.entityUrn.includes("fs_event"));
+            if (!isEvent) continue;
+
+            const body = r.eventContent?.attributedBody?.text || r.body || "";
+            if (!body || !body.trim()) continue;
+
+            const fromUrn = typeof r.from === "string" ? r.from : (r.from?.entityUrn || r.from?.objectUrn);
+            const senderProfile = fromUrn ? profiles.get(fromUrn) : null;
+
             observations.push({
-              externalThreadId: threadId,
-              externalMessageId: ev.entityUrn || ev.id,
+              externalThreadId: convUrn,
+              externalMessageId: r.entityUrn || r.id || `${convUrn}_${r.createdAt || Date.now()}`,
               direction: "inbound",
               body: body.trim(),
-              receivedAt: ev.createdAt ? new Date(ev.createdAt).toISOString() : new Date().toISOString(),
-              senderExternalId: ev.from?.entityUrn || null,
-              senderName: ev.from?.name || null,
-              providerEventId: ev.entityUrn || ev.id,
+              receivedAt: r.createdAt ? new Date(r.createdAt).toISOString() : new Date().toISOString(),
+              senderExternalId: fromUrn || null,
+              senderName: senderProfile?.name || null,
+              senderProfileUrl: senderProfile?.profileUrl || (senderProfile?.publicIdentifier ? `https://www.linkedin.com/in/${senderProfile.publicIdentifier}` : null),
+              senderMessagingUrn: fromUrn || null,
+              providerEventId: r.entityUrn || r.id || null,
             });
           }
         }
+      } catch (evErr) {
+        // Continuar con siguiente hilo
       }
     }
 
     if (observations.length > 0) {
-      console.log(`[InHubFlow ServiceWorker] Sincronizando ${observations.length} mensajes de LinkedIn con la plataforma...`);
-      await fetch(`${serverUrl}/api/extension/inbox-sync`, {
+      console.log(`[InHubFlow ServiceWorker] Enviando ${observations.length} mensajes recopilados al servidor...`);
+      const syncRes = await fetch(`${serverUrl}/api/extension/inbox-sync`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ accountId, observations }),
       });
+      const syncData = await syncRes.json();
+      console.log("[InHubFlow ServiceWorker] Respuesta del servidor:", syncData);
     }
   } catch (err) {
-    console.warn("[InHubFlow ServiceWorker] Sincronización de inbox omitida:", err);
+    console.warn("[InHubFlow ServiceWorker] Error en sincronización de inbox:", err);
   }
 }
 

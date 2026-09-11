@@ -261,7 +261,8 @@ export function captureCampaignInboxObservations(
       result.skipped.push({ ...key, reason: "wrong_account_ownership" });
       continue;
     }
-    if (observation.campaignRunId !== match.scope.runId) {
+    const effectiveRunId = observation.campaignRunId || match.scope.runId;
+    if (effectiveRunId !== match.scope.runId) {
       result.skipped.push({ ...key, reason: "not_campaign_message" });
       continue;
     }
@@ -269,16 +270,13 @@ export function captureCampaignInboxObservations(
     const campaignOutboundAtMs = parseCampaignTimestamp(match.scope.outboundAt);
     const observedOutboundAtMs = typeof observation.campaignOutboundObservedAt === "string"
       ? parseCampaignTimestamp(observation.campaignOutboundObservedAt)
-      : NaN;
-    if (
-      !Number.isFinite(campaignOutboundAtMs)
-      || !Number.isFinite(observedOutboundAtMs)
-      || observedOutboundAtMs < campaignOutboundAtMs - CAMPAIGN_OUTBOUND_TOLERANCE_MS
-    ) {
+      : campaignOutboundAtMs;
+
+    if (!Number.isFinite(campaignOutboundAtMs)) {
       result.skipped.push({ ...key, reason: "not_campaign_message" });
       continue;
     }
-    if (receivedAtMs <= observedOutboundAtMs) {
+    if (Number.isFinite(observedOutboundAtMs) && receivedAtMs <= (observedOutboundAtMs - CAMPAIGN_OUTBOUND_TOLERANCE_MS)) {
       result.skipped.push({ ...key, reason: "stale_message" });
       continue;
     }
