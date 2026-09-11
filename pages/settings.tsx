@@ -754,15 +754,15 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
               Tu espacio de trabajo ya está sincronizado con LinkedIn y listo para ejecutar campañas.
             </p>
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-6 text-left">
+            <div className="bg-brand-500/10 border border-brand-500/20 rounded-2xl p-4 mb-6 text-left">
               <div className="flex items-start gap-3">
                 <span className="text-xl flex-shrink-0">💡</span>
                 <div>
-                  <h4 className="text-xs font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider mb-1">
-                    Consejo de Rendimiento y Estabilidad
+                  <h4 className="text-xs font-bold text-brand-700 dark:text-brand-300 uppercase tracking-wider mb-1">
+                    Buenas Prácticas de Automatización
                   </h4>
-                  <p className="text-xs text-amber-900/80 dark:text-amber-200/90 leading-relaxed">
-                    Para que tus automatizaciones se ejecuten con total fluidez y evitar desconexiones por sesiones simultáneas en LinkedIn, <strong>te sugerimos cerrar la pestaña de LinkedIn en este navegador</strong> mientras tus campañas estén activas.
+                  <p className="text-xs text-gray-700 dark:text-gray-200 leading-relaxed">
+                    Tus campañas se ejecutarán de forma inteligente en segundo plano. Para proyectar un comportamiento humano y seguro ante LinkedIn, te sugerimos no realizar envíos masivos manuales mientras las secuencias automáticas estén trabajando.
                   </p>
                 </div>
               </div>
