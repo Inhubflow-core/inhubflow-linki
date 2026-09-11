@@ -570,6 +570,14 @@ async function executeStep(
   leaseActive: () => boolean = () => true
 ): Promise<void> {
   if (!leaseActive()) return;
+
+  // InHubFlow Architecture: All LinkedIn actions are executed from the user's residential IP
+  // via the InHubFlow Connect Chrome extension. The server runner MUST NOT execute server-side Playwright
+  // from datacenter IP unless LINKEDIN_SERVER_PLAYWRIGHT_ENABLED=true is explicitly set.
+  if (tr.track === "linkedin" && process.env.LINKEDIN_SERVER_PLAYWRIGHT_ENABLED !== "true") {
+    return;
+  }
+
   const bypassSchedule = db.prepare(
     "UPDATE run_profile_tracks SET force_run_once = 0 WHERE id = ? AND force_run_once = 1"
   ).run(tr.id).changes === 1;
@@ -1320,8 +1328,11 @@ async function tick(
   leaseActive: () => boolean = () => true
 ): Promise<void> {
   if (!leaseActive()) return;
-  const campaignAccountIds = campaignInboxSchedulerEnabled() ? listCampaignInboxAccountIds(db) : [];
-  await syncCampaignInboxAccounts(db, campaignAccountIds);
+  const serverPlaywrightAllowed = process.env.LINKEDIN_SERVER_PLAYWRIGHT_ENABLED === "true";
+  if (serverPlaywrightAllowed) {
+    const campaignAccountIds = campaignInboxSchedulerEnabled() ? listCampaignInboxAccountIds(db) : [];
+    await syncCampaignInboxAccounts(db, campaignAccountIds);
+  }
   if (!leaseActive()) return;
 
   const activeRuns = db.prepare(`
@@ -1344,11 +1355,13 @@ async function tick(
   }
 
   // Periodic authoritative reconciliation (up to once per 8h per account).
-  for (const accountId of seenAccounts) {
-    if (shouldSyncAccepted(accountId) && !acceptedReconciliationCoolingDown(accountId)) {
-      try {
-        console.log(`[runner] Starting accepted-connections sync for account ${accountId}`);
-        const syncResult = await reconcileAcceptedConnections(accountId);
+  // Only executed on the server if explicitly allowed with residential proxies.
+  if (serverPlaywrightAllowed) {
+    for (const accountId of seenAccounts) {
+      if (shouldSyncAccepted(accountId) && !acceptedReconciliationCoolingDown(accountId)) {
+        try {
+          console.log(`[runner] Starting accepted-connections sync for account ${accountId}`);
+          const syncResult = await reconcileAcceptedConnections(accountId);
         const stamped = syncResult.stamped;
         if (stamped > 0) {
           for (const r of activeRuns.filter(x => x.account_id === accountId)) {
@@ -1364,6 +1377,7 @@ async function tick(
       }
     }
   }
+}
 
   // LinkedIn inbox reply detection (messaging GraphQL) — once per 15min per
   // account. Sets targets.last_replied_at so the runner auto-unenrolls repliers.
@@ -1752,6 +1766,17 @@ async function tick(
     }
 
     const target = db.prepare("SELECT * FROM targets WHERE id = ?").get(tr.target_id) as Target;
+
+    // InHubFlow Architecture: All LinkedIn actions are executed from the user's residential IP
+    // via the InHubFlow Connect Chrome extension. The server runner MUST NOT execute server-side Playwright
+    // from datacenter IP unless LINKEDIN_SERVER_PLAYWRIGHT_ENABLED=true is explicitly set.
+    if (tr.track === "linkedin") {
+      const serverPlaywrightEnabled = process.env.LINKEDIN_SERVER_PLAYWRIGHT_ENABLED === "true";
+      if (!serverPlaywrightEnabled) {
+        continue;
+      }
+    }
+
     await executeStep(db, tr.run_id, tr, target, steps, tr.account_id, limits, emailAccountId, emailLimits, getWorkflowPrompt(tr.workflow_id), leaseActive);
     await randomDelay(PROFILE_DELAY_MIN, PROFILE_DELAY_MAX);
   }
@@ -1806,14 +1831,18 @@ export async function forceRunStep(
 ): Promise<{ success: boolean; message: string }> {
   const db = getDb();
   const run = db.prepare(`
-    SELECT r.account_id, a.is_authenticated
+    SELECT r.account_id, a.is_authenticated, a.extension_active
     FROM runs r
     JOIN accounts a ON a.id = r.account_id
     WHERE r.id = ?
-  `).get(runId) as { account_id: string; is_authenticated: number } | undefined;
+  `).get(runId) as { account_id: string; is_authenticated: number; extension_active?: number } | undefined;
   if (!run) throw new Error("Run or LinkedIn account not found");
   if (run.is_authenticated !== 1) {
-    throw new Error("La cuenta de LinkedIn necesita autenticarse antes de ejecutar una acción");
+    if (run.extension_active === 1) {
+      db.prepare("UPDATE accounts SET is_authenticated = 1 WHERE id = ?").run(run.account_id);
+    } else {
+      throw new Error("La cuenta de LinkedIn necesita autenticarse antes de ejecutar una acción");
+    }
   }
 
   const trackRows = targetId

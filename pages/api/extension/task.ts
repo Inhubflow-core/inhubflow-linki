@@ -29,7 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Smart multi-account resolution: match by LinkedIn session token if accountId is not provided
   const tokenHeader = (req.headers["x-linkedin-token"] || req.body?.li_at || req.query?.li_at) as string | undefined;
   if (!accountId && tokenHeader && tokenHeader.length > 20) {
-    const allAccounts = db.prepare("SELECT id, cookies_json FROM accounts WHERE is_authenticated = 1").all() as any[];
+    const allAccounts = db.prepare("SELECT id, cookies_json FROM accounts").all() as any[];
     for (const a of allAccounts) {
       if (!a.cookies_json) continue;
       const dec = decryptSecret(a.cookies_json);
@@ -40,9 +40,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
-  // Fallback: If no account ID passed, resolve the first active authenticated account
+  // Fallback: If no account ID passed, resolve the first active account (prioritize authenticated)
   if (!accountId) {
-    const acc = db.prepare("SELECT id FROM accounts WHERE is_authenticated = 1 LIMIT 1").get() as { id: string } | undefined;
+    const acc = db.prepare("SELECT id FROM accounts ORDER BY is_authenticated DESC, created_at ASC LIMIT 1").get() as { id: string } | undefined;
     accountId = acc?.id;
   }
 
@@ -55,18 +55,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 
-  // Update extension activity ping
+  // Update extension activity ping and mark account active & authenticated
   try {
     db.prepare(`
       UPDATE accounts 
       SET extension_active = 1, 
+          is_authenticated = 1,
           last_extension_ping_at = datetime('now') 
       WHERE id = ?
     `).run(accountId);
   } catch { /* ignore */ }
 
   const account = db.prepare(`
-    SELECT id, email, daily_connect_limit, daily_message_limit, active_hours_start, active_hours_end, timezone, working_days
+    SELECT id, email, daily_connection_limit, daily_message_limit, active_hours_start, active_hours_end, timezone, working_days
     FROM accounts WHERE id = ?
   `).get(accountId) as any;
 
@@ -89,7 +90,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       AND date(created_at) = date('now')
   `).get(accountId) as { c: number })?.c || 0;
 
-  const maxConnects = account.daily_connect_limit || 20;
+  const maxConnects = account.daily_connection_limit || 20;
   const maxMessages = account.daily_message_limit || 20;
 
   // Candidate due track runs across active campaigns

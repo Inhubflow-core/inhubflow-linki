@@ -14,7 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Auto-identification by LinkedIn token if accountId is missing
   const token = (req.headers["x-linkedin-token"] || req.body?.li_at || req.query?.li_at) as string | undefined;
   if (!accountId && token && token.length > 20) {
-    const allAccounts = db.prepare("SELECT id, cookies_json FROM accounts WHERE is_authenticated = 1").all() as any[];
+    const allAccounts = db.prepare("SELECT id, cookies_json FROM accounts").all() as any[];
     for (const a of allAccounts) {
       if (!a.cookies_json) continue;
       const dec = decryptSecret(a.cookies_json);
@@ -25,11 +25,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
+  // Fallback if still no accountId
+  if (!accountId) {
+    const acc = db.prepare("SELECT id FROM accounts ORDER BY is_authenticated DESC, created_at ASC LIMIT 1").get() as { id: string } | undefined;
+    accountId = acc?.id;
+  }
+
   if (accountId) {
     try {
       db.prepare(`
         UPDATE accounts 
         SET extension_active = 1, 
+            is_authenticated = 1,
             last_extension_ping_at = datetime('now') 
         WHERE id = ? OR email = ?
       `).run(accountId, accountId);
