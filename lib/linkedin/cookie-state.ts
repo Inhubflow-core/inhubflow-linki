@@ -54,9 +54,11 @@ export function normalizeLinkedInCookie(
   const raw = input as Record<string, unknown>;
   const name = typeof raw.name === "string" ? raw.name.trim() : "";
   const value = typeof raw.value === "string" ? raw.value : "";
-  const domainValue = typeof raw.domain === "string" && raw.domain.trim()
+  let domainValue = typeof raw.domain === "string" && raw.domain.trim()
     ? raw.domain.trim().toLowerCase()
     : (defaults.domain ?? ".linkedin.com");
+  if (!domainValue.startsWith(".")) domainValue = "." + domainValue;
+  if (!domainValue.includes("linkedin.com")) domainValue = ".linkedin.com";
   const path = typeof raw.path === "string" && raw.path ? raw.path : "/";
   if (!COOKIE_NAME_RE.test(name) || hasControlCharacters(value)) return null;
   if (!LINKEDIN_HOST_RE.test(domainValue.replace(/^\./, "")) || !path.startsWith("/") || hasControlCharacters(path)) return null;
@@ -96,12 +98,19 @@ export function hasValidLinkedInLiAt(cookies: readonly Pick<LinkedInSessionCooki
 }
 
 export function dedupeLinkedInCookies(cookies: readonly LinkedInSessionCookie[]): LinkedInSessionCookie[] {
-  const byKey = new Map<string, LinkedInSessionCookie>();
+  const byName = new Map<string, LinkedInSessionCookie>();
   for (const cookie of cookies) {
-    const key = `${cookie.name}|${cookie.domain}|${cookie.path}`;
-    if (!byKey.has(key)) byKey.set(key, cookie);
+    // Keep single cookie per name on root path, preferring valid values
+    if (!byName.has(cookie.name)) {
+      byName.set(cookie.name, cookie);
+    } else {
+      const existing = byName.get(cookie.name)!;
+      if ((!existing.value || existing.value.length < 5) && cookie.value && cookie.value.length >= 5) {
+        byName.set(cookie.name, cookie);
+      }
+    }
   }
-  return [...byKey.values()];
+  return [...byName.values()];
 }
 
 export function linkedinCsrfFromCookies(cookies: readonly Pick<LinkedInSessionCookie, "name" | "value">[]): string | null {

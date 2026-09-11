@@ -213,9 +213,9 @@ async function openComposeFromProfilePage(page: Page): Promise<boolean> {
       return a ? a.getAttribute("href") : el.getAttribute("href");
     }).catch(() => null);
 
-    if (directHref && directHref.includes("/messaging/thread/")) {
+    if (directHref && (directHref.includes("/messaging/thread/") || directHref.includes("/messaging/compose/"))) {
       const targetUrl = directHref.startsWith("http") ? directHref : `https://www.linkedin.com${directHref}`;
-      console.log(`[message] openComposeFromProfilePage: following direct conversation thread link: ${targetUrl}`);
+      console.log(`[message] openComposeFromProfilePage: following direct conversation thread/compose link: ${targetUrl}`);
       await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
       const focused = await findAndFocusComposeBox(page, 10000);
       if (focused) return true;

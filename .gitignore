@@ -53,8 +53,11 @@ next-env.d.ts
 # Runtime log file
 log.txt
 
-# Temporary / personal dev scripts — not useful to others
+# Temporary / personal dev scripts and tokens — not useful to others
 scripts/tmp/
+scratch/
+*.txt
+
 
 # Playwright browser cache (downloaded automatically on first run)
 /playwright-browsers

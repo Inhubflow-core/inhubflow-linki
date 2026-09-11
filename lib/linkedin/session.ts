@@ -102,7 +102,22 @@ async function getOrCreateContext(accountId: string): Promise<BrowserContext> {
           return candidate.name === "li_at" && typeof candidate.value === "string" && candidate.value.length > 20;
         });
         if (hasLiAt) {
-          storageState = parsed;
+          const seen = new Set<string>();
+          const deduped: Array<any> = [];
+          for (const c of (cookies as Array<any>)) {
+            if (!c || typeof c !== "object" || !c.name) continue;
+            let domain = c.domain || ".linkedin.com";
+            if (!domain.startsWith(".")) domain = "." + domain;
+            if (!domain.includes("linkedin.com")) domain = ".linkedin.com";
+            if (!seen.has(c.name)) {
+              seen.add(c.name);
+              deduped.push({ ...c, domain, path: c.path || "/" });
+            }
+          }
+          storageState = {
+            ...parsed,
+            cookies: deduped,
+          };
         } else {
           // A syntactically valid storage state without li_at cannot authenticate
           // LinkedIn. Do not leave the account looking connected while the
