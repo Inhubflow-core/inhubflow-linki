@@ -274,35 +274,77 @@
       };
     }
 
-    msgBtn.scrollIntoView({ behavior: "smooth", block: "center" });
-    await sleep(randomBetween(600, 1200));
-    msgBtn.click();
-    await sleep(randomBetween(2000, 3000));
-
-    // Look for active compose box
-    const composeSelectors = [
-      "div.msg-form__contenteditable[contenteditable='true']",
-      "div[role='textbox'].msg-form__message-texteditor",
-      "div[role='textbox'][contenteditable='true']",
-      "div.msg-form__contenteditable",
-      "form.msg-form [contenteditable='true']",
-      "form.msg-form textarea",
-      "textarea.msg-form__textarea",
-      "[contenteditable='true']"
-    ];
-
-    let composeBox = null;
-    for (const sel of composeSelectors) {
-      const els = Array.from(document.querySelectorAll(sel));
-      for (const el of els) {
-        const rect = el.getBoundingClientRect();
-        if (rect.width > 50 && rect.height > 20) {
-          composeBox = el;
-          break;
-        }
-      }
-      if (composeBox) break;
+    // Click the message button
+    const directHref = msgBtn.getAttribute("href") || msgBtn.closest("a")?.getAttribute("href");
+    if (directHref && (directHref.includes("/messaging/thread/") || directHref.includes("/messaging/compose/"))) {
+      const targetUrl = directHref.startsWith("http") ? directHref : `https://www.linkedin.com${directHref}`;
+      console.log("[InHubFlow] Following direct message thread URL:", targetUrl);
+      window.location.href = targetUrl;
+      await sleep(3500);
+    } else {
+      msgBtn.scrollIntoView({ behavior: "smooth", block: "center" });
+      await sleep(randomBetween(600, 1000));
+      msgBtn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+      msgBtn.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
+      msgBtn.click();
+      const parentAnchor = msgBtn.closest("a");
+      if (parentAnchor && parentAnchor !== msgBtn) parentAnchor.click();
     }
+
+    // Helper: Poll for active compose box across DOM (up to 12 seconds)
+    async function findComposeBox(timeoutMs = 12000) {
+      const startTime = Date.now();
+      const composeSelectors = [
+        "div.msg-form__contenteditable[contenteditable='true']",
+        "div.msg-form__contenteditable",
+        "div[role='textbox'].msg-form__message-texteditor",
+        "div[role='textbox'][contenteditable='true']",
+        "div[role='textbox']",
+        "form.msg-form [contenteditable='true']",
+        "form.msg-form textarea",
+        ".msg-overlay-conversation-bubble [contenteditable='true']",
+        ".msg-overlay-conversation-bubble textarea",
+        ".msg-thread [contenteditable='true']",
+        ".msg-thread textarea",
+        "div[data-placeholder][contenteditable='true']",
+        "div[aria-label*='mensagem' i][contenteditable='true']",
+        "div[aria-label*='mensaje' i][contenteditable='true']",
+        "div[aria-label*='message' i][contenteditable='true']",
+        "div.ql-editor",
+        "textarea.msg-form__textarea",
+        "textarea[name='message']",
+        "p.msg-form__contenteditable",
+        "[contenteditable='true']"
+      ];
+
+      while (Date.now() - startTime < timeoutMs) {
+        // Expand minimized bubbles if any
+        const minimized = document.querySelectorAll(
+          ".msg-overlay-conversation-bubble--is-minimized, aside#msg-overlay.msg-overlay-container--is-minimized"
+        );
+        for (const b of Array.from(minimized)) {
+          const header = b.querySelector(
+            "header, .msg-overlay-bubble-header, button[data-control-name='overlay.toggle_conversation'], button[data-control-name='overlay.expand']"
+          );
+          if (header) header.click();
+        }
+
+        // Search for compose box
+        for (const sel of composeSelectors) {
+          const els = Array.from(document.querySelectorAll(sel));
+          for (const el of els) {
+            const style = window.getComputedStyle(el);
+            if (style.visibility !== "hidden" && style.display !== "none") {
+              return el;
+            }
+          }
+        }
+        await sleep(500);
+      }
+      return null;
+    }
+
+    const composeBox = await findComposeBox(12000);
 
     if (!composeBox) {
       return {
@@ -311,28 +353,54 @@
       };
     }
 
+    composeBox.focus();
     composeBox.click();
-    await sleep(randomBetween(500, 1000));
+    await sleep(500);
 
     // Type the message with human delay
     await humanType(composeBox, task.body);
     await sleep(randomBetween(800, 1500));
 
-    // Locate and click Send button
-    const container = composeBox.closest("form") || composeBox.closest(".msg-convo-wrapper") || composeBox.closest(".msg-overlay-conversation-bubble") || document;
-    const sendBtn = Array.from(container.querySelectorAll("button")).find((b) => {
-      const txt = (b.innerText || "").trim().toLowerCase();
-      const aria = (b.getAttribute("aria-label") || "").trim().toLowerCase();
-      const type = (b.getAttribute("type") || "").toLowerCase();
-      return (
-        type === "submit" ||
-        txt === "enviar" ||
-        txt === "send" ||
-        b.classList.contains("msg-form__send-button") ||
-        aria.includes("enviar") ||
-        aria.includes("send")
-      );
-    });
+    // Ensure React/Ember recognizes the input
+    composeBox.dispatchEvent(new Event("input", { bubbles: true }));
+    composeBox.dispatchEvent(new Event("change", { bubbles: true }));
+
+    // Locate Send button with retry
+    async function findSendButton(box) {
+      const container = box.closest("form") || box.closest(".msg-convo-wrapper") || box.closest(".msg-overlay-conversation-bubble") || box.closest(".msg-thread") || document;
+      const sendSelectors = [
+        "button[type='submit']",
+        "button.msg-form__send-button",
+        "button[data-control-name='send']",
+        "button"
+      ];
+      for (const sel of sendSelectors) {
+        const buttons = Array.from(container.querySelectorAll(sel));
+        const btn = buttons.find((b) => {
+          const txt = (b.innerText || "").trim().toLowerCase();
+          const aria = (b.getAttribute("aria-label") || "").trim().toLowerCase();
+          const type = (b.getAttribute("type") || "").toLowerCase();
+          return (
+            type === "submit" ||
+            b.classList.contains("msg-form__send-button") ||
+            txt === "enviar" ||
+            txt === "send" ||
+            aria.includes("enviar") ||
+            aria.includes("send")
+          );
+        });
+        if (btn && !btn.disabled) return btn;
+      }
+      return null;
+    }
+
+    let sendBtn = null;
+    for (let i = 0; i < 10; i++) {
+      sendBtn = await findSendButton(composeBox);
+      if (sendBtn && !sendBtn.disabled) break;
+      composeBox.dispatchEvent(new Event("input", { bubbles: true }));
+      await sleep(500);
+    }
 
     if (!sendBtn || sendBtn.disabled) {
       return {
