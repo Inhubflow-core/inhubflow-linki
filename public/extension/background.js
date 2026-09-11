@@ -112,6 +112,48 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Envía la tarea a la pestaña y espera respuesta con canal dual (sendResponse + runtime ack)
+async function dispatchTaskToTab(tabId, task) {
+  return new Promise((resolve) => {
+    let isResolved = false;
+    const doResolve = (res) => {
+      if (isResolved) return;
+      isResolved = true;
+      chrome.runtime.onMessage.removeListener(ackListener);
+      clearTimeout(timeout);
+      resolve(res);
+    };
+
+    const timeout = setTimeout(() => {
+      doResolve({ status: "failed", error: "Tiempo de espera agotado al ejecutar acción en la página" });
+    }, 60000);
+
+    const ackListener = (msg) => {
+      if (msg && msg.action === "task_result_ack" && msg.result) {
+        console.log("[InHubFlow ServiceWorker] Resultado recibido vía runtime ack:", msg.result);
+        doResolve(msg.result);
+      }
+    };
+    chrome.runtime.onMessage.addListener(ackListener);
+
+    chrome.tabs.sendMessage(tabId, { action: "execute_task", task }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.warn("[InHubFlow ServiceWorker] tabs.sendMessage advertencia:", chrome.runtime.lastError.message);
+        setTimeout(() => {
+          if (!isResolved) {
+            doResolve({
+              status: "failed",
+              error: chrome.runtime.lastError.message || "Error comunicando con la pestaña",
+            });
+          }
+        }, 1500);
+      } else if (response) {
+        doResolve(response);
+      }
+    });
+  });
+}
+
 // Ciclo principal de ejecución
 async function runWorkerCycle(triggerSource = "manual") {
   if (isProcessingTask) {
@@ -258,53 +300,50 @@ async function runWorkerCycle(triggerSource = "manual") {
 
     await sleep(1000);
 
-    // 6. Enviar mensaje de ejecución a la pestaña (con soporte dual sendResponse + runtime.sendMessage)
-    let taskResult;
-    try {
-      taskResult = await new Promise((resolve) => {
-        let isResolved = false;
-        const doResolve = (res) => {
-          if (isResolved) return;
-          isResolved = true;
-          chrome.runtime.onMessage.removeListener(ackListener);
-          clearTimeout(timeout);
-          resolve(res);
-        };
+    // 6. Enviar mensaje de ejecución a la pestaña
+    let taskResult = await dispatchTaskToTab(tabId, task);
 
-        const timeout = setTimeout(() => {
-          doResolve({ status: "failed", error: "Tiempo de espera agotado al ejecutar acción en la página" });
-        }, 60000);
+    // Si la acción requirió navegar a la pantalla completa de mensajería (/messaging/thread/new/...)
+    if (taskResult && taskResult.status === "navigate_to_messaging" && taskResult.nextUrl) {
+      console.log(`[InHubFlow ServiceWorker] Redirigiendo pestaña a pantalla de mensajes: ${taskResult.nextUrl}`);
+      await updateWorkerStatus("abriendo_mensajeria", `Abriendo chat con ${task.fullName}...`);
 
-        const ackListener = (msg) => {
-          if (msg && msg.action === "task_result_ack" && msg.result) {
-            console.log("[InHubFlow ServiceWorker] Resultado recibido vía runtime ack:", msg.result);
-            doResolve(msg.result);
-          }
-        };
-        chrome.runtime.onMessage.addListener(ackListener);
+      await chrome.tabs.update(tabId, { url: taskResult.nextUrl });
+      await waitForTabComplete(tabId, 25000);
+      await sleep(3500);
 
-        chrome.tabs.sendMessage(tabId, { action: "execute_task", task }, (response) => {
-          if (chrome.runtime.lastError) {
-            console.warn("[InHubFlow ServiceWorker] tabs.sendMessage advertencia:", chrome.runtime.lastError.message);
-            // Pequeña espera por si ackListener ya lo entregó o está por llegar
-            setTimeout(() => {
-              if (!isResolved) {
-                doResolve({
-                  status: "failed",
-                  error: chrome.runtime.lastError.message || "Error comunicando con la pestaña",
-                });
-              }
-            }, 1200);
-          } else if (response) {
-            doResolve(response);
-          }
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          files: ["content-runner.js"],
         });
-      });
-    } catch (msgErr) {
-      taskResult = { status: "failed", error: String(msgErr) };
+      } catch (e) {}
+
+      await sleep(1000);
+      taskResult = await dispatchTaskToTab(tabId, task);
+    } else if (taskResult && taskResult.status === "failed") {
+      // Si falló pero la pestaña navegó automáticamente a /messaging/ durante la interacción
+      try {
+        const tabInfo = await chrome.tabs.get(tabId);
+        if (tabInfo && tabInfo.url && tabInfo.url.includes("/messaging/")) {
+          console.log(`[InHubFlow ServiceWorker] Detectada navegación a mensajería (${tabInfo.url}). Ejecutando envío en la nueva pantalla...`);
+          await waitForTabComplete(tabId, 15000);
+          await sleep(2500);
+          try {
+            await chrome.scripting.executeScript({
+              target: { tabId },
+              files: ["content-runner.js"],
+            });
+          } catch (e) {}
+          await sleep(1000);
+          taskResult = await dispatchTaskToTab(tabId, task);
+        }
+      } catch (checkErr) {
+        // Ignorar si la pestaña ya fue cerrada
+      }
     }
 
-    console.log(`[InHubFlow ServiceWorker] Resultado de la tarea:`, taskResult);
+    console.log(`[InHubFlow ServiceWorker] Resultado final de la tarea:`, taskResult);
 
     // 7. Cerrar pestaña de segundo plano inmediatamente
     try {

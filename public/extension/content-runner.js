@@ -181,10 +181,129 @@
 
   // ─── ACTION: MESSAGE ────────────────────────────────────────────────────────
   async function handleMessage(task) {
+    console.log("[InHubFlow] handleMessage iniciado para:", task.fullName, "en URL:", window.location.href);
+
+    // Helper: Poll for active compose box across DOM (up to timeoutMs)
+    async function findComposeBox(timeoutMs = 15000) {
+      const startTime = Date.now();
+      while (Date.now() - startTime < timeoutMs) {
+        // Expand any minimized bubbles in the bottom-right overlay
+        const minimized = document.querySelectorAll(
+          ".msg-overlay-conversation-bubble--is-minimized, aside#msg-overlay.msg-overlay-container--is-minimized, [data-control-name='overlay.expand']"
+        );
+        for (const b of Array.from(minimized)) {
+          const btn = b.querySelector("button, header") || b;
+          try { btn.click(); } catch (e) {}
+        }
+
+        // Search for any active contenteditable or textarea compose element
+        const candidateSelectors = [
+          "form.msg-form div.msg-form__contenteditable[contenteditable='true']",
+          "form.msg-form div[role='textbox']",
+          "form.msg-form [contenteditable='true']",
+          ".msg-thread form.msg-form div[contenteditable='true']",
+          ".msg-convo-wrapper div[contenteditable='true']",
+          ".msg-overlay-conversation-bubble div.msg-form__contenteditable[contenteditable='true']",
+          ".msg-overlay-conversation-bubble div.msg-form__contenteditable",
+          ".msg-overlay-conversation-bubble [contenteditable='true']",
+          "div.msg-form__contenteditable[contenteditable='true']",
+          "div.msg-form__contenteditable",
+          "div[role='textbox'].msg-form__message-texteditor",
+          "div[role='textbox'][contenteditable='true']",
+          "div[role='textbox']",
+          "form.msg-form textarea",
+          "textarea.msg-form__textarea",
+          "textarea[name='message']",
+        ];
+
+        for (const sel of candidateSelectors) {
+          const elements = Array.from(document.querySelectorAll(sel));
+          for (const el of elements) {
+            if (el.closest("#global-nav, .global-nav, .msg-search-form, header")) continue;
+            const rect = el.getBoundingClientRect();
+            if (rect.width > 50 && rect.height > 20) {
+              return el;
+            }
+          }
+        }
+
+        await sleep(500);
+      }
+      return null;
+    }
+
+    async function typeAndSendMessage(composeBox, body) {
+      console.log("[InHubFlow] Enfocando cuadro de redacción...");
+      composeBox.focus();
+      composeBox.click();
+      await sleep(400);
+
+      await humanType(composeBox, body);
+      await sleep(randomBetween(600, 1000));
+
+      composeBox.dispatchEvent(new Event("input", { bubbles: true }));
+      composeBox.dispatchEvent(new Event("change", { bubbles: true }));
+      try {
+        composeBox.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText" }));
+      } catch (e) {}
+
+      // Contenedor del formulario
+      const container = composeBox.closest("form.msg-form") ||
+                        composeBox.closest(".msg-convo-wrapper") ||
+                        composeBox.closest(".msg-overlay-conversation-bubble") ||
+                        composeBox.closest(".msg-thread") ||
+                        document;
+
+      // Buscar botón de envío
+      let sendBtn = container.querySelector("button[type='submit'], button.msg-form__send-button, button[data-control-name='send']");
+      if (!sendBtn) {
+        const allButtons = Array.from(container.querySelectorAll("button"));
+        sendBtn = allButtons.find((b) => {
+          const txt = (b.innerText || "").trim().toLowerCase();
+          const aria = (b.getAttribute("aria-label") || "").trim().toLowerCase();
+          return txt === "enviar" || txt === "send" || aria.includes("enviar") || aria.includes("send");
+        });
+      }
+
+      if (sendBtn) {
+        console.log("[InHubFlow] Botón de enviar encontrado. Activando y haciendo clic...");
+        sendBtn.removeAttribute("disabled");
+        sendBtn.disabled = false;
+        sendBtn.focus();
+        sendBtn.click();
+        const inner = sendBtn.querySelector("span");
+        if (inner) inner.click();
+        await sleep(1000);
+      }
+
+      // Enviar con Control+Enter como respaldo garantizado
+      composeBox.focus();
+      composeBox.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, which: 13, ctrlKey: true, bubbles: true }));
+      composeBox.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", keyCode: 13, which: 13, ctrlKey: true, bubbles: true }));
+      await sleep(randomBetween(1500, 2500));
+
+      return {
+        status: "completed",
+      };
+    }
+
+    // CASO 1: Si ya estamos en la interfaz de mensajería (linkedin.com/messaging/...)
+    if (window.location.href.includes("/messaging/")) {
+      console.log("[InHubFlow] Interfaz de mensajería detectada. Esperando cuadro de redacción...");
+      const composeBox = await findComposeBox(15000);
+      if (!composeBox) {
+        return {
+          status: "failed",
+          error: "No se encontró el cuadro de redacción en la pantalla de mensajes de LinkedIn",
+        };
+      }
+      return await typeAndSendMessage(composeBox, task.body);
+    }
+
+    // CASO 2: Estamos en la página de perfil (/in/...)
     await sleep(randomBetween(2000, 3000));
     await simulateHumanScroll();
 
-    // Helper to get only profile action buttons (strictly excluding global nav and bottom-right messaging overlay)
     function getProfileButtons() {
       const topCard = document.querySelector(".pv-top-card, .pvs-profile-actions, .pv-top-card-v2-ctas, main section") || document.querySelector("main, div[role='main']");
       if (!topCard) return [];
@@ -194,14 +313,12 @@
       });
     }
 
-    // Wait up to 8 seconds for profile buttons to render
     let buttons = getProfileButtons();
     for (let attempt = 0; attempt < 16 && buttons.length < 2; attempt++) {
       await sleep(500);
       buttons = getProfileButtons();
     }
 
-    // Helper matcher for Message button on the profile
     function isMsgButton(btn) {
       if (btn.closest("#global-nav, .global-nav, aside#msg-overlay, .msg-overlay-container, footer")) {
         return false;
@@ -209,12 +326,12 @@
       const txt = (btn.innerText || "").trim().toLowerCase();
       const aria = (btn.getAttribute("aria-label") || "").trim().toLowerCase();
 
-      // Exclude locked InMail buttons
+      // Excluir botones InMail bloqueados
       if (btn.querySelector("svg[data-test-icon*='lock'], .artdeco-button__icon--lock")) {
         return false;
       }
 
-      // Exclude plural inbox tabs ("mensajes", "messages")
+      // Excluir pestañas de la bandeja
       if (txt === "mensajes" || txt === "messages" || txt === "mensagens") return false;
       if (aria === "mensajes" || aria === "messages" || aria === "mensagens") return false;
 
@@ -235,153 +352,98 @@
       );
     }
 
-    // Helper: Poll for active compose box across DOM (up to timeoutMs)
-    async function findComposeBox(timeoutMs = 15000) {
-      const startTime = Date.now();
-      while (Date.now() - startTime < timeoutMs) {
-        // Expand any minimized bubbles in the bottom-right overlay
-        const minimized = document.querySelectorAll(
-          ".msg-overlay-conversation-bubble--is-minimized, aside#msg-overlay.msg-overlay-container--is-minimized, [data-control-name='overlay.expand']"
-        );
-        for (const b of Array.from(minimized)) {
-          const btn = b.querySelector("button, header") || b;
-          btn.click();
-        }
-
-        // Search for any active contenteditable or textarea compose element
-        const candidate = document.querySelector(`
-          .msg-overlay-conversation-bubble div.msg-form__contenteditable[contenteditable='true'],
-          .msg-overlay-conversation-bubble div.msg-form__contenteditable,
-          .msg-overlay-conversation-bubble [contenteditable='true'],
-          div.msg-form__contenteditable[contenteditable='true'],
-          div.msg-form__contenteditable,
-          div[role='textbox'].msg-form__message-texteditor,
-          div[role='textbox'][contenteditable='true'],
-          div[role='textbox'],
-          form.msg-form [contenteditable='true'],
-          form.msg-form textarea,
-          .msg-thread [contenteditable='true'],
-          textarea.msg-form__textarea,
-          textarea[name='message'],
-          [contenteditable='true']
-        `);
-
-        if (candidate) {
-          return candidate;
-        }
-
-        await sleep(500);
-      }
-      return null;
+    // Comprobar si ya hay una burbuja de redacción abierta
+    let composeBox = await findComposeBox(1500);
+    if (composeBox) {
+      return await typeAndSendMessage(composeBox, task.body);
     }
 
-    // Check if a conversation bubble is ALREADY open and ready
-    let composeBox = await findComposeBox(1500);
+    let msgBtn = buttons.find(isMsgButton);
 
-    if (!composeBox) {
-      let msgBtn = buttons.find(isMsgButton);
+    if (!msgBtn) {
+      const moreBtn = buttons.find((btn) => {
+        const txt = (btn.innerText || "").trim().toLowerCase();
+        const aria = (btn.getAttribute("aria-label") || "").trim().toLowerCase();
+        return (
+          txt === "más" ||
+          txt === "more" ||
+          txt === "mais" ||
+          aria.includes("más acciones") ||
+          aria.includes("more actions") ||
+          aria.includes("mais ações")
+        );
+      });
 
-      // If not directly visible in top-card, check the "Más..." ("More...") dropdown
-      if (!msgBtn) {
-        const moreBtn = buttons.find((btn) => {
-          const txt = (btn.innerText || "").trim().toLowerCase();
-          const aria = (btn.getAttribute("aria-label") || "").trim().toLowerCase();
-          return (
-            txt === "más" ||
-            txt === "more" ||
-            txt === "mais" ||
-            aria.includes("más acciones") ||
-            aria.includes("more actions") ||
-            aria.includes("mais ações")
-          );
-        });
-
-        if (moreBtn) {
-          moreBtn.click();
-          await sleep(randomBetween(800, 1400));
-          const dropdownItems = Array.from(document.querySelectorAll("div.artdeco-dropdown__content button, div.artdeco-dropdown__content a, [role='menuitem']"));
-          msgBtn = dropdownItems.find(isMsgButton);
-        }
+      if (moreBtn) {
+        moreBtn.click();
+        await sleep(randomBetween(800, 1400));
+        const dropdownItems = Array.from(document.querySelectorAll("div.artdeco-dropdown__content button, div.artdeco-dropdown__content a, [role='menuitem']"));
+        msgBtn = dropdownItems.find(isMsgButton);
       }
+    }
 
-      if (!msgBtn) {
-        // Diagnostic check: is the contact 2nd/3rd degree or pending?
-        const hasConnect = buttons.some((b) => {
-          const t = (b.innerText || "").toLowerCase();
-          return t === "conectar" || t === "connect" || t === "seguir" || t === "follow";
-        });
-        const hasPending = buttons.some((b) => {
-          const t = (b.innerText || "").toLowerCase();
-          const a = (b.getAttribute("aria-label") || "").toLowerCase();
-          return t.includes("pendiente") || t.includes("pending") || a.includes("pendiente") || a.includes("pending");
-        });
+    if (!msgBtn) {
+      const hasConnect = buttons.some((b) => {
+        const t = (b.innerText || "").toLowerCase();
+        return t === "conectar" || t === "connect" || t === "seguir" || t === "follow";
+      });
+      const hasPending = buttons.some((b) => {
+        const t = (b.innerText || "").toLowerCase();
+        const a = (b.getAttribute("aria-label") || "").toLowerCase();
+        return t.includes("pendiente") || t.includes("pending") || a.includes("pendiente") || a.includes("pending");
+      });
 
-        if (hasConnect || hasPending) {
-          return {
-            status: "failed",
-            error: `${task.fullName || "El contacto"} aún no es contacto de 1er grado (invitación pendiente o sin conectar). LinkedIn solo permite mensajes directos a contactos aceptados.`,
-          };
-        }
-
+      if (hasConnect || hasPending) {
         return {
           status: "failed",
-          error: "Botón de enviar mensaje no disponible en el perfil",
+          error: `${task.fullName || "El contacto"} aún no es contacto de 1er grado (invitación pendiente o sin conectar). LinkedIn solo permite mensajes directos a contactos aceptados.`,
         };
       }
 
-      // Click the profile message button
-      msgBtn.scrollIntoView({ behavior: "smooth", block: "center" });
-      await sleep(randomBetween(500, 800));
-      msgBtn.focus();
-      msgBtn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
-      msgBtn.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
-      msgBtn.click();
-      const inner = msgBtn.querySelector("span, span.artdeco-button__text");
-      if (inner) inner.click();
-
-      // Poll for the compose box to open
-      composeBox = await findComposeBox(15000);
-    }
-
-    if (!composeBox) {
       return {
         status: "failed",
-        error: "El cuadro de redacción de mensaje no se abrió tras hacer clic en Enviar mensaje",
+        error: "Botón de enviar mensaje no disponible en el perfil",
       };
     }
 
-    composeBox.focus();
-    composeBox.click();
-    await sleep(500);
-
-    // Type the message with human typing delay
-    await humanType(composeBox, task.body);
-    await sleep(randomBetween(600, 1000));
-
-    // Force React to recognize the typed content
-    composeBox.dispatchEvent(new Event("input", { bubbles: true }));
-    composeBox.dispatchEvent(new Event("change", { bubbles: true }));
-    try {
-      composeBox.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText" }));
-    } catch (e) {}
-
-    // Send Strategy 1: Keyboard shortcut (Control+Enter)
-    composeBox.focus();
-    await sleep(200);
-    composeBox.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, which: 13, ctrlKey: true, bubbles: true }));
-    composeBox.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", keyCode: 13, which: 13, ctrlKey: true, bubbles: true }));
-    await sleep(800);
-
-    // Send Strategy 2: Click the Send button if still present
-    const container = composeBox.closest("form") || composeBox.closest(".msg-convo-wrapper") || composeBox.closest(".msg-overlay-conversation-bubble") || composeBox.closest(".msg-thread") || document;
-    const sendBtn = container.querySelector("button[type='submit'], button.msg-form__send-button, button[data-control-name='send']");
-    if (sendBtn && !sendBtn.disabled) {
-      sendBtn.click();
+    // Si el botón tiene enlace directo a mensajería (/messaging/thread/new/...)
+    const directHref = msgBtn.getAttribute("href") || (msgBtn.tagName === "A" ? msgBtn.href : null);
+    if (directHref && (directHref.includes("/messaging/") || directHref.includes("/thread/"))) {
+      const fullMessagingUrl = directHref.startsWith("http") ? directHref : "https://www.linkedin.com" + directHref;
+      console.log("[InHubFlow] Botón de mensaje redirige a pantalla completa:", fullMessagingUrl);
+      return {
+        status: "navigate_to_messaging",
+        nextUrl: fullMessagingUrl,
+      };
     }
-    await sleep(randomBetween(1500, 2500));
+
+    // Clic en el botón si no es enlace directo
+    msgBtn.scrollIntoView({ behavior: "smooth", block: "center" });
+    await sleep(randomBetween(500, 800));
+    msgBtn.focus();
+    msgBtn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+    msgBtn.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
+    msgBtn.click();
+    const inner = msgBtn.querySelector("span, span.artdeco-button__text");
+    if (inner) inner.click();
+
+    composeBox = await findComposeBox(8000);
+    if (composeBox) {
+      return await typeAndSendMessage(composeBox, task.body);
+    }
+
+    // Si tras el clic navegó a mensajería
+    await sleep(2000);
+    if (window.location.href.includes("/messaging/")) {
+      composeBox = await findComposeBox(10000);
+      if (composeBox) {
+        return await typeAndSendMessage(composeBox, task.body);
+      }
+    }
 
     return {
-      status: "completed",
+      status: "failed",
+      error: "El cuadro de redacción de mensaje no se abrió tras hacer clic en Enviar mensaje",
     };
   }
 
