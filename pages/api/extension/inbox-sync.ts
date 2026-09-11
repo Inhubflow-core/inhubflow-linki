@@ -71,7 +71,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       id, account_id, target_id, run_id, workflow_id,
       external_thread_id, external_message_id, direction,
       sender_external_id, sender_name, body, sent_at, identity_mode, metadata_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'extension_sync', ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(account_id, external_thread_id, external_message_id) DO NOTHING
   `);
 
@@ -136,6 +136,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       senderProfileUrl: obs.senderProfileUrl,
     });
 
+    const hasUrn = Boolean(obs.senderMessagingUrn || obs.senderExternalId || target.messaging_urn);
+    const hasUrl = Boolean(obs.senderProfileUrl || target.linkedin_url);
+    const identityMode = hasUrn && hasUrl ? "messaging_urn+profile_url" : (hasUrl ? "profile_url" : "messaging_urn");
+
     try {
       const res = insert.run(
         randomUUID(),
@@ -150,6 +154,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         obs.senderName || target.full_name,
         obs.body.trim(),
         sentAt,
+        identityMode,
         metadata
       );
 
