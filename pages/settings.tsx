@@ -29,6 +29,8 @@ interface LiAccount {
   timezone: string; working_days: string;
   created_at: string;
   active_run_count: number;
+  extension_active?: number;
+  last_extension_ping_at?: string;
 }
 
 interface EmailAccount {
@@ -55,6 +57,7 @@ export const getServerSideProps: GetServerSideProps = async ({ query }) => {
     .prepare(
       `SELECT a.id, a.name, a.email, a.is_authenticated, a.daily_connection_limit, a.daily_message_limit, a.daily_inmail_limit,
               a.active_hours_start, a.active_hours_end, a.timezone, a.working_days, a.created_at,
+              a.extension_active, a.last_extension_ping_at,
               (SELECT COUNT(*) FROM runs r WHERE r.account_id = a.id AND r.status IN ('running', 'paused')) AS active_run_count
        FROM accounts a ORDER BY a.created_at DESC`
     )
@@ -465,6 +468,15 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${a.is_authenticated ? "bg-success/15 text-success" : "bg-base-300 text-base-content/40"}`}>
                   {a.is_authenticated ? <><RiCheckLine size={10} /> Auth</> : "Unauth"}
                 </span>
+                {a.extension_active ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-500/15 text-emerald-500" title={`Motor en segundo plano activo. Último reporte: ${a.last_extension_ping_at || 'Reciente'}`}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Motor PC Activo
+                  </span>
+                ) : (
+                  <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-base-300/60 text-base-content/50" title="Instala la extensión InHubFlow Connect para ejecutar tareas desde tu IP residencial">
+                    Extensión Inactiva
+                  </span>
+                )}
                 <button
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
                   onClick={() => openAuthModal(a)}

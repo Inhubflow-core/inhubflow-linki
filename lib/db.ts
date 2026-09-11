@@ -708,6 +708,9 @@ function runMigrations(db: Database.Database) {
       expires_at_ms INTEGER NOT NULL,
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+    // Extension worker tracking: registers client-side extension status and ping
+    "ALTER TABLE accounts ADD COLUMN extension_active INTEGER DEFAULT 0",
+    "ALTER TABLE accounts ADD COLUMN last_extension_ping_at TEXT",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }

@@ -1,14 +1,23 @@
 {
   "manifest_version": 3,
   "name": "InHubFlow Connect",
-  "version": "1.0.0",
-  "description": "Extensión complementaria oficial para sincronizar y conectar de forma segura tu espacio de trabajo de InHubFlow con tu perfil profesional sin compartir contraseñas.",
+  "version": "1.1.0",
+  "description": "Extensión complementaria oficial para sincronizar tu cuenta profesional y ejecutar tareas en segundo plano con InHubFlow.",
   "permissions": [
-    "cookies"
+    "cookies",
+    "storage",
+    "alarms",
+    "tabs",
+    "scripting"
   ],
   "host_permissions": [
-    "*://*.linkedin.com/*"
+    "*://*.linkedin.com/*",
+    "https://*.inhubflow.online/*",
+    "http://localhost:*/*"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_popup": "popup.html",
     "default_title": "InHubFlow Connect",
