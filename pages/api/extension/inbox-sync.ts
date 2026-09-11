@@ -4,6 +4,15 @@ import { randomUUID } from "crypto";
 import { canonicalLinkedInVanity } from "@/lib/linkedin/connection-reconciliation";
 import { captureSdrInboundMessage } from "@/lib/sdr-agent/repository";
 
+function normalizeString(str?: string | null): string {
+  if (!str) return "";
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     res.setHeader("Allow", ["POST"]);
@@ -62,7 +71,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       id, account_id, target_id, run_id, workflow_id,
       external_thread_id, external_message_id, direction,
       sender_external_id, sender_name, body, sent_at, identity_mode, metadata_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'inbound', ?, ?, ?, ?, 'extension_sync', ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'extension_sync', ?)
     ON CONFLICT(account_id, external_thread_id, external_message_id) DO NOTHING
   `);
 
@@ -90,17 +99,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   for (const obs of observations) {
     if (!obs.body || typeof obs.body !== "string" || !obs.body.trim()) continue;
-    if (obs.direction === "outbound") continue;
 
+    const direction = obs.direction === "outbound" ? "outbound" : "inbound";
     const senderVanity = canonicalLinkedInVanity(obs.senderProfileUrl);
-    const senderName = (obs.senderName || "").trim().toLowerCase();
+    const senderName = normalizeString(obs.senderName);
     const senderUrn = (obs.senderMessagingUrn || obs.senderExternalId || "").trim();
+    const explicitTargetId = typeof obs.targetId === "string" ? obs.targetId.trim() : null;
 
     // Match candidate target
     const target = targets.find((t) => {
-      if (senderVanity && canonicalLinkedInVanity(t.linkedin_url) === senderVanity) return true;
-      if (senderName && t.full_name && t.full_name.trim().toLowerCase() === senderName) return true;
-      if (senderUrn && t.messaging_urn && t.messaging_urn.trim() === senderUrn) return true;
+      if (explicitTargetId && t.id === explicitTargetId) return true;
+      if (senderVanity) {
+        const tVanity = canonicalLinkedInVanity(t.linkedin_url);
+        if (tVanity && normalizeString(tVanity) === normalizeString(senderVanity)) return true;
+      }
+      if (senderName && t.full_name) {
+        const tName = normalizeString(t.full_name);
+        if (tName === senderName || tName.includes(senderName) || senderName.includes(tName)) return true;
+      }
+      if (senderUrn && t.messaging_urn && (t.messaging_urn.trim() === senderUrn || senderUrn.includes(t.messaging_urn.trim()))) {
+        return true;
+      }
       return false;
     });
 
@@ -126,6 +145,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         target.workflow_id,
         threadId,
         messageId,
+        direction,
         obs.senderExternalId || senderUrn || null,
         obs.senderName || target.full_name,
         obs.body.trim(),
@@ -135,29 +155,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (res.changes === 1) {
         captured++;
-        updateTargetReply.run(sentAt, accountId, target.id);
-        stopTracks.run(target.id, accountId);
+        if (direction === "inbound") {
+          updateTargetReply.run(sentAt, accountId, target.id);
+          stopTracks.run(target.id, accountId);
 
-        try {
-          captureSdrInboundMessage(db, {
-            eventId: `linkedin-campaign:${accountId}:${messageId}`,
-            channel: "linkedin",
-            targetId: target.id,
-            accountId,
-            externalThreadId: threadId,
-            externalMessageId: messageId,
-            senderExternalId: obs.senderExternalId || senderUrn || null,
-            senderName: obs.senderName || target.full_name,
-            body: obs.body.trim(),
-            receivedAt: sentAt,
-            metadata: {
-              source: "extension_inbox_sync",
-              campaignRunId: target.run_id,
-              campaignWorkflowId: target.workflow_id,
-            },
-          });
-        } catch (sdrErr) {
-          console.warn("[inbox-sync] Non-blocking SDR error:", sdrErr);
+          try {
+            captureSdrInboundMessage(db, {
+              eventId: `linkedin-campaign:${accountId}:${messageId}`,
+              channel: "linkedin",
+              targetId: target.id,
+              accountId,
+              externalThreadId: threadId,
+              externalMessageId: messageId,
+              senderExternalId: obs.senderExternalId || senderUrn || null,
+              senderName: obs.senderName || target.full_name,
+              body: obs.body.trim(),
+              receivedAt: sentAt,
+              metadata: {
+                source: "extension_inbox_sync",
+                campaignRunId: target.run_id,
+                campaignWorkflowId: target.workflow_id,
+              },
+            });
+          } catch (sdrErr) {
+            console.warn("[inbox-sync] Non-blocking SDR error:", sdrErr);
+          }
         }
       } else {
         duplicates++;

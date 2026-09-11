@@ -5,6 +5,22 @@
 
   console.log("[InHubFlow] Content runner initialized on:", window.location.href);
 
+  // Si estamos en la plataforma InHubFlow, habilitar el puente de comunicación con la UI
+  const hostname = window.location.hostname;
+  if (hostname.includes("inhubflow") || hostname === "localhost" || hostname === "127.0.0.1") {
+    console.log("[InHubFlow Connect] Bridge activo en la plataforma InHubFlow.");
+    window.__inhubflow_extension_active = true;
+    window.dispatchEvent(new CustomEvent("inhubflow_extension_ready", { detail: { active: true, version: "1.2.0" } }));
+
+    window.addEventListener("inhubflow_sync_linkedin", (e) => {
+      console.log("[InHubFlow Connect] Disparando sincronización forzada desde UI:", e.detail);
+      chrome.runtime.sendMessage({ action: "sync_inbox_now", accountId: e.detail?.accountId }, (res) => {
+        window.dispatchEvent(new CustomEvent("inhubflow_sync_completed", { detail: res }));
+      });
+    });
+    return;
+  }
+
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
@@ -485,4 +501,64 @@
   });
 
   console.log("[InHubFlow] Content runner ready to receive tasks");
+
+  // Lector automático de mensajes si el usuario tiene LinkedIn Mensajería abierta
+  if (window.location.href.includes("/messaging")) {
+    console.log("[InHubFlow] Monitor de mensajería activo en esta pestaña.");
+    let lastScrapedHash = "";
+
+    function scrapeActiveThread() {
+      try {
+        const linkEl = document.querySelector(".msg-title-bar a[href*='/in/'], .msg-entity-lockup a[href*='/in/'], a.msg-thread__link-to-profile, a[href*='/in/']");
+        const titleEl = document.querySelector(".msg-title-bar__title, .msg-entity-lockup__entity-title, h2");
+        if (!linkEl && !titleEl) return;
+
+        const senderProfileUrl = linkEl ? linkEl.href.split("?")[0] : null;
+        const senderName = titleEl ? titleEl.innerText.trim() : (linkEl ? linkEl.innerText.trim() : null);
+
+        const items = document.querySelectorAll(".msg-s-message-list__event, .msg-s-event-listitem, .msg-s-message-group");
+        if (!items || items.length === 0) return;
+
+        const messages = [];
+        for (const it of items) {
+          const bodyEl = it.querySelector(".msg-s-event-listitem__body, .msg-s-message-group__message, p");
+          if (!bodyEl) continue;
+          const body = bodyEl.innerText.trim();
+          if (!body) continue;
+
+          const isSelf = it.classList.contains("msg-s-message-listitem--self") || 
+                         it.classList.contains("msg-s-message-group--self") ||
+                         it.closest(".msg-s-message-listitem--self") !== null;
+
+          const timeEl = it.querySelector("time");
+          const timeStr = timeEl ? (timeEl.getAttribute("datetime") || timeEl.innerText.trim()) : null;
+
+          messages.push({
+            externalThreadId: window.location.href,
+            externalMessageId: `dom_${it.getAttribute("id") || (messages.length + "_" + body.slice(0, 10))}`,
+            direction: isSelf ? "outbound" : "inbound",
+            body,
+            receivedAt: timeStr || new Date().toISOString(),
+            senderName: isSelf ? "Tú" : senderName,
+            senderProfileUrl: isSelf ? null : senderProfileUrl,
+          });
+        }
+
+        const hash = messages.map((m) => m.body).join("|");
+        if (messages.length > 0 && hash !== lastScrapedHash) {
+          lastScrapedHash = hash;
+          console.log(`[InHubFlow] Hilo activo detectado con ${messages.length} mensajes. Sincronizando con la plataforma...`);
+          chrome.runtime.sendMessage({
+            action: "ingest_dom_messages",
+            messages,
+          });
+        }
+      } catch (err) {
+        // Silencioso
+      }
+    }
+
+    setInterval(scrapeActiveThread, 4000);
+    setTimeout(scrapeActiveThread, 1500);
+  }
 })();

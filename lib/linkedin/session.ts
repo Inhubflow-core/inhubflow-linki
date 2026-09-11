@@ -298,9 +298,9 @@ export async function closeSession(accountId: string): Promise<void> {
 export async function markNeedsReauth(accountId: string): Promise<void> {
   const db = getDb();
   try {
-    const acc = db.prepare("SELECT extension_active FROM accounts WHERE id = ?").get(accountId) as { extension_active?: number } | undefined;
-    if (acc?.extension_active === 1) {
-      console.warn(`[session] account ${accountId} tiene extensión activa; preservando autenticación.`);
+    const acc = db.prepare("SELECT extension_active, cookies_json FROM accounts WHERE id = ?").get(accountId) as { extension_active?: number; cookies_json?: string } | undefined;
+    if (acc?.extension_active === 1 || (acc?.cookies_json && acc.cookies_json.length > 50)) {
+      console.warn(`[session] account ${accountId} opera mediante extensión residencial / cookies preservadas; manteniendo is_authenticated = 1.`);
       return;
     }
   } catch { /* ignore */ }

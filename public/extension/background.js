@@ -51,12 +51,12 @@ async function updateWorkerStatus(status, error = null) {
 
 // Inicialización de Alarmas
 chrome.runtime.onInstalled.addListener(() => {
-  console.log("[InHubFlow] Extensión instalada/actualizada. Configurando alarma periódica...");
+  console.log("[InHubFlow] Extensión instalada/actualizada v1.2.0. Configurando alarma...");
   chrome.alarms.create(ALARM_NAME, {
     periodInMinutes: TICK_INTERVAL_MINUTES,
   });
   // Tick inicial
-  setTimeout(() => runWorkerCycle("instalacion"), 3000);
+  setTimeout(() => runWorkerCycle("instalacion"), 2000);
 });
 
 chrome.runtime.onStartup.addListener(() => {
@@ -72,13 +72,43 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
-// Sincroniza mensajes entrantes de LinkedIn directamente con la sesión de Chrome (IP residencial)
-async function syncLinkedInInbox(serverUrl, accountId) {
-  if (!accountId) return;
+// Resuelve CSRF de LinkedIn de manera infalible
+async function getLinkedInCsrf() {
+  try {
+    const allCookies = await chrome.cookies.getAll({ domain: "linkedin.com" });
+    const jsession = allCookies.find((c) => c && c.name && c.name.toLowerCase() === "jsessionid");
+    if (jsession?.value) {
+      return jsession.value.replace(/"/g, "").trim();
+    }
+  } catch (err) {
+    console.warn("[InHubFlow ServiceWorker] Error obteniendo cookies por dominio:", err);
+  }
+
   try {
     const cookie = await chrome.cookies.get({ url: "https://www.linkedin.com", name: "JSESSIONID" });
-    const csrf = (cookie?.value || "").replace(/"/g, "");
-    if (!csrf) return;
+    if (cookie?.value) {
+      return cookie.value.replace(/"/g, "").trim();
+    }
+  } catch (err) {
+    console.warn("[InHubFlow ServiceWorker] Error obteniendo cookie por url:", err);
+  }
+
+  return null;
+}
+
+// Sincroniza mensajes entrantes y salientes de LinkedIn directamente con la sesión de Chrome (IP residencial)
+async function syncLinkedInInbox(serverUrl, accountId) {
+  if (!accountId) {
+    console.warn("[InHubFlow ServiceWorker] syncLinkedInInbox: Falta accountId.");
+    return { ok: false, error: "Missing accountId" };
+  }
+
+  try {
+    const csrf = await getLinkedInCsrf();
+    if (!csrf) {
+      console.warn("[InHubFlow ServiceWorker] No se pudo obtener JSESSIONID (CSRF). ¿Sesión activa de LinkedIn?");
+      return { ok: false, error: "No CSRF token" };
+    }
 
     const headers = {
       accept: "application/vnd.linkedin.normalized+json+2.1",
@@ -86,15 +116,29 @@ async function syncLinkedInInbox(serverUrl, accountId) {
       "csrf-token": csrf,
     };
 
+    // 0. Identificar el perfil del usuario autenticado (Roberto)
+    let myUrn = null;
+    let myPublicId = null;
+    try {
+      const meRes = await fetch("https://www.linkedin.com/voyager/api/me", { headers, credentials: "include" });
+      if (meRes.ok) {
+        const meData = await meRes.json();
+        myUrn = meData.miniProfile?.entityUrn || meData.entityUrn || null;
+        myPublicId = meData.miniProfile?.publicIdentifier || null;
+      }
+    } catch {
+      // Continuar con fallback
+    }
+
     // 1. Obtener lista de conversaciones recientes
-    const convRes = await fetch("https://www.linkedin.com/voyager/api/messaging/conversations?keyVersion=LEGACY_INBOX&q=participants&start=0&count=15", {
-      headers,
-      credentials: "include",
-    });
+    const convRes = await fetch(
+      "https://www.linkedin.com/voyager/api/messaging/conversations?keyVersion=LEGACY_INBOX&q=participants&start=0&count=20",
+      { headers, credentials: "include" }
+    );
 
     if (!convRes.ok) {
       console.warn("[InHubFlow ServiceWorker] Voyager conversations status:", convRes.status);
-      return;
+      return { ok: false, error: `Voyager HTTP ${convRes.status}` };
     }
 
     const convPayload = await convRes.json();
@@ -103,18 +147,43 @@ async function syncLinkedInInbox(serverUrl, accountId) {
     const allRecords = [...included, ...elements];
 
     // Mapa de MiniProfiles para asociar nombre y URL pública a cada URN
-    const profiles = new Map();
+    const miniProfiles = new Map();
+    const memberToMiniProfile = new Map();
+
     for (const r of allRecords) {
       if (!r) continue;
       const urn = r.entityUrn || r.objectUrn;
-      if (urn && (r.$type?.includes("MiniProfile") || r.publicIdentifier || r.firstName)) {
-        profiles.set(urn, {
-          name: `${r.firstName || ""} ${r.lastName || ""}`.trim(),
-          publicIdentifier: r.publicIdentifier || null,
-          profileUrl: r.publicIdentifier ? `https://www.linkedin.com/in/${r.publicIdentifier}` : null,
+      if (!urn) continue;
+
+      if (r.$type?.includes("MiniProfile") || r.publicIdentifier || (r.firstName && r.lastName)) {
+        const publicIdentifier = r.publicIdentifier || "";
+        const name = `${r.firstName || ""} ${r.lastName || ""}`.trim();
+        miniProfiles.set(urn, {
+          name,
+          publicIdentifier,
+          profileUrl: publicIdentifier ? `https://www.linkedin.com/in/${publicIdentifier}` : null,
           urn,
         });
       }
+
+      if (r.$type?.includes("MessagingMember") || urn.includes("messagingMember")) {
+        const miniUrn = r["*miniProfile"] || r.miniProfile;
+        if (miniUrn) {
+          memberToMiniProfile.set(urn, miniUrn);
+        }
+      }
+    }
+
+    function resolveProfile(urnOrObj) {
+      if (!urnOrObj) return null;
+      const urn = typeof urnOrObj === "string" ? urnOrObj : (urnOrObj.entityUrn || urnOrObj["*messagingMember"] || urnOrObj.objectUrn || "");
+      if (!urn) return null;
+      if (miniProfiles.has(urn)) return miniProfiles.get(urn);
+      if (memberToMiniProfile.has(urn)) {
+        const miniUrn = memberToMiniProfile.get(urn);
+        if (miniProfiles.has(miniUrn)) return miniProfiles.get(miniUrn);
+      }
+      return null;
     }
 
     // 2. Extraer hilos y buscar eventos en los hilos más recientes
@@ -123,16 +192,32 @@ async function syncLinkedInInbox(serverUrl, accountId) {
       (r) => r && (r.$type === "com.linkedin.voyager.messaging.Conversation" || (r.entityUrn && r.entityUrn.includes("msg_conversation")))
     );
 
-    for (let i = 0; i < Math.min(convItems.length, 10); i++) {
+    console.log(`[InHubFlow ServiceWorker] Analizando ${convItems.length} hilos de conversación...`);
+
+    for (let i = 0; i < Math.min(convItems.length, 12); i++) {
       const conv = convItems[i];
       const convUrn = conv.entityUrn || "";
       const match = convUrn.match(/urn:li:msg_conversation:\((?:[^,]+),(.+)\)$/);
       const threadPathId = match ? match[1] : (conv.id || convUrn);
       if (!threadPathId) continue;
 
+      // Identificar al otro participante de este hilo
+      let otherParticipant = null;
+      const participants = conv.participants || conv["*participants"] || [];
+      for (const p of participants) {
+        const prof = resolveProfile(p);
+        if (prof) {
+          const isMe = (myPublicId && prof.publicIdentifier === myPublicId) || (myUrn && prof.urn === myUrn);
+          if (!isMe) {
+            otherParticipant = prof;
+            break;
+          }
+        }
+      }
+
       try {
         const evRes = await fetch(
-          `https://www.linkedin.com/voyager/api/messaging/conversations/${encodeURIComponent(threadPathId)}/events?start=0&count=25`,
+          `https://www.linkedin.com/voyager/api/messaging/conversations/${encodeURIComponent(threadPathId)}/events?start=0&count=30`,
           { headers, credentials: "include" }
         );
 
@@ -145,13 +230,20 @@ async function syncLinkedInInbox(serverUrl, accountId) {
           for (const r of evAll) {
             if (!r) continue;
             const urn = r.entityUrn || r.objectUrn;
-            if (urn && (r.$type?.includes("MiniProfile") || r.publicIdentifier || r.firstName)) {
-              profiles.set(urn, {
-                name: `${r.firstName || ""} ${r.lastName || ""}`.trim(),
-                publicIdentifier: r.publicIdentifier || null,
-                profileUrl: r.publicIdentifier ? `https://www.linkedin.com/in/${r.publicIdentifier}` : null,
+            if (!urn) continue;
+            if (r.$type?.includes("MiniProfile") || r.publicIdentifier || (r.firstName && r.lastName)) {
+              const publicIdentifier = r.publicIdentifier || "";
+              const name = `${r.firstName || ""} ${r.lastName || ""}`.trim();
+              miniProfiles.set(urn, {
+                name,
+                publicIdentifier,
+                profileUrl: publicIdentifier ? `https://www.linkedin.com/in/${publicIdentifier}` : null,
                 urn,
               });
+            }
+            if (r.$type?.includes("MessagingMember") || urn.includes("messagingMember")) {
+              const miniUrn = r["*miniProfile"] || r.miniProfile;
+              if (miniUrn) memberToMiniProfile.set(urn, miniUrn);
             }
           }
 
@@ -166,18 +258,24 @@ async function syncLinkedInInbox(serverUrl, accountId) {
             const body = r.eventContent?.attributedBody?.text || r.body || "";
             if (!body || !body.trim()) continue;
 
-            const fromUrn = typeof r.from === "string" ? r.from : (r.from?.entityUrn || r.from?.objectUrn);
-            const senderProfile = fromUrn ? profiles.get(fromUrn) : null;
+            const fromUrn = typeof r.from === "string" ? r.from : (r.from?.entityUrn || r.from?.["*messagingMember"] || r.from?.objectUrn);
+            const senderProfile = resolveProfile(fromUrn);
+
+            const isSenderMe =
+              (myPublicId && senderProfile?.publicIdentifier === myPublicId) ||
+              (myUrn && (fromUrn === myUrn || senderProfile?.urn === myUrn));
+
+            const effectiveProfile = isSenderMe ? senderProfile : (senderProfile || otherParticipant);
 
             observations.push({
               externalThreadId: convUrn,
               externalMessageId: r.entityUrn || r.id || `${convUrn}_${r.createdAt || Date.now()}`,
-              direction: "inbound",
+              direction: isSenderMe ? "outbound" : "inbound",
               body: body.trim(),
               receivedAt: r.createdAt ? new Date(r.createdAt).toISOString() : new Date().toISOString(),
               senderExternalId: fromUrn || null,
-              senderName: senderProfile?.name || null,
-              senderProfileUrl: senderProfile?.profileUrl || (senderProfile?.publicIdentifier ? `https://www.linkedin.com/in/${senderProfile.publicIdentifier}` : null),
+              senderName: effectiveProfile?.name || null,
+              senderProfileUrl: effectiveProfile?.profileUrl || null,
               senderMessagingUrn: fromUrn || null,
               providerEventId: r.entityUrn || r.id || null,
             });
@@ -197,9 +295,14 @@ async function syncLinkedInInbox(serverUrl, accountId) {
       });
       const syncData = await syncRes.json();
       console.log("[InHubFlow ServiceWorker] Respuesta del servidor:", syncData);
+      return { ok: true, count: observations.length, syncData };
+    } else {
+      console.log("[InHubFlow ServiceWorker] No se encontraron mensajes nuevos en este ciclo.");
+      return { ok: true, count: 0 };
     }
   } catch (err) {
     console.warn("[InHubFlow ServiceWorker] Error en sincronización de inbox:", err);
+    return { ok: false, error: err.message };
   }
 }
 
@@ -221,10 +324,10 @@ async function isUserActivelyBrowsingLinkedIn() {
 
 // Espera a que una pestaña termine de cargar
 function waitForTabComplete(tabId, timeoutMs = 30000) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const timeout = setTimeout(() => {
       chrome.tabs.onUpdated.removeListener(listener);
-      resolve(false); // Resolvemos en falso si tardó mucho para no colapsar
+      resolve(false);
     }, timeoutMs);
 
     function listener(updatedTabId, changeInfo) {
@@ -292,7 +395,8 @@ async function runWorkerCycle(triggerSource = "manual") {
     return { success: false, reason: "already_running" };
   }
 
-  const { serverUrl, enabled, accountId, stats } = await getStorageData();
+  // LET (no const) para permitir reasignar si el heartbeat o storage actualizan accountId
+  let { serverUrl, enabled, accountId, stats } = await getStorageData();
 
   if (!enabled) {
     await updateWorkerStatus("pausado");
@@ -318,7 +422,7 @@ async function runWorkerCycle(triggerSource = "manual") {
         const cookie = await chrome.cookies.get({ url: "https://www.linkedin.com", name: "li_at" });
         if (cookie && cookie.value) liAtVal = cookie.value.trim();
       }
-    } catch (cookieErr) {
+    } catch {
       // Ignorar
     }
 
@@ -350,7 +454,7 @@ async function runWorkerCycle(triggerSource = "manual") {
         await syncLinkedInInbox(serverUrl, accountId);
       }
     } catch (inboxSyncErr) {
-      // No bloqueante
+      console.warn("[InHubFlow ServiceWorker] Error en sincronización de inbox:", inboxSyncErr);
     }
 
     // 2. Solicitar Tarea a la Plataforma
@@ -362,7 +466,7 @@ async function runWorkerCycle(triggerSource = "manual") {
       taskResponse = await fetch(taskEndpoint, {
         method: "GET",
         headers: {
-          "Accept": "application/json",
+          Accept: "application/json",
           ...(accountId ? { "x-account-id": accountId } : {}),
           ...(liAtVal ? { "x-linkedin-token": liAtVal } : {}),
         },
@@ -398,103 +502,82 @@ async function runWorkerCycle(triggerSource = "manual") {
     const task = taskData.task;
     if (!task) {
       const reason = taskData.reason || "queue_empty";
-      console.log(`[InHubFlow ServiceWorker] Sin tareas pendientes (${reason}).`);
-      await updateWorkerStatus(reason === "queue_empty" ? "en_espera" : "esperando_condicion");
+      console.log(`[InHubFlow ServiceWorker] No hay tareas pendientes (${reason}).`);
+      await updateWorkerStatus("en_espera", reason);
       isProcessingTask = false;
-      return { success: true, task: null, reason };
+      return { success: true, message: "No tasks pending" };
     }
 
-    console.log(`[InHubFlow ServiceWorker] Tarea recibida: ${task.type} para ${task.fullName} (${task.targetUrl})`);
-    await updateWorkerStatus(`ejecutando_${task.type}`, `Procesando ${task.fullName}...`);
+    console.log(`[InHubFlow ServiceWorker] Tarea recibida: ${task.type} para ${task.fullName} (${task.profileUrl})`);
+    await updateWorkerStatus(`ejecutando_${task.type}`, `Procesando: ${task.fullName}`);
 
-    // 3. Abrir pestaña silenciosa en segundo plano (active: false)
-    let backgroundTab;
+    // 3. Crear pestaña silenciosa para ejecutar la acción humana
+    let tab;
     try {
-      backgroundTab = await chrome.tabs.create({
-        url: task.targetUrl,
+      tab = await chrome.tabs.create({
+        url: task.profileUrl,
         active: false,
       });
-    } catch (tabErr) {
-      console.error("[InHubFlow ServiceWorker] Error abriendo pestaña:", tabErr);
-      await updateWorkerStatus("error_abriendo_pestana", tabErr.message);
+    } catch (tabCreateErr) {
+      console.error("[InHubFlow ServiceWorker] Error creando pestaña:", tabCreateErr);
       isProcessingTask = false;
-      return { success: false, error: tabErr.message };
+      return { success: false, error: tabCreateErr.message };
     }
 
-    const tabId = backgroundTab.id;
+    const tabId = tab.id;
 
-    // 4. Esperar carga completa
-    await waitForTabComplete(tabId, 25000);
-    // Margen para hidratación de React/SPA en LinkedIn
-    await sleep(3500);
+    // Esperar carga completa
+    const loaded = await waitForTabComplete(tabId, 35000);
+    if (!loaded) {
+      console.warn("[InHubFlow ServiceWorker] Pestaña tardó en cargar, continuando con intento de inyección...");
+    }
 
-    // 5. Inyectar runner
+    // Pequeño retardo natural de estabilización humana (2-4 seg)
+    await sleep(2500);
+
+    // Asegurar que el script ejecutor esté inyectado
     try {
       await chrome.scripting.executeScript({
         target: { tabId },
         files: ["content-runner.js"],
       });
-    } catch (injectErr) {
-      console.warn("[InHubFlow ServiceWorker] Inyección de script (posiblemente ya inyectado):", injectErr);
+    } catch (scriptErr) {
+      // Ignorar si ya estaba inyectado por manifest
     }
 
     await sleep(1000);
 
-    // 6. Enviar mensaje de ejecución a la pestaña
+    // 4. Despachar acción a la pestaña
     let taskResult = await dispatchTaskToTab(tabId, task);
 
-    // Si la acción requirió navegar a la pantalla completa de mensajería (/messaging/thread/new/...)
+    // Si la acción requirió redirigir a mensajería (/messaging/thread/new/...)
     if (taskResult && taskResult.status === "navigate_to_messaging" && taskResult.nextUrl) {
-      console.log(`[InHubFlow ServiceWorker] Redirigiendo pestaña a pantalla de mensajes: ${taskResult.nextUrl}`);
-      await updateWorkerStatus("abriendo_mensajeria", `Abriendo chat con ${task.fullName}...`);
-
+      console.log("[InHubFlow ServiceWorker] Navegando a pantalla completa de mensajería:", taskResult.nextUrl);
       await chrome.tabs.update(tabId, { url: taskResult.nextUrl });
-      await waitForTabComplete(tabId, 25000);
-      await sleep(3500);
-
+      await waitForTabComplete(tabId, 30000);
+      await sleep(3000);
       try {
         await chrome.scripting.executeScript({
           target: { tabId },
           files: ["content-runner.js"],
         });
-      } catch (e) {}
-
+      } catch (e) { /* ignore */ }
       await sleep(1000);
       taskResult = await dispatchTaskToTab(tabId, task);
-    } else if (taskResult && taskResult.status === "failed") {
-      // Si falló pero la pestaña navegó automáticamente a /messaging/ durante la interacción
-      try {
-        const tabInfo = await chrome.tabs.get(tabId);
-        if (tabInfo && tabInfo.url && tabInfo.url.includes("/messaging/")) {
-          console.log(`[InHubFlow ServiceWorker] Detectada navegación a mensajería (${tabInfo.url}). Ejecutando envío en la nueva pantalla...`);
-          await waitForTabComplete(tabId, 15000);
-          await sleep(2500);
-          try {
-            await chrome.scripting.executeScript({
-              target: { tabId },
-              files: ["content-runner.js"],
-            });
-          } catch (e) {}
-          await sleep(1000);
-          taskResult = await dispatchTaskToTab(tabId, task);
-        }
-      } catch (checkErr) {
-        // Ignorar si la pestaña ya fue cerrada
-      }
     }
 
-    console.log(`[InHubFlow ServiceWorker] Resultado final de la tarea:`, taskResult);
+    console.log("[InHubFlow ServiceWorker] Resultado de la tarea:", taskResult);
 
-    // 7. Cerrar pestaña de segundo plano inmediatamente
+    // Cerrar pestaña silenciosa
     try {
       await chrome.tabs.remove(tabId);
     } catch (closeErr) {
-      // Ignorar si ya fue cerrada
+      // Ya cerrada o error no fatal
     }
 
-    // 8. Reportar resultado a la plataforma
+    // 5. Reportar resultado a la plataforma
     try {
-      const reportUrl = `${serverUrl}/api/extension/report`;
+      const reportUrl = `${serverUrl}/api/extension/task`;
       const reportPayload = {
         taskId: task.id,
         targetId: task.targetId,
@@ -546,7 +629,7 @@ async function runWorkerCycle(triggerSource = "manual") {
   }
 }
 
-// Escuchar peticiones desde popup.js
+// Escuchar peticiones desde popup.js y content-runner.js
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "get_worker_state") {
     getStorageData().then((data) => {
@@ -560,7 +643,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const nextEnabled = !data.enabled;
       await setStorageData({ enabled: nextEnabled });
       if (nextEnabled) {
-        // Disparar ciclo inmediato al activar
         runWorkerCycle("activacion_usuario");
       } else {
         await updateWorkerStatus("pausado");
@@ -580,6 +662,42 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "run_worker_now") {
     runWorkerCycle("boton_popup").then((result) => {
       sendResponse(result);
+    });
+    return true;
+  }
+
+  if (request.action === "sync_inbox_now") {
+    getStorageData().then(async ({ serverUrl, accountId }) => {
+      const targetAccountId = request.accountId || accountId;
+      console.log("[InHubFlow ServiceWorker] Disparando sincronización forzada de inbox para cuenta:", targetAccountId);
+      const res = await syncLinkedInInbox(serverUrl, targetAccountId);
+      sendResponse(res);
+    });
+    return true;
+  }
+
+  if (request.action === "ingest_dom_messages" && Array.isArray(request.messages)) {
+    getStorageData().then(async ({ serverUrl, accountId }) => {
+      const targetAccountId = request.accountId || accountId;
+      if (!targetAccountId) {
+        sendResponse({ ok: false, error: "Missing accountId" });
+        return;
+      }
+      console.log(`[InHubFlow ServiceWorker] Ingestando ${request.messages.length} mensajes recibidos desde DOM activo...`);
+      try {
+        const syncRes = await fetch(`${serverUrl}/api/extension/inbox-sync`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            accountId: targetAccountId,
+            observations: request.messages,
+          }),
+        });
+        const syncData = await syncRes.json();
+        sendResponse({ ok: true, syncData });
+      } catch (err) {
+        sendResponse({ ok: false, error: err.message });
+      }
     });
     return true;
   }

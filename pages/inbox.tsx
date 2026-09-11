@@ -1347,16 +1347,25 @@ export default function InboxPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al sincronizar LinkedIn");
+      
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("inhubflow_sync_linkedin", { detail: { accountId: accId } }));
+      }
+
       toast.success(
         data.extension_delegated
-          ? (data.message || "LinkedIn sincronizado mediante tu extensión local InHubFlow Connect.")
+          ? (data.message || "Sincronizando LinkedIn mediante tu extensión local InHubFlow Connect...")
           : `LinkedIn sincronizado: ${data.capturedCount || 0} respuestas capturadas.`
       );
-      await load();
+      
+      // Esperar brevemente a que el puente de la extensión recolecte hilos y recargar
+      setTimeout(async () => {
+        await load();
+      }, 2000);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al sincronizar");
     } finally {
-      setSyncingLinkedIn(false);
+      setTimeout(() => setSyncingLinkedIn(false), 2500);
     }
   }
 
