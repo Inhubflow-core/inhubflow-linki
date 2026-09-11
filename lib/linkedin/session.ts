@@ -293,6 +293,13 @@ export async function closeSession(accountId: string): Promise<void> {
  */
 export async function markNeedsReauth(accountId: string): Promise<void> {
   const db = getDb();
+  try {
+    const acc = db.prepare("SELECT extension_active FROM accounts WHERE id = ?").get(accountId) as { extension_active?: number } | undefined;
+    if (acc?.extension_active === 1) {
+      console.warn(`[session] account ${accountId} tiene extensión activa; preservando autenticación.`);
+      return;
+    }
+  } catch { /* ignore */ }
   db.prepare("UPDATE accounts SET is_authenticated = 0 WHERE id = ?").run(accountId);
   try { await closeSession(accountId); } catch { /* ignore */ }
   console.warn(`[session] account ${accountId} flagged needs-reauth (session logged out)`);

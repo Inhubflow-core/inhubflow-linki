@@ -21,10 +21,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!canAccessLinkedInAccount(db, actor, accountId)) {
     return res.status(404).json({ error: "LinkedIn account not found" });
   }
-  const account = db.prepare("SELECT id, is_authenticated FROM accounts WHERE id = ?").get(accountId) as
-    | { id: string; is_authenticated: number }
+  const account = db.prepare("SELECT id, is_authenticated, extension_active FROM accounts WHERE id = ?").get(accountId) as
+    | { id: string; is_authenticated: number; extension_active?: number }
     | undefined;
   if (!account) return res.status(404).json({ error: "LinkedIn account not found" });
+
+  // Si la cuenta opera con la extensión InHubFlow Connect (IP residencial):
+  if (account.extension_active === 1) {
+    if (account.is_authenticated !== 1) {
+      db.prepare("UPDATE accounts SET is_authenticated = 1 WHERE id = ?").run(accountId);
+    }
+    db.prepare("UPDATE accounts SET linkedin_inbox_synced_at = datetime('now') WHERE id = ?").run(accountId);
+
+    return res.status(200).json({
+      ok: true,
+      capturedCount: 0,
+      extension_delegated: true,
+      message: "Sincronización gestionada a través de la extensión InHubFlow Connect con IP residencial.",
+    });
+  }
+
   if (account.is_authenticated !== 1) return res.status(400).json({ error: "Account not authenticated" });
 
   const contractVersion = campaignInboxContractVersion();

@@ -72,6 +72,64 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
+// Sincroniza mensajes entrantes de LinkedIn directamente con la sesión de Chrome (IP residencial)
+async function syncLinkedInInbox(serverUrl, accountId) {
+  if (!accountId) return;
+  try {
+    const cookie = await chrome.cookies.get({ url: "https://www.linkedin.com", name: "JSESSIONID" });
+    const csrf = (cookie?.value || "").replace(/"/g, "");
+    if (!csrf) return;
+
+    const res = await fetch("https://www.linkedin.com/voyager/api/messaging/conversations?keyVersion=LEGACY_INBOX&q=participants&start=0&count=20", {
+      headers: {
+        accept: "application/vnd.linkedin.normalized+json+2.1",
+        "x-restli-protocol-version": "2.0.0",
+        "csrf-token": csrf,
+      },
+      credentials: "include",
+    });
+
+    if (!res.ok) return;
+
+    const payload = await res.json();
+    const elements = payload.elements || [];
+    const observations = [];
+
+    for (const conv of elements) {
+      const threadId = conv.entityUrn || conv.id;
+      const events = conv.events || [];
+      for (const ev of events) {
+        if (ev.from && !ev.from.isCurrentUser) {
+          const body = ev.eventContent?.attributedBody?.text || ev.body || "";
+          if (body) {
+            observations.push({
+              externalThreadId: threadId,
+              externalMessageId: ev.entityUrn || ev.id,
+              direction: "inbound",
+              body: body.trim(),
+              receivedAt: ev.createdAt ? new Date(ev.createdAt).toISOString() : new Date().toISOString(),
+              senderExternalId: ev.from?.entityUrn || null,
+              senderName: ev.from?.name || null,
+              providerEventId: ev.entityUrn || ev.id,
+            });
+          }
+        }
+      }
+    }
+
+    if (observations.length > 0) {
+      console.log(`[InHubFlow ServiceWorker] Sincronizando ${observations.length} mensajes de LinkedIn con la plataforma...`);
+      await fetch(`${serverUrl}/api/extension/inbox-sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId, observations }),
+      });
+    }
+  } catch (err) {
+    console.warn("[InHubFlow ServiceWorker] Sincronización de inbox omitida:", err);
+  }
+}
+
 // Comprueba si el usuario tiene una pestaña activa y enfocada de LinkedIn
 async function isUserActivelyBrowsingLinkedIn() {
   try {
@@ -211,6 +269,15 @@ async function runWorkerCycle(triggerSource = "manual") {
       }
     } catch (hbErr) {
       console.warn("[InHubFlow ServiceWorker] Heartbeat ping falló (no crítico):", hbErr);
+    }
+
+    // 1.5. Sincronización silenciosa del Inbox de LinkedIn (IP residencial)
+    try {
+      if (accountId) {
+        await syncLinkedInInbox(serverUrl, accountId);
+      }
+    } catch (inboxSyncErr) {
+      // No bloqueante
     }
 
     // 2. Solicitar Tarea a la Plataforma

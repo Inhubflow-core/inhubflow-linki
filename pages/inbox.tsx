@@ -1347,7 +1347,11 @@ export default function InboxPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al sincronizar LinkedIn");
-      toast.success(`LinkedIn sincronizado: ${data.capturedCount || 0} respuestas capturadas.`);
+      toast.success(
+        data.extension_delegated
+          ? (data.message || "LinkedIn sincronizado mediante tu extensión local InHubFlow Connect.")
+          : `LinkedIn sincronizado: ${data.capturedCount || 0} respuestas capturadas.`
+      );
       await load();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al sincronizar");
