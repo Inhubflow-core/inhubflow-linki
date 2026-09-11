@@ -184,161 +184,164 @@
     await sleep(randomBetween(2000, 3000));
     await simulateHumanScroll();
 
-    // Helper to get all action buttons on the profile
+    // Helper to get only profile action buttons (strictly excluding global nav and bottom-right messaging overlay)
     function getProfileButtons() {
-      return Array.from(document.querySelectorAll(`
-        .pv-top-card button, .pv-top-card a,
-        .pvs-profile-actions button, .pvs-profile-actions a,
-        .pv-top-card-v2-ctas button, .pv-top-card-v2-ctas a,
-        main section button, main section a,
-        div[role='main'] button, div[role='main'] a,
-        button, a
-      `));
+      const topCard = document.querySelector(".pv-top-card, .pvs-profile-actions, .pv-top-card-v2-ctas, main section") || document.querySelector("main, div[role='main']");
+      if (!topCard) return [];
+      const raw = Array.from(topCard.querySelectorAll("button, a"));
+      return raw.filter((el) => {
+        return !el.closest("#global-nav, .global-nav, aside#msg-overlay, .msg-overlay-container, footer");
+      });
     }
 
-    // Wait up to 7 seconds for profile buttons to render
+    // Wait up to 8 seconds for profile buttons to render
     let buttons = getProfileButtons();
-    for (let attempt = 0; attempt < 14 && buttons.length < 3; attempt++) {
+    for (let attempt = 0; attempt < 16 && buttons.length < 2; attempt++) {
       await sleep(500);
       buttons = getProfileButtons();
     }
 
-    // Helper matcher for Message button
+    // Helper matcher for Message button on the profile
     function isMsgButton(btn) {
+      if (btn.closest("#global-nav, .global-nav, aside#msg-overlay, .msg-overlay-container, footer")) {
+        return false;
+      }
       const txt = (btn.innerText || "").trim().toLowerCase();
       const aria = (btn.getAttribute("aria-label") || "").trim().toLowerCase();
-      const isLocked = btn.querySelector("svg[data-test-icon*='lock'], .artdeco-button__icon--lock") !== null;
-      if (isLocked) return false;
+
+      // Exclude locked InMail buttons
+      if (btn.querySelector("svg[data-test-icon*='lock'], .artdeco-button__icon--lock")) {
+        return false;
+      }
+
+      // Exclude plural inbox tabs ("mensajes", "messages")
+      if (txt === "mensajes" || txt === "messages" || txt === "mensagens") return false;
+      if (aria === "mensajes" || aria === "messages" || aria === "mensagens") return false;
+
       return (
         txt === "mensaje" ||
         txt === "message" ||
         txt === "mensagem" ||
-        txt.includes("enviar mensaje") ||
-        txt.includes("send message") ||
-        txt.includes("enviar mensagem") ||
+        txt === "enviar mensaje" ||
+        txt === "send message" ||
+        txt === "enviar mensagem" ||
         aria.includes("enviar mensaje") ||
         aria.includes("send message") ||
         aria.includes("enviar mensagem") ||
-        aria.startsWith("mensaje ") ||
-        aria.startsWith("message ")
+        aria.startsWith("mensaje a") ||
+        aria.startsWith("message ") ||
+        aria.startsWith("mensagem para") ||
+        (aria.includes("mensaje") && !aria.includes("lista de"))
       );
     }
 
-    let msgBtn = buttons.find(isMsgButton);
-
-    // If not directly visible, check the "Más..." ("More...") dropdown
-    if (!msgBtn) {
-      const moreBtn = buttons.find((btn) => {
-        const txt = (btn.innerText || "").trim().toLowerCase();
-        const aria = (btn.getAttribute("aria-label") || "").trim().toLowerCase();
-        return (
-          txt === "más" ||
-          txt === "more" ||
-          txt === "mais" ||
-          aria.includes("más acciones") ||
-          aria.includes("more actions") ||
-          aria.includes("mais ações")
-        );
-      });
-
-      if (moreBtn) {
-        moreBtn.click();
-        await sleep(randomBetween(800, 1400));
-        const dropdownItems = Array.from(document.querySelectorAll("div.artdeco-dropdown__content button, div.artdeco-dropdown__content a, [role='menuitem']"));
-        msgBtn = dropdownItems.find(isMsgButton);
-      }
-    }
-
-    if (!msgBtn) {
-      // Diagnostic check: is the contact 2nd/3rd degree or pending?
-      const hasConnect = buttons.some((b) => {
-        const t = (b.innerText || "").toLowerCase();
-        return t === "conectar" || t === "connect" || t === "seguir" || t === "follow";
-      });
-      const hasPending = buttons.some((b) => {
-        const t = (b.innerText || "").toLowerCase();
-        const a = (b.getAttribute("aria-label") || "").toLowerCase();
-        return t.includes("pendiente") || t.includes("pending") || a.includes("pendiente") || a.includes("pending");
-      });
-
-      if (hasConnect || hasPending) {
-        return {
-          status: "failed",
-          error: `${task.fullName || "El contacto"} aún no es contacto de 1er grado (invitación pendiente o sin conectar). LinkedIn solo permite mensajes directos a contactos aceptados.`,
-        };
-      }
-
-      return {
-        status: "failed",
-        error: "Botón de enviar mensaje no disponible en el perfil",
-      };
-    }
-
-    // Click the message button (triggering the chat overlay without navigating away)
-    msgBtn.scrollIntoView({ behavior: "smooth", block: "center" });
-    await sleep(randomBetween(600, 1000));
-    msgBtn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
-    msgBtn.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
-    msgBtn.click();
-    const parentAnchor = msgBtn.closest("a");
-    if (parentAnchor && parentAnchor !== msgBtn) {
-      parentAnchor.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-    }
-
-    // Helper: Poll for active compose box across DOM (up to 12 seconds)
-    async function findComposeBox(timeoutMs = 12000) {
+    // Helper: Poll for active compose box across DOM (up to timeoutMs)
+    async function findComposeBox(timeoutMs = 15000) {
       const startTime = Date.now();
-      const composeSelectors = [
-        "div.msg-form__contenteditable[contenteditable='true']",
-        "div.msg-form__contenteditable",
-        "div[role='textbox'].msg-form__message-texteditor",
-        "div[role='textbox'][contenteditable='true']",
-        "div[role='textbox']",
-        "form.msg-form [contenteditable='true']",
-        "form.msg-form textarea",
-        ".msg-overlay-conversation-bubble [contenteditable='true']",
-        ".msg-overlay-conversation-bubble textarea",
-        ".msg-thread [contenteditable='true']",
-        ".msg-thread textarea",
-        "div[data-placeholder][contenteditable='true']",
-        "div[aria-label*='mensagem' i][contenteditable='true']",
-        "div[aria-label*='mensaje' i][contenteditable='true']",
-        "div[aria-label*='message' i][contenteditable='true']",
-        "div.ql-editor",
-        "textarea.msg-form__textarea",
-        "textarea[name='message']",
-        "p.msg-form__contenteditable",
-        "[contenteditable='true']"
-      ];
-
       while (Date.now() - startTime < timeoutMs) {
-        // Expand minimized bubbles if any
+        // Expand any minimized bubbles in the bottom-right overlay
         const minimized = document.querySelectorAll(
-          ".msg-overlay-conversation-bubble--is-minimized, aside#msg-overlay.msg-overlay-container--is-minimized"
+          ".msg-overlay-conversation-bubble--is-minimized, aside#msg-overlay.msg-overlay-container--is-minimized, [data-control-name='overlay.expand']"
         );
         for (const b of Array.from(minimized)) {
-          const header = b.querySelector(
-            "header, .msg-overlay-bubble-header, button[data-control-name='overlay.toggle_conversation'], button[data-control-name='overlay.expand']"
-          );
-          if (header) header.click();
+          const btn = b.querySelector("button, header") || b;
+          btn.click();
         }
 
-        // Search for compose box
-        for (const sel of composeSelectors) {
-          const els = Array.from(document.querySelectorAll(sel));
-          for (const el of els) {
-            const style = window.getComputedStyle(el);
-            if (style.visibility !== "hidden" && style.display !== "none") {
-              return el;
-            }
-          }
+        // Search for any active contenteditable or textarea compose element
+        const candidate = document.querySelector(`
+          .msg-overlay-conversation-bubble div.msg-form__contenteditable[contenteditable='true'],
+          .msg-overlay-conversation-bubble div.msg-form__contenteditable,
+          .msg-overlay-conversation-bubble [contenteditable='true'],
+          div.msg-form__contenteditable[contenteditable='true'],
+          div.msg-form__contenteditable,
+          div[role='textbox'].msg-form__message-texteditor,
+          div[role='textbox'][contenteditable='true'],
+          div[role='textbox'],
+          form.msg-form [contenteditable='true'],
+          form.msg-form textarea,
+          .msg-thread [contenteditable='true'],
+          textarea.msg-form__textarea,
+          textarea[name='message'],
+          [contenteditable='true']
+        `);
+
+        if (candidate) {
+          return candidate;
         }
+
         await sleep(500);
       }
       return null;
     }
 
-    const composeBox = await findComposeBox(12000);
+    // Check if a conversation bubble is ALREADY open and ready
+    let composeBox = await findComposeBox(1500);
+
+    if (!composeBox) {
+      let msgBtn = buttons.find(isMsgButton);
+
+      // If not directly visible in top-card, check the "Más..." ("More...") dropdown
+      if (!msgBtn) {
+        const moreBtn = buttons.find((btn) => {
+          const txt = (btn.innerText || "").trim().toLowerCase();
+          const aria = (btn.getAttribute("aria-label") || "").trim().toLowerCase();
+          return (
+            txt === "más" ||
+            txt === "more" ||
+            txt === "mais" ||
+            aria.includes("más acciones") ||
+            aria.includes("more actions") ||
+            aria.includes("mais ações")
+          );
+        });
+
+        if (moreBtn) {
+          moreBtn.click();
+          await sleep(randomBetween(800, 1400));
+          const dropdownItems = Array.from(document.querySelectorAll("div.artdeco-dropdown__content button, div.artdeco-dropdown__content a, [role='menuitem']"));
+          msgBtn = dropdownItems.find(isMsgButton);
+        }
+      }
+
+      if (!msgBtn) {
+        // Diagnostic check: is the contact 2nd/3rd degree or pending?
+        const hasConnect = buttons.some((b) => {
+          const t = (b.innerText || "").toLowerCase();
+          return t === "conectar" || t === "connect" || t === "seguir" || t === "follow";
+        });
+        const hasPending = buttons.some((b) => {
+          const t = (b.innerText || "").toLowerCase();
+          const a = (b.getAttribute("aria-label") || "").toLowerCase();
+          return t.includes("pendiente") || t.includes("pending") || a.includes("pendiente") || a.includes("pending");
+        });
+
+        if (hasConnect || hasPending) {
+          return {
+            status: "failed",
+            error: `${task.fullName || "El contacto"} aún no es contacto de 1er grado (invitación pendiente o sin conectar). LinkedIn solo permite mensajes directos a contactos aceptados.`,
+          };
+        }
+
+        return {
+          status: "failed",
+          error: "Botón de enviar mensaje no disponible en el perfil",
+        };
+      }
+
+      // Click the profile message button
+      msgBtn.scrollIntoView({ behavior: "smooth", block: "center" });
+      await sleep(randomBetween(500, 800));
+      msgBtn.focus();
+      msgBtn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+      msgBtn.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
+      msgBtn.click();
+      const inner = msgBtn.querySelector("span, span.artdeco-button__text");
+      if (inner) inner.click();
+
+      // Poll for the compose box to open
+      composeBox = await findComposeBox(15000);
+    }
 
     if (!composeBox) {
       return {
@@ -351,59 +354,30 @@
     composeBox.click();
     await sleep(500);
 
-    // Type the message with human delay
+    // Type the message with human typing delay
     await humanType(composeBox, task.body);
-    await sleep(randomBetween(800, 1500));
+    await sleep(randomBetween(600, 1000));
 
-    // Ensure React/Ember recognizes the input
+    // Force React to recognize the typed content
     composeBox.dispatchEvent(new Event("input", { bubbles: true }));
     composeBox.dispatchEvent(new Event("change", { bubbles: true }));
+    try {
+      composeBox.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText" }));
+    } catch (e) {}
 
-    // Locate Send button with retry
-    async function findSendButton(box) {
-      const container = box.closest("form") || box.closest(".msg-convo-wrapper") || box.closest(".msg-overlay-conversation-bubble") || box.closest(".msg-thread") || document;
-      const sendSelectors = [
-        "button[type='submit']",
-        "button.msg-form__send-button",
-        "button[data-control-name='send']",
-        "button"
-      ];
-      for (const sel of sendSelectors) {
-        const buttons = Array.from(container.querySelectorAll(sel));
-        const btn = buttons.find((b) => {
-          const txt = (b.innerText || "").trim().toLowerCase();
-          const aria = (b.getAttribute("aria-label") || "").trim().toLowerCase();
-          const type = (b.getAttribute("type") || "").toLowerCase();
-          return (
-            type === "submit" ||
-            b.classList.contains("msg-form__send-button") ||
-            txt === "enviar" ||
-            txt === "send" ||
-            aria.includes("enviar") ||
-            aria.includes("send")
-          );
-        });
-        if (btn && !btn.disabled) return btn;
-      }
-      return null;
+    // Send Strategy 1: Keyboard shortcut (Control+Enter)
+    composeBox.focus();
+    await sleep(200);
+    composeBox.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, which: 13, ctrlKey: true, bubbles: true }));
+    composeBox.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", keyCode: 13, which: 13, ctrlKey: true, bubbles: true }));
+    await sleep(800);
+
+    // Send Strategy 2: Click the Send button if still present
+    const container = composeBox.closest("form") || composeBox.closest(".msg-convo-wrapper") || composeBox.closest(".msg-overlay-conversation-bubble") || composeBox.closest(".msg-thread") || document;
+    const sendBtn = container.querySelector("button[type='submit'], button.msg-form__send-button, button[data-control-name='send']");
+    if (sendBtn && !sendBtn.disabled) {
+      sendBtn.click();
     }
-
-    let sendBtn = null;
-    for (let i = 0; i < 10; i++) {
-      sendBtn = await findSendButton(composeBox);
-      if (sendBtn && !sendBtn.disabled) break;
-      composeBox.dispatchEvent(new Event("input", { bubbles: true }));
-      await sleep(500);
-    }
-
-    if (!sendBtn || sendBtn.disabled) {
-      return {
-        status: "failed",
-        error: "Botón de enviar mensaje no clickable o deshabilitado",
-      };
-    }
-
-    sendBtn.click();
     await sleep(randomBetween(1500, 2500));
 
     return {
