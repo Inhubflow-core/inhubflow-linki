@@ -274,21 +274,15 @@
       };
     }
 
-    // Click the message button
-    const directHref = msgBtn.getAttribute("href") || msgBtn.closest("a")?.getAttribute("href");
-    if (directHref && (directHref.includes("/messaging/thread/") || directHref.includes("/messaging/compose/"))) {
-      const targetUrl = directHref.startsWith("http") ? directHref : `https://www.linkedin.com${directHref}`;
-      console.log("[InHubFlow] Following direct message thread URL:", targetUrl);
-      window.location.href = targetUrl;
-      await sleep(3500);
-    } else {
-      msgBtn.scrollIntoView({ behavior: "smooth", block: "center" });
-      await sleep(randomBetween(600, 1000));
-      msgBtn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
-      msgBtn.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
-      msgBtn.click();
-      const parentAnchor = msgBtn.closest("a");
-      if (parentAnchor && parentAnchor !== msgBtn) parentAnchor.click();
+    // Click the message button (triggering the chat overlay without navigating away)
+    msgBtn.scrollIntoView({ behavior: "smooth", block: "center" });
+    await sleep(randomBetween(600, 1000));
+    msgBtn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+    msgBtn.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
+    msgBtn.click();
+    const parentAnchor = msgBtn.closest("a");
+    if (parentAnchor && parentAnchor !== msgBtn) {
+      parentAnchor.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
     }
 
     // Helper: Poll for active compose box across DOM (up to 12 seconds)
@@ -420,6 +414,14 @@
   // Listen for execution commands from background.js
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "execute_task" && request.task) {
+      let sent = false;
+      const deliver = (result) => {
+        if (sent) return;
+        sent = true;
+        try { sendResponse(result); } catch (e) { /* channel closed */ }
+        try { chrome.runtime.sendMessage({ action: "task_result_ack", result, taskId: request.task.id }); } catch (e) { /* ignore */ }
+      };
+
       (async () => {
         try {
           console.log("[InHubFlow] Executing task:", request.task.type, request.task.fullName);
@@ -433,10 +435,10 @@
           } else {
             result = { status: "failed", error: "Tipo de tarea desconocido: " + request.task.type };
           }
-          sendResponse(result);
+          deliver(result);
         } catch (err) {
           console.error("[InHubFlow] Execution error:", err);
-          sendResponse({
+          deliver({
             status: "failed",
             error: err instanceof Error ? err.message : String(err),
           });

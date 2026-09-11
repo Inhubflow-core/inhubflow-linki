@@ -258,23 +258,45 @@ async function runWorkerCycle(triggerSource = "manual") {
 
     await sleep(1000);
 
-    // 6. Enviar mensaje de ejecución a la pestaña
+    // 6. Enviar mensaje de ejecución a la pestaña (con soporte dual sendResponse + runtime.sendMessage)
     let taskResult;
     try {
-      taskResult = await new Promise((resolve, reject) => {
+      taskResult = await new Promise((resolve) => {
+        let isResolved = false;
+        const doResolve = (res) => {
+          if (isResolved) return;
+          isResolved = true;
+          chrome.runtime.onMessage.removeListener(ackListener);
+          clearTimeout(timeout);
+          resolve(res);
+        };
+
         const timeout = setTimeout(() => {
-          resolve({ status: "failed", error: "Tiempo de espera agotado al ejecutar acción en la página" });
+          doResolve({ status: "failed", error: "Tiempo de espera agotado al ejecutar acción en la página" });
         }, 60000);
 
+        const ackListener = (msg) => {
+          if (msg && msg.action === "task_result_ack" && msg.result) {
+            console.log("[InHubFlow ServiceWorker] Resultado recibido vía runtime ack:", msg.result);
+            doResolve(msg.result);
+          }
+        };
+        chrome.runtime.onMessage.addListener(ackListener);
+
         chrome.tabs.sendMessage(tabId, { action: "execute_task", task }, (response) => {
-          clearTimeout(timeout);
           if (chrome.runtime.lastError) {
-            resolve({
-              status: "failed",
-              error: chrome.runtime.lastError.message || "Error comunicando con la pestaña",
-            });
-          } else {
-            resolve(response || { status: "completed" });
+            console.warn("[InHubFlow ServiceWorker] tabs.sendMessage advertencia:", chrome.runtime.lastError.message);
+            // Pequeña espera por si ackListener ya lo entregó o está por llegar
+            setTimeout(() => {
+              if (!isResolved) {
+                doResolve({
+                  status: "failed",
+                  error: chrome.runtime.lastError.message || "Error comunicando con la pestaña",
+                });
+              }
+            }, 1200);
+          } else if (response) {
+            doResolve(response);
           }
         });
       });
