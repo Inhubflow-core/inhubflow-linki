@@ -181,27 +181,93 @@
 
   // ─── ACTION: MESSAGE ────────────────────────────────────────────────────────
   async function handleMessage(task) {
-    await sleep(randomBetween(1500, 2500));
+    await sleep(randomBetween(2000, 3000));
     await simulateHumanScroll();
 
-    // Look for message button in top card
-    const topCard = document.querySelector("main section, div[role='main'] section, .pv-top-card, header") || document.body;
-    const buttons = Array.from(topCard.querySelectorAll("button, a"));
+    // Helper to get all action buttons on the profile
+    function getProfileButtons() {
+      return Array.from(document.querySelectorAll(`
+        .pv-top-card button, .pv-top-card a,
+        .pvs-profile-actions button, .pvs-profile-actions a,
+        .pv-top-card-v2-ctas button, .pv-top-card-v2-ctas a,
+        main section button, main section a,
+        div[role='main'] button, div[role='main'] a,
+        button, a
+      `));
+    }
 
-    const msgBtn = buttons.find((btn) => {
+    // Wait up to 7 seconds for profile buttons to render
+    let buttons = getProfileButtons();
+    for (let attempt = 0; attempt < 14 && buttons.length < 3; attempt++) {
+      await sleep(500);
+      buttons = getProfileButtons();
+    }
+
+    // Helper matcher for Message button
+    function isMsgButton(btn) {
       const txt = (btn.innerText || "").trim().toLowerCase();
       const aria = (btn.getAttribute("aria-label") || "").trim().toLowerCase();
+      const isLocked = btn.querySelector("svg[data-test-icon*='lock'], .artdeco-button__icon--lock") !== null;
+      if (isLocked) return false;
       return (
-        txt.includes("mensagem") ||
-        txt.includes("mensaje") ||
-        txt.includes("message") ||
-        aria.includes("mensagem") ||
-        aria.includes("mensaje") ||
-        aria.includes("message")
+        txt === "mensaje" ||
+        txt === "message" ||
+        txt === "mensagem" ||
+        txt.includes("enviar mensaje") ||
+        txt.includes("send message") ||
+        txt.includes("enviar mensagem") ||
+        aria.includes("enviar mensaje") ||
+        aria.includes("send message") ||
+        aria.includes("enviar mensagem") ||
+        aria.startsWith("mensaje ") ||
+        aria.startsWith("message ")
       );
-    });
+    }
+
+    let msgBtn = buttons.find(isMsgButton);
+
+    // If not directly visible, check the "Más..." ("More...") dropdown
+    if (!msgBtn) {
+      const moreBtn = buttons.find((btn) => {
+        const txt = (btn.innerText || "").trim().toLowerCase();
+        const aria = (btn.getAttribute("aria-label") || "").trim().toLowerCase();
+        return (
+          txt === "más" ||
+          txt === "more" ||
+          txt === "mais" ||
+          aria.includes("más acciones") ||
+          aria.includes("more actions") ||
+          aria.includes("mais ações")
+        );
+      });
+
+      if (moreBtn) {
+        moreBtn.click();
+        await sleep(randomBetween(800, 1400));
+        const dropdownItems = Array.from(document.querySelectorAll("div.artdeco-dropdown__content button, div.artdeco-dropdown__content a, [role='menuitem']"));
+        msgBtn = dropdownItems.find(isMsgButton);
+      }
+    }
 
     if (!msgBtn) {
+      // Diagnostic check: is the contact 2nd/3rd degree or pending?
+      const hasConnect = buttons.some((b) => {
+        const t = (b.innerText || "").toLowerCase();
+        return t === "conectar" || t === "connect" || t === "seguir" || t === "follow";
+      });
+      const hasPending = buttons.some((b) => {
+        const t = (b.innerText || "").toLowerCase();
+        const a = (b.getAttribute("aria-label") || "").toLowerCase();
+        return t.includes("pendiente") || t.includes("pending") || a.includes("pendiente") || a.includes("pending");
+      });
+
+      if (hasConnect || hasPending) {
+        return {
+          status: "failed",
+          error: `${task.fullName || "El contacto"} aún no es contacto de 1er grado (invitación pendiente o sin conectar). LinkedIn solo permite mensajes directos a contactos aceptados.`,
+        };
+      }
+
       return {
         status: "failed",
         error: "Botón de enviar mensaje no disponible en el perfil",
