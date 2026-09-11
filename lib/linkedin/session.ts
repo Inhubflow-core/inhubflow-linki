@@ -48,6 +48,9 @@ function contextOptions(storageState?: PersistedStorageState, accountTimezone?: 
     locale,
     timezoneId,
     permissions: ["clipboard-read", "clipboard-write"] as ("clipboard-read" | "clipboard-write")[],
+    extraHTTPHeaders: {
+      "sec-ch-ua-platform": '"Windows"',
+    },
   };
 }
 
@@ -106,6 +109,7 @@ async function getOrCreateContext(accountId: string): Promise<BrowserContext> {
           const deduped: Array<any> = [];
           for (const c of (cookies as Array<any>)) {
             if (!c || typeof c !== "object" || !c.name) continue;
+            if (c.name === "__cf_bm" || c.name === "cf_clearance" || String(c.name).startsWith("_cf")) continue;
             let domain = c.domain || ".linkedin.com";
             if (!domain.startsWith(".")) domain = "." + domain;
             if (!domain.includes("linkedin.com")) domain = ".linkedin.com";
@@ -132,6 +136,14 @@ async function getOrCreateContext(accountId: string): Promise<BrowserContext> {
     }
 
     const ctx = await b.newContext(contextOptions(storageState, account.timezone));
+    await ctx.addInitScript(() => {
+      try {
+        Object.defineProperty(navigator, "platform", { get: () => "Win32" });
+        if ((navigator as any).userAgentData) {
+          Object.defineProperty((navigator as any).userAgentData, "platform", { get: () => "Windows" });
+        }
+      } catch { /* ignore */ }
+    });
 
     // Auto-evict from map when context closes for any reason (crash, session expiry, etc.)
     ctx.on("close", () => { if (contexts.get(accountId) === ctx) contexts.delete(accountId); });
@@ -224,7 +236,10 @@ export async function saveSessionState(accountId: string): Promise<void> {
   if (!ctx) return;
   const db = getDb();
   const state = await ctx.storageState();
-  const hasLiAt = state.cookies.some((cookie) =>
+  const cleanCookies = (state.cookies || []).filter(
+    (c) => c.name !== "__cf_bm" && c.name !== "cf_clearance" && !c.name.startsWith("_cf")
+  );
+  const hasLiAt = cleanCookies.some((cookie) =>
     cookie.name === "li_at" && typeof cookie.value === "string" && cookie.value.length > 20
   );
   if (!hasLiAt) {
@@ -237,7 +252,7 @@ export async function saveSessionState(accountId: string): Promise<void> {
   // revert this session to DEFAULT_USER_AGENT on the next context build. That
   // is a fingerprint change mid-session, which LinkedIn answers by revoking
   // li_at. Carry the pinned UA forward on every save.
-  const persisted: PersistedStorageState = { ...state };
+  const persisted: PersistedStorageState = { ...state, cookies: cleanCookies };
   const previousUserAgent = readPersistedUserAgent(db, accountId);
   if (previousUserAgent) persisted.userAgent = previousUserAgent;
 

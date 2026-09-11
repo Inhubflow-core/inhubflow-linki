@@ -52,6 +52,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const cookieMap = new Map();
         for (const c of allCookies) {
           if (!c || typeof c.name !== "string" || typeof c.value !== "string" || !c.name || !c.value) continue;
+          if (c.name === "__cf_bm" || c.name === "cf_clearance" || c.name.startsWith("_cf")) continue;
           const domain = typeof c.domain === "string" && c.domain ? c.domain.toLowerCase() : "linkedin.com";
           if (!(domain === "linkedin.com" || domain.endsWith(".linkedin.com"))) continue;
           const path = typeof c.path === "string" && c.path.startsWith("/") ? c.path : "/";

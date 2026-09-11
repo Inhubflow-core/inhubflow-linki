@@ -143,7 +143,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
   }
 
-  db.prepare("UPDATE accounts SET cookies_json = ?, is_authenticated = 1 WHERE id = ?").run(
+  db.prepare("UPDATE accounts SET cookies_json = ?, is_authenticated = 1, accepted_sync_at = datetime('now') WHERE id = ?").run(
     encryptSecret(JSON.stringify(storageState)),
     id
   );

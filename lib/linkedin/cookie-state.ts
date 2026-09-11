@@ -61,6 +61,8 @@ export function normalizeLinkedInCookie(
   if (!domainValue.includes("linkedin.com")) domainValue = ".linkedin.com";
   const path = typeof raw.path === "string" && raw.path ? raw.path : "/";
   if (!COOKIE_NAME_RE.test(name) || hasControlCharacters(value)) return null;
+  // Discard ephemeral bot-management cookies that bind to client IP and TLS fingerprint
+  if (name === "__cf_bm" || name === "cf_clearance" || name.startsWith("_cf")) return null;
   if (!LINKEDIN_HOST_RE.test(domainValue.replace(/^\./, "")) || !path.startsWith("/") || hasControlCharacters(path)) return null;
 
   const expiryValue = raw.expires ?? raw.expirationDate;
@@ -87,7 +89,7 @@ export function normalizeLinkedInCookieList(
   const cookies: LinkedInSessionCookie[] = [];
   for (const item of input) {
     const cookie = normalizeLinkedInCookie(item, defaults);
-    if (!cookie) return null;
+    if (!cookie) continue; // Allow skipping filtered cookies without rejecting the list
     cookies.push(cookie);
   }
   return cookies;
@@ -100,6 +102,7 @@ export function hasValidLinkedInLiAt(cookies: readonly Pick<LinkedInSessionCooki
 export function dedupeLinkedInCookies(cookies: readonly LinkedInSessionCookie[]): LinkedInSessionCookie[] {
   const byName = new Map<string, LinkedInSessionCookie>();
   for (const cookie of cookies) {
+    if (cookie.name === "__cf_bm" || cookie.name === "cf_clearance" || cookie.name.startsWith("_cf")) continue;
     // Keep single cookie per name on root path, preferring valid values
     if (!byName.has(cookie.name)) {
       byName.set(cookie.name, cookie);
