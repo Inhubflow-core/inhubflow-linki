@@ -47,22 +47,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.json({ ok: true, captured: 0, message: "No observations to process" });
   }
 
-  // Load all targets messaged from this account across active or completed runs
+  // Load all targets across active or completed runs or lists
   const targets = db.prepare(`
     SELECT t.id, t.full_name, t.linkedin_url, t.messaging_urn, t.last_replied_at,
            rp.run_id, r.workflow_id
     FROM targets t
-    JOIN run_profiles rp ON rp.target_id = t.id
-    JOIN runs r ON r.id = rp.run_id
-    WHERE r.account_id = ?
+    LEFT JOIN run_profiles rp ON rp.target_id = t.id
+    LEFT JOIN runs r ON r.id = rp.run_id
     ORDER BY rp.created_at DESC
-  `).all(accountId) as Array<{
+  `).all() as Array<{
     id: string;
     full_name: string | null;
     linkedin_url: string | null;
     messaging_urn: string | null;
     last_replied_at: string | null;
-    run_id: string;
+    run_id: string | null;
     workflow_id: string | null;
   }>;
 
@@ -102,20 +101,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const direction = obs.direction === "outbound" ? "outbound" : "inbound";
     const senderVanity = canonicalLinkedInVanity(obs.senderProfileUrl);
-    const senderName = normalizeString(obs.senderName);
+    const senderNorm = normalizeString(obs.senderName);
+    const senderFirst = senderNorm.split(" ")[0] || "";
     const senderUrn = (obs.senderMessagingUrn || obs.senderExternalId || "").trim();
     const explicitTargetId = typeof obs.targetId === "string" ? obs.targetId.trim() : null;
 
     // Match candidate target
-    const target = targets.find((t) => {
+    let target = targets.find((t) => {
       if (explicitTargetId && t.id === explicitTargetId) return true;
-      if (senderVanity) {
+      if (senderVanity && t.linkedin_url) {
         const tVanity = canonicalLinkedInVanity(t.linkedin_url);
-        if (tVanity && normalizeString(tVanity) === normalizeString(senderVanity)) return true;
+        if (tVanity) {
+          const v1 = normalizeString(tVanity);
+          const v2 = normalizeString(senderVanity);
+          if (v1 === v2 || v1.includes(v2) || v2.includes(v1)) return true;
+        }
       }
-      if (senderName && t.full_name) {
-        const tName = normalizeString(t.full_name);
-        if (tName === senderName || tName.includes(senderName) || senderName.includes(tName)) return true;
+      if (senderNorm && t.full_name) {
+        const tNorm = normalizeString(t.full_name);
+        if (tNorm === senderNorm || tNorm.includes(senderNorm) || senderNorm.includes(tNorm)) return true;
+        const tFirst = tNorm.split(" ")[0] || "";
+        if (senderFirst.length >= 3 && tFirst === senderFirst) return true;
       }
       if (senderUrn && t.messaging_urn && (t.messaging_urn.trim() === senderUrn || senderUrn.includes(t.messaging_urn.trim()))) {
         return true;
@@ -123,8 +129,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return false;
     });
 
+    // Auto-create target if none exists so NO incoming message is ever dropped!
     if (!target) {
-      continue;
+      const activeRun = db.prepare(`
+        SELECT r.id as run_id, r.workflow_id 
+        FROM runs r 
+        WHERE r.account_id = ? 
+        ORDER BY r.created_at DESC LIMIT 1
+      `).get(accountId) as { run_id: string; workflow_id: string } | undefined;
+
+      const newTargetId = randomUUID();
+      try {
+        db.prepare(`
+          INSERT INTO targets (id, full_name, linkedin_url, messaging_urn, created_at)
+          VALUES (?, ?, ?, ?, datetime('now'))
+        `).run(
+          newTargetId,
+          obs.senderName || "Contacto LinkedIn",
+          obs.senderProfileUrl || null,
+          senderUrn || null
+        );
+
+        target = {
+          id: newTargetId,
+          full_name: obs.senderName || "Contacto LinkedIn",
+          linkedin_url: obs.senderProfileUrl || null,
+          messaging_urn: senderUrn || null,
+          last_replied_at: null,
+          run_id: activeRun?.run_id || null,
+          workflow_id: activeRun?.workflow_id || null,
+        };
+        targets.push(target);
+      } catch (insertTargetErr) {
+        console.warn("[inbox-sync] Could not auto-create target:", insertTargetErr);
+        continue;
+      }
     }
 
     const messageId = obs.externalMessageId || randomUUID();

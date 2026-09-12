@@ -670,7 +670,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     getStorageData().then(async ({ serverUrl, accountId }) => {
       const targetAccountId = request.accountId || accountId;
       console.log("[InHubFlow ServiceWorker] Disparando sincronización forzada de inbox para cuenta:", targetAccountId);
+
+      // Si no hay pestañas de LinkedIn abiertas, abrir una silenciosa para despertar la sesión de cookies
+      let tempTabId = null;
+      try {
+        const tabs = await chrome.tabs.query({ url: "*://*.linkedin.com/*" });
+        if (!tabs || tabs.length === 0) {
+          console.log("[InHubFlow ServiceWorker] Abriendo pestaña silenciosa de LinkedIn para activar sesión...");
+          const newTab = await chrome.tabs.create({ url: "https://www.linkedin.com/messaging/", active: false });
+          tempTabId = newTab.id;
+          await waitForTabComplete(tempTabId, 15000);
+          await sleep(2500);
+        }
+      } catch (tabErr) {
+        console.warn("[InHubFlow ServiceWorker] No se pudo abrir pestaña silenciosa:", tabErr);
+      }
+
       const res = await syncLinkedInInbox(serverUrl, targetAccountId);
+
+      if (tempTabId) {
+        try { await chrome.tabs.remove(tempTabId); } catch (e) { /* ignore */ }
+      }
+
       sendResponse(res);
     });
     return true;
